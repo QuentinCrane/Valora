@@ -4,8 +4,8 @@
   <p><strong>让每一件物品的价值，都有迹可循。</strong></p>
   <p>A clean personal asset tracker that turns purchases into daily cost, lifecycle, and value insights.</p>
 
-  <p>
-    <img src="https://img.shields.io/badge/version-0.79.0%2B79-7CC6F2" alt="Version 0.79.0+79" />
+<p>
+    <img src="https://img.shields.io/badge/version-0.79.0%2B79-7CC6F2" alt="Version 0.79" />
     <img src="https://img.shields.io/badge/Flutter-stable-02569B?logo=flutter&logoColor=white" alt="Flutter stable" />
     <img src="https://img.shields.io/badge/Dart-%3E%3D3.3.0%20%3C4.0.0-0175C2?logo=dart&logoColor=white" alt="Dart SDK >=3.3.0 <4.0.0" />
     <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=white" alt="Android APK" />
@@ -35,42 +35,21 @@ Valora（值谱）是一款面向个人物品、数码产品和长期消费品�
 
 ## 预览与宣传图
 
-<p align="center">
-  <img src="docs/assets/screenshots/hero-placeholder.svg" alt="Valora app preview placeholder" width="860" />
-</p>
-
-正式公开前建议把上面的占位图替换成脱敏宣传图：
-
-```text
-docs/assets/screenshots/hero.png
-```
-
-截图建议放在 `docs/assets/screenshots/`，优先展示：
-
-- 首页资产总览和日均成本卡片。
-- 资产详情页的生命周期和目标日均。
-- 分析页的趋势、排行和价值复盘。
-- 封面/贴纸编辑能力。
-- 设置里的备份、同步和小组件入口。
-
-不要提交包含个人资产、账号、WebDAV 地址或其他隐私内容的真实截图。
+//TODO
 
 ## 项目概览
 
-| 项目 | 内容 |
-| --- | --- |
-| 当前版本 | `0.79.0+79` |
-| 英文名 | Valora |
-| 中文名 | 值谱 |
-| Flutter package | `valora_assets` |
-| Android applicationId | `com.valora.assets` |
-| Android 最低版本 | `minSdk 24` |
-| 当前重点 | Android APK 构建与本地优先体验 |
-| 数据策略 | 本地优先，云端同步为可选能力 |
+| 项目                  | 内容                           |
+| --------------------- | ------------------------------ |
+| 当前版本              | `0.79`                       |
+| 英文名                | Valora                         |
+| 中文名                | 值谱                           |
+| Flutter package       | `valora_assets`              |
+| Android applicationId | `com.valora.assets`          |
+| Android 最低版本      | `minSdk 24`                  |
+| 当前重点              | Android APK 构建与本地优先体验 |
+| 数据策略              | 本地优先，云端同步为可选能力   |
 
-> 开源前请确认你拥有本项目代码、图标、图片、模型、文案和第三方素材的公开授权。如果项目中存在个人数据、私有备份、签名证书或未授权资源，请先移除后再推送到 GitHub。
-
-> 建议把 `valora_app/` 的内容作为 GitHub 仓库根目录发布；外层 `archives/`、宣传站 `valora-site/`、本地压缩包和构建产物不进入源码仓库。APK 请通过 GitHub Releases 作为附件发布。
 
 ## 核心特色
 
