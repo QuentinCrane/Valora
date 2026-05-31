@@ -1,0 +1,88 @@
+# Flutter / Dart
+.dart_tool/
+.dart-local/
+.packages
+.pub/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+.dart_tool/package_config.json
+.dart_tool/version
+
+# Keep lockfile for reproducible Flutter app builds.
+!pubspec.lock
+
+# Build outputs
+build/
+coverage/
+*.apk
+*.aab
+*.apks
+*.ipa
+*.app
+*.aar
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+archives/
+dist/
+
+# Android / Gradle
+.gradle/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+local.properties
+captures/
+
+# Android signing and secrets
+key.properties
+android/key.properties
+*.jks
+*.keystore
+*.p12
+*.pem
+*.der
+*.mobileprovision
+
+# Environment files
+.env
+.env.*
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Flutter platform generated folders if added later
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# FVM local SDK cache
+.fvm/flutter_sdk

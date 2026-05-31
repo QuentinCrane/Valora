@@ -1,0 +1,44 @@
+plugins {
+    id "com.android.application"
+    id "dev.flutter.flutter-gradle-plugin"
+    id "org.jetbrains.kotlin.android"
+}
+
+android {
+    namespace "com.valora.assets"
+    compileSdk flutter.compileSdkVersion
+
+    defaultConfig {
+        applicationId "com.valora.assets"
+        minSdk 24
+        targetSdk flutter.targetSdkVersion
+        versionCode 77
+        versionName "0.77.0"
+    }
+
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+flutter {
+    source "../.."
+}
+
+
+dependencies {
+    implementation "androidx.appcompat:appcompat:1.7.0"
+    implementation "com.google.android.material:material:1.14.0"
+    implementation "androidx.core:core:1.13.1"
+    implementation "androidx.activity:activity:1.9.3"
+    implementation "com.google.mlkit:barcode-scanning:17.3.0"
+    implementation "com.google.mlkit:text-recognition:16.0.1"
+    implementation "com.google.mlkit:text-recognition-chinese:16.0.1"
+    implementation "com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1"
+}

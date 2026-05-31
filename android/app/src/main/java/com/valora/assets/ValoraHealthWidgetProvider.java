@@ -1,0 +1,30 @@
+package com.valora.assets;
+
+import android.appwidget.AppWidgetManager;
+import android.appwidget.AppWidgetProvider;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.widget.RemoteViews;
+
+public class ValoraHealthWidgetProvider extends AppWidgetProvider {
+    @Override
+    public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
+        for (int id : appWidgetIds) updateWidget(context, appWidgetManager, id);
+    }
+
+    public static void updateAll(Context context, AppWidgetManager manager) {
+        WidgetUtils.updateProvider(context, ValoraHealthWidgetProvider.class, manager);
+    }
+
+    private static void updateWidget(Context context, AppWidgetManager manager, int id) {
+        SharedPreferences prefs = WidgetUtils.prefs(context);
+        int leakCount = prefs.getInt("leakCount", 0);
+        int dueSoon = prefs.getInt("dueSoonCount", 0);
+        int retired = prefs.getInt("retiredCount", 0);
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_health);
+        views.setTextViewText(R.id.widget_health_score, leakCount == 0 && dueSoon == 0 ? "良好" : "待复盘");
+        views.setTextViewText(R.id.widget_health_meta, leakCount + " 个钱包漏洞 · " + dueSoon + " 个临期 · " + retired + " 个退役");
+        views.setOnClickPendingIntent(R.id.widget_health_root, WidgetUtils.openApp(context, 7403));
+        manager.updateAppWidget(id, views);
+    }
+}

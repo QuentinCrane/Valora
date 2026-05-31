@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Valora preview placeholder</title>
+  <desc id="desc">A placeholder banner for the Valora README preview image.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F7FCFF"/>
+      <stop offset="0.54" stop-color="#E7F6FF"/>
+      <stop offset="1" stop-color="#F4FFF8"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="28" stdDeviation="36" flood-color="#2E6C8E" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" rx="56" fill="url(#bg)"/>
+  <rect x="110" y="96" width="1380" height="708" rx="44" fill="#FFFFFF" opacity="0.86" filter="url(#shadow)"/>
+  <circle cx="293" cy="270" r="82" fill="#7CC6F2" opacity="0.95"/>
+  <path d="M252 271c27-39 56-57 88-54 20 2 33 14 38 34 8 33-15 65-54 76-31 9-62-2-86-30 7-8 12-17 14-26Z" fill="#FFFFFF" opacity="0.92"/>
+  <text x="420" y="245" font-family="Inter, Arial, sans-serif" font-size="86" font-weight="800" fill="#102A3A">Valora</text>
+  <text x="424" y="310" font-family="Inter, Arial, sans-serif" font-size="34" fill="#486578">Personal asset lifecycle management</text>
+  <g transform="translate(188 445)">
+    <rect width="360" height="168" rx="28" fill="#EAF7FF"/>
+    <text x="34" y="62" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700" fill="#17384D">Daily cost</text>
+    <text x="34" y="116" font-family="Inter, Arial, sans-serif" font-size="52" font-weight="800" fill="#157CB4">¥ 5.42</text>
+  </g>
+  <g transform="translate(620 445)">
+    <rect width="360" height="168" rx="28" fill="#F1FFF5"/>
+    <text x="34" y="62" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700" fill="#17384D">Lifecycle</text>
+    <rect x="34" y="98" width="292" height="18" rx="9" fill="#CDEED8"/>
+    <rect x="34" y="98" width="204" height="18" rx="9" fill="#2EB875"/>
+  </g>
+  <g transform="translate(1052 445)">
+    <rect width="360" height="168" rx="28" fill="#FFF8E8"/>
+    <text x="34" y="62" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700" fill="#17384D">Recovery</text>
+    <text x="34" y="116" font-family="Inter, Arial, sans-serif" font-size="52" font-weight="800" fill="#D48918">68%</text>
+  </g>
+  <text x="800" y="716" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="26" fill="#6B8190">Replace this placeholder with docs/assets/screenshots/hero.png before public launch.</text>
+</svg>

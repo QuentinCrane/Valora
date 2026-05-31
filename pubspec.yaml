@@ -1,0 +1,16 @@
+name: valora_assets
+version: 0.79.0+79
+publish_to: 'none'
+description: Flutter Android app for Valora personal asset lifecycle management.
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/app_icon.png

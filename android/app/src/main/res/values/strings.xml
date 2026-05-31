@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">值谱</string>
+    <string name="widget_total_name">值谱｜资产总览</string>
+    <string name="widget_wish_name">值谱｜心愿清单</string>
+    <string name="widget_daily_name">值谱｜日均成本</string>
+    <string name="widget_health_name">值谱｜资产体检</string>
+    <string name="widget_quick_name">值谱｜快速记录</string>
+    <string name="widget_due_name">值谱｜到期提醒</string>
+    <string name="widget_snapshot_name">值谱｜资产快照</string>
+    <string name="widget_total_desc">显示总资产、资产数量和日均成本。</string>
+    <string name="widget_wish_desc">显示心愿数量和快照数量。</string>
+    <string name="widget_daily_desc">显示当前平均日均成本。</string>
+    <string name="widget_health_desc">显示钱包漏洞、临期资产和退役资产。</string>
+    <string name="widget_quick_desc">快速新增资产或心愿。</string>
+    <string name="widget_due_desc">显示即将到期的资产数量。</string>
+    <string name="widget_snapshot_desc">显示本机资产快照数量。</string>
+</resources>

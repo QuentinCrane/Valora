@@ -1,0 +1,19 @@
+* text=auto
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh text eol=lf
+*.dart text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+*.md text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.jar binary
+*.apk binary
+*.aab binary
+*.zip binary

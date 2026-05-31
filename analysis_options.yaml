@@ -1,0 +1,4 @@
+# Minimal analysis options. No external lint package required.
+analyzer:
+  exclude:
+    - build/**

@@ -1,0 +1,7 @@
+# Copy this file to android/key.properties and replace the placeholder values.
+# Keep android/key.properties and the keystore file private; they are ignored by git.
+# For PKCS12 keystores, keyPassword should match storePassword.
+storePassword=replace-with-store-password
+keyPassword=replace-with-store-password
+keyAlias=valora-release
+storeFile=app/valora-release-key-quentincrane.p12
