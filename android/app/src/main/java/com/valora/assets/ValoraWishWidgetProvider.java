@@ -22,7 +22,7 @@ public class ValoraWishWidgetProvider extends AppWidgetProvider {
         int snapshotCount = prefs.getInt("snapshotCount", 0);
         RemoteViews views = new RemoteViews(context.getPackageName(), WidgetUtils.layout(context, R.layout.widget_wish, R.layout.widget_wish_hyperos));
         views.setTextViewText(R.id.widget_wish_count, String.valueOf(wishCount));
-        views.setTextViewText(R.id.widget_wish_meta, snapshotCount + " 份快照 · 点击打开心愿");
+        views.setTextViewText(R.id.widget_wish_meta, context.getString(R.string.widget_wish_meta_format, snapshotCount));
         views.setOnClickPendingIntent(R.id.widget_wish_root, WidgetUtils.openApp(context, 7401));
         manager.updateAppWidget(id, views);
     }

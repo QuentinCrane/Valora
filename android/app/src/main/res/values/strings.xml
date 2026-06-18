@@ -29,6 +29,7 @@
     <string name="widget_health_review">待回顧</string>
     <string name="widget_health_empty_meta">0 個高耗資產</string>
     <string name="widget_due_empty">暫無即將到期資產</string>
+    <string name="widget_due_label">到期提醒</string>
     <string name="widget_snapshot_label">資產快照</string>
     <string name="widget_snapshot_empty_meta">本機快照數量</string>
     <string name="widget_total_meta_empty">0 件資產 · 每日 ¥0.00</string>
@@ -51,4 +52,16 @@
     <string name="shortcut_add_asset_long">新增值譜資產</string>
     <string name="shortcut_add_wish_short">新增願望</string>
     <string name="shortcut_add_wish_long">新增值譜願望</string>
+    <string name="archive_share_title">值譜完整備份包</string>
+    <string name="archive_readme">值譜完整備份包 / Valora complete backup\n\n包含：\n- backup/valora_backup.json 與 backup/zhipu_backup.json：可還原的結構化資料\n- backup/valora_assets.csv 與 backup/zhipu_assets.csv：資產表格\n- backup/valora_report.md 與 backup/zhipu_report.md：資產報告\n- backup/media_manifest.tsv：媒體原始路徑與 ZIP 路徑對照，用於跨裝置還原圖片\n- sqlite/：App 目前的 SQLite 資料庫副本\n- media/：本機封面、貼紙、手動描邊圖片等媒體檔案\n\n說明：還原時會優先使用 JSON + media 重建目前 SQLite，不會直接覆蓋執行中的資料庫檔案</string>
+    <string name="archive_share_failed">完整備份包產生失敗：%1$s</string>
+    <string name="archive_restore_read_failed">無法讀取 ZIP 檔案</string>
+    <string name="archive_restore_no_json">ZIP 中找不到可還原的 JSON。已相容 backup/valora_backup.json、backup/zhipu_backup.json 和常見 *_backup.json 命名，請確認選擇的是值譜 / Valora 匯出的完整備份包</string>
+    <string name="archive_restore_read_ok">已讀取完整備份包</string>
+    <string name="sticker_label_fallback">備用</string>
+    <string name="sticker_label_extra_fallback">補充備用</string>
+    <string name="sticker_label_conservative">保守</string>
+    <string name="sticker_label_balanced">均衡</string>
+    <string name="sticker_label_strong">強化</string>
+    <string name="sticker_label_fine">精細</string>
 </resources>

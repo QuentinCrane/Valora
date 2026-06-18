@@ -29,6 +29,7 @@
     <string name="widget_health_review">Review</string>
     <string name="widget_health_empty_meta">0 high-cost assets</string>
     <string name="widget_due_empty">Nothing due soon</string>
+    <string name="widget_due_label">Due soon</string>
     <string name="widget_snapshot_label">Asset snapshots</string>
     <string name="widget_snapshot_empty_meta">Local snapshot count</string>
     <string name="widget_total_meta_empty">0 assets · Daily ¥0.00</string>
@@ -51,4 +52,16 @@
     <string name="shortcut_add_asset_long">Add Valora asset</string>
     <string name="shortcut_add_wish_short">New wish</string>
     <string name="shortcut_add_wish_long">Add Valora wish</string>
+    <string name="archive_share_title">Valora complete backup</string>
+    <string name="archive_readme">Valora complete backup\n\nIncludes:\n- backup/valora_backup.json and backup/zhipu_backup.json: restorable structured data\n- backup/valora_assets.csv and backup/zhipu_assets.csv: asset spreadsheet\n- backup/valora_report.md and backup/zhipu_report.md: asset report\n- backup/media_manifest.tsv: original media paths and ZIP paths for cross-device restore\n- sqlite/: a copy of the current SQLite database\n- media/: local covers, stickers, manual cutouts, and related media files\n\nRestore note: the app rebuilds the current SQLite data from JSON + media first. It does not directly overwrite a database that is currently in use</string>
+    <string name="archive_share_failed">Failed to create complete backup: %1$s</string>
+    <string name="archive_restore_read_failed">Unable to read ZIP file</string>
+    <string name="archive_restore_no_json">No restorable JSON was found in this ZIP. Supported names include backup/valora_backup.json, backup/zhipu_backup.json, and common *_backup.json files. Please choose a complete backup exported by Valora</string>
+    <string name="archive_restore_read_ok">Complete backup loaded</string>
+    <string name="sticker_label_fallback">Fallback</string>
+    <string name="sticker_label_extra_fallback">Extra fallback</string>
+    <string name="sticker_label_conservative">Conservative</string>
+    <string name="sticker_label_balanced">Balanced</string>
+    <string name="sticker_label_strong">Strong</string>
+    <string name="sticker_label_fine">Fine</string>
 </resources>

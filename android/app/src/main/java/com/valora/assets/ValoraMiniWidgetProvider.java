@@ -23,7 +23,7 @@ public class ValoraMiniWidgetProvider extends AppWidgetProvider {
         String daily = prefs.getString("averageDailyCost", "0.00");
         RemoteViews views = new RemoteViews(context.getPackageName(), WidgetUtils.layout(context, R.layout.widget_mini, R.layout.widget_mini_hyperos));
         views.setTextViewText(R.id.widget_mini_total, currency + total);
-        views.setTextViewText(R.id.widget_mini_daily, "日均\n" + currency + daily);
+        views.setTextViewText(R.id.widget_mini_daily, context.getString(R.string.widget_mini_daily_format, currency, daily));
         views.setOnClickPendingIntent(R.id.widget_mini_root, WidgetUtils.openApp(context, 7410));
         manager.updateAppWidget(id, views);
     }

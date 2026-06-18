@@ -235,8 +235,8 @@ public class MainActivity extends FlutterActivity {
                 case "importDataArchive":
                     Intent openArchive = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                     openArchive.addCategory(Intent.CATEGORY_OPENABLE);
-                    // 不限制 MIME。很多国产文件管理器会把 .zip 标成 application/octet-stream、application/x-zip、甚至 */*，
-                    // 之前加 EXTRA_MIME_TYPES 会导致部分设备根本选不到 ZIP。
+                    // 不限制 MIME。許多國產檔案管理器會把 .zip 標成 application/octet-stream、application/x-zip，甚至 */*，
+                    // 之前加 EXTRA_MIME_TYPES 會導致部分裝置根本選不到 ZIP。
                     openArchive.setType("*/*");
                     openArchive.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     openArchive.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
@@ -254,8 +254,8 @@ public class MainActivity extends FlutterActivity {
                     break;
                 case "scheduleNotification":
                     scheduleNotification(
-                            arg(call.argument("title"), "值谱提醒"),
-                            arg(call.argument("text"), "该复盘资产了"),
+                            arg(call.argument("title"), getString(R.string.notification_default_title)),
+                            arg(call.argument("text"), getString(R.string.notification_default_text)),
                             longArg(call.argument("delayMillis"), 60000L)
                     );
                     result.success(true);
@@ -641,7 +641,7 @@ public class MainActivity extends FlutterActivity {
                         if (detailed) {
                             StickerCandidate only = new StickerCandidate();
                             only.uri = path;
-                            only.label = "兜底";
+                            only.label = getString(R.string.sticker_label_fallback);
                             only.engine = "Heuristic";
                             only.score = 0.42;
                             only.width = fallback.getWidth();
@@ -670,7 +670,7 @@ public class MainActivity extends FlutterActivity {
                     if (detailed) {
                         StickerCandidate only = new StickerCandidate();
                         only.uri = path;
-                        only.label = "兜底";
+                        only.label = getString(R.string.sticker_label_fallback);
                         only.engine = "Heuristic";
                         only.score = 0.42;
                         only.width = fallback.getWidth();
@@ -698,7 +698,7 @@ public class MainActivity extends FlutterActivity {
     private void generateStickerCandidates(Bitmap source, StickerEngineConfig config, CandidateSuccess success, CandidateFailure failure) {
         final List<StickerCandidate> candidates = new ArrayList<>();
         try {
-            // 预留本地 TFLite 模型入口；若未来模型文件存在，可在这里接入。
+            // 預留本機 TFLite 模型入口；若未來模型檔案存在，可在這裡接入。
             candidates.addAll(generateOptionalLocalModelCandidates(source, config));
         } catch (Exception ignored) {}
 
@@ -714,9 +714,9 @@ public class MainActivity extends FlutterActivity {
                         try {
                             candidates.addAll(generateMlKitCandidates(source, segmentation.getForegroundBitmap(), segmentation.getForegroundConfidenceMask(), config));
                             if (candidates.isEmpty()) {
-                                candidates.add(generateHeuristicCandidate(source, "兜底", "Heuristic"));
+                                candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
                             } else {
-                                candidates.add(generateHeuristicCandidate(source, "补充兜底", "Heuristic"));
+                                candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_extra_fallback), "Heuristic"));
                             }
                             success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
                         } catch (Exception e) {
@@ -727,7 +727,7 @@ public class MainActivity extends FlutterActivity {
                     })
                     .addOnFailureListener(e -> {
                         try {
-                            candidates.add(generateHeuristicCandidate(source, "兜底", "Heuristic"));
+                            candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
                             success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
                         } catch (Exception inner) {
                             failure.accept(inner);
@@ -737,7 +737,7 @@ public class MainActivity extends FlutterActivity {
                     });
         } catch (Throwable mlInitError) {
             try {
-                candidates.add(generateHeuristicCandidate(source, "兜底", "Heuristic"));
+                candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
                 success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
             } catch (Exception e) {
                 failure.accept(e);
@@ -756,7 +756,12 @@ public class MainActivity extends FlutterActivity {
         source.getPixels(srcPixels, 0, w, 0, 0, w, h);
         final List<StickerCandidate> out = new ArrayList<>();
         final float[] thresholds = config.thresholds;
-        final String[] labels = new String[]{"保守", "均衡", "激进", "精细"};
+        final String[] labels = new String[]{
+                getString(R.string.sticker_label_conservative),
+                getString(R.string.sticker_label_balanced),
+                getString(R.string.sticker_label_strong),
+                getString(R.string.sticker_label_fine)
+        };
         if (confidenceMask != null && confidenceMask.capacity() >= w * h) {
             float[] maskValues = new float[w * h];
             confidenceMask.rewind();
@@ -778,7 +783,7 @@ public class MainActivity extends FlutterActivity {
             scaledFg.getPixels(fgPixels, 0, w, 0, 0, w, h);
             boolean[] mask = new boolean[w * h];
             for (int i = 0; i < mask.length; i++) mask[i] = Color.alpha(fgPixels[i]) > 32;
-            StickerCandidate candidate = buildMaskStickerCandidate(source, srcPixels, mask, "均衡", "MLKit alpha");
+            StickerCandidate candidate = buildMaskStickerCandidate(source, srcPixels, mask, getString(R.string.sticker_label_balanced), "MLKit alpha");
             if (candidate != null) out.add(candidate);
             if (scaledFg != foregroundBitmap) scaledFg.recycle();
         }
@@ -1235,8 +1240,8 @@ public class MainActivity extends FlutterActivity {
     }
 
     private boolean[] featherBoundary(boolean[] fg, int w, int h) {
-        // 这里仍返回布尔 mask，真正的半透明边缘在 renderStickerBitmap 中根据邻域动态减淡。
-        // 单独保留这个函数是为了后续如果要接入 TFLite alpha matting，可以只替换这里。
+        // 這裡仍返回布林 mask，真正的半透明邊緣在 renderStickerBitmap 中根據鄰域動態減淡。
+        // 單獨保留這個函式是為了後續如果要接入 TFLite alpha matting，可以只替換這裡。
         return fg;
     }
 
@@ -1506,7 +1511,7 @@ public class MainActivity extends FlutterActivity {
     @SuppressWarnings("unchecked")
     private void shareDataArchive(Object arguments) {
         Map<String, Object> args = arguments instanceof Map ? (Map<String, Object>) arguments : new HashMap<>();
-        String title = arg(args.get("title"), "值谱完整资料包");
+        String title = arg(args.get("title"), getString(R.string.archive_share_title));
         String json = arg(args.get("json"), "{}");
         String csv = arg(args.get("csv"), "");
         String markdown = arg(args.get("markdown"), "");
@@ -1525,13 +1530,13 @@ public class MainActivity extends FlutterActivity {
             File zip = new File(shareDir, fileName.endsWith(".zip") ? fileName : fileName + ".zip");
             ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zip));
             addTextEntry(zos, "backup/valora_backup.json", json);
-            // 兼容中文品牌名“值谱”以及历史 zhipu 备份命名：新包同时写入两份同内容 JSON。
+            // 相容中文品牌名「值譜」以及歷史 zhipu 備份命名：新包同時寫入兩份同內容 JSON。
             addTextEntry(zos, "backup/zhipu_backup.json", json);
             addTextEntry(zos, "backup/valora_assets.csv", csv);
             addTextEntry(zos, "backup/zhipu_assets.csv", csv);
             addTextEntry(zos, "backup/valora_report.md", markdown);
             addTextEntry(zos, "backup/zhipu_report.md", markdown);
-            addTextEntry(zos, "README.txt", "值谱完整资料包 / Valora complete backup\n\n包含：\n- backup/valora_backup.json 与 backup/zhipu_backup.json：可恢复的结构化数据\n- backup/valora_assets.csv 与 backup/zhipu_assets.csv：资产表格\n- backup/valora_report.md 与 backup/zhipu_report.md：资产报告\n- backup/media_manifest.tsv：媒体原路径与 ZIP 路径映射，用于跨设备恢复图片\n- sqlite/：应用当前 SQLite 数据库副本\n- media/：本地封面、贴纸、手动勾勒图片等媒体文件\n\n说明：恢复时优先使用 JSON + media 重建当前 SQLite，不会直接覆盖运行中的数据库文件。\n");
+            addTextEntry(zos, "README.txt", getString(R.string.archive_readme));
             addSqliteFiles(zos);
             String mediaManifest = addMediaFiles(zos, mediaPaths);
             addTextEntry(zos, "backup/media_manifest.tsv", mediaManifest);
@@ -1544,7 +1549,7 @@ public class MainActivity extends FlutterActivity {
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(send, title));
         } catch (Exception e) {
-            shareText(title, "完整资料包生成失败：" + e.getMessage() + "\n\n" + markdown);
+            shareText(title, getString(R.string.archive_share_failed, e.getMessage()) + "\n\n" + markdown);
         }
     }
 
@@ -1640,7 +1645,7 @@ public class MainActivity extends FlutterActivity {
         if (lower.equals("backup/valora_backup.json") || lower.endsWith("/valora_backup.json") || lower.equals("valora_backup.json")) return true;
         if (lower.equals("backup/zhipu_backup.json") || lower.endsWith("/zhipu_backup.json") || lower.equals("zhipu_backup.json")) return true;
         if (lower.equals("backup/backup.json") || lower.endsWith("/backup.json") || lower.equals("backup.json")) return true;
-        // 兼容历史中文/拼音品牌包：只在 backup 目录或根目录接受 *_backup.json，避免误读媒体侧边文件。
+        // 相容歷史中文 / 拼音品牌包：只在 backup 目錄或根目錄接受 *_backup.json，避免誤讀媒體側邊檔案。
         if (lower.endsWith("_backup.json")) {
             return !lower.contains("/") || lower.startsWith("backup/") || lower.contains("/backup/");
         }
@@ -1652,7 +1657,7 @@ public class MainActivity extends FlutterActivity {
         try {
             InputStream raw = getContentResolver().openInputStream(uri);
             if (raw == null) {
-                result.success("{\"ok\":false,\"message\":\"无法读取 ZIP 文件\"}");
+                result.success("{\"ok\":false,\"message\":\"" + escape(getString(R.string.archive_restore_read_failed)) + "\"}");
                 return;
             }
             zis = new ZipInputStream(raw);
@@ -1722,7 +1727,7 @@ public class MainActivity extends FlutterActivity {
             zis.close();
             zis = null;
             if (backupJson.trim().length() == 0) {
-                result.success("{\"ok\":false,\"message\":\"ZIP 中没有找到可恢复的 JSON。已兼容 backup/valora_backup.json、backup/zhipu_backup.json 和常见 *_backup.json 命名，请确认选择的是值谱/Valora 导出的完整资料包。\"}");
+                result.success("{\"ok\":false,\"message\":\"" + escape(getString(R.string.archive_restore_no_json)) + "\"}");
                 return;
             }
             applyMediaManifest(mediaManifest, mediaEntryMap, mediaMap);
@@ -1735,13 +1740,13 @@ public class MainActivity extends FlutterActivity {
             String jsonPath = "file://" + jsonFile.getAbsolutePath();
             StringBuilder sb = new StringBuilder();
             sb.append("{\"ok\":true");
-            sb.append(",\"message\":\"已读取完整资料包\"");
+            sb.append(",\"message\":\"").append(escape(getString(R.string.archive_restore_read_ok))).append("\"");
             sb.append(",\"mediaCount\":").append(mediaCount);
             sb.append(",\"sqliteCount\":").append(sqliteCount);
             sb.append(",\"entryCount\":").append(totalEntries);
             sb.append(",\"jsonSize\":").append(rewrittenJson.length());
             sb.append(",\"jsonPath\":\"").append(escape(jsonPath)).append("\"");
-            // 小型备份直接回传，较大的备份让 Flutter 从 jsonPath 读取，避免 MethodChannel 大字符串不稳定。
+            // 小型備份直接回傳，較大的備份讓 Flutter 從 jsonPath 讀取，避免 MethodChannel 大字串不穩定。
             if (rewrittenJson.length() < 256000) {
                 sb.append(",\"json\":\"").append(escape(rewrittenJson)).append("\"");
             }
@@ -1809,7 +1814,7 @@ public class MainActivity extends FlutterActivity {
     private String rewriteArchiveMediaPaths(String json, Map<String, String> mediaMap) {
         if (json == null || json.length() == 0 || mediaMap == null || mediaMap.isEmpty()) return json == null ? "" : json;
         String result = json;
-        // 1. 先做精确替换：v50 的 media_manifest.tsv 会提供旧设备完整 file:// 路径和绝对路径。
+        // 1. 先做精確替換：v50 的 media_manifest.tsv 會提供舊裝置完整 file:// 路徑和絕對路徑。
         List<Map.Entry<String, String>> entries = new ArrayList<>(mediaMap.entrySet());
         Collections.sort(entries, (a, b) -> Integer.compare(b.getKey() == null ? 0 : b.getKey().length(), a.getKey() == null ? 0 : a.getKey().length()));
         for (Map.Entry<String, String> item : entries) {
@@ -1820,7 +1825,7 @@ public class MainActivity extends FlutterActivity {
                 result = result.replace(key, restored);
             } catch (Exception ignored) {}
         }
-        // 2. 再做旧版 ZIP 兼容：v49 没有 manifest，只能通过文件名尽量匹配旧绝对路径。
+        // 2. 再做舊版 ZIP 相容：v49 沒有 manifest，只能透過檔名盡量匹配舊絕對路徑。
         for (Map.Entry<String, String> item : entries) {
             String fileName = item.getKey();
             String restored = item.getValue();
@@ -1854,7 +1859,7 @@ public class MainActivity extends FlutterActivity {
 
     private void writeClipboardText(String text) {
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("值谱", text));
+        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText(getString(R.string.app_name), text));
     }
 
     private void scheduleNotification(String title, String text, long delayMillis) {
@@ -1880,14 +1885,14 @@ public class MainActivity extends FlutterActivity {
         Intent addAsset = new Intent(this, MainActivity.class).setAction("com.valora.assets.ADD_ASSET");
         Intent addWish = new Intent(this, MainActivity.class).setAction("com.valora.assets.ADD_WISH");
         ShortcutInfo s1 = new ShortcutInfo.Builder(this, "add_asset")
-                .setShortLabel("新增资产")
-                .setLongLabel("新增值谱资产")
+                .setShortLabel(getString(R.string.shortcut_add_asset_short))
+                .setLongLabel(getString(R.string.shortcut_add_asset_long))
                 .setIcon(Icon.createWithResource(this, R.drawable.ic_shortcut_add))
                 .setIntent(addAsset)
                 .build();
         ShortcutInfo s2 = new ShortcutInfo.Builder(this, "add_wish")
-                .setShortLabel("新增心愿")
-                .setLongLabel("新增值谱心愿")
+                .setShortLabel(getString(R.string.shortcut_add_wish_short))
+                .setLongLabel(getString(R.string.shortcut_add_wish_long))
                 .setIcon(Icon.createWithResource(this, R.drawable.ic_shortcut_wish))
                 .setIntent(addWish)
                 .build();

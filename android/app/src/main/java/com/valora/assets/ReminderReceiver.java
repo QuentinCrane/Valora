@@ -17,14 +17,14 @@ public class ReminderReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         String title = intent.getStringExtra("title");
         String text = intent.getStringExtra("text");
-        if (title == null || title.isEmpty()) title = "值谱提醒";
-        if (text == null || text.isEmpty()) text = "该复盘你的资产了。";
+        if (title == null || title.isEmpty()) title = context.getString(R.string.notification_default_title);
+        if (text == null || text.isEmpty()) text = context.getString(R.string.notification_default_text);
 
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) return;
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "值谱资产提醒", NotificationManager.IMPORTANCE_DEFAULT);
-            channel.setDescription("到期、资产体检与复盘提醒");
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, context.getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_DEFAULT);
+            channel.setDescription(context.getString(R.string.notification_channel_desc));
             channel.enableLights(true);
             channel.setLightColor(Color.rgb(124, 198, 242));
             manager.createNotificationChannel(channel);

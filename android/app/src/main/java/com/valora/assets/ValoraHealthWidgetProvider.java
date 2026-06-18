@@ -22,8 +22,8 @@ public class ValoraHealthWidgetProvider extends AppWidgetProvider {
         int dueSoon = prefs.getInt("dueSoonCount", 0);
         int retired = prefs.getInt("retiredCount", 0);
         RemoteViews views = new RemoteViews(context.getPackageName(), WidgetUtils.layout(context, R.layout.widget_health, R.layout.widget_health_hyperos));
-        views.setTextViewText(R.id.widget_health_score, leakCount == 0 && dueSoon == 0 ? "良好" : "待复盘");
-        views.setTextViewText(R.id.widget_health_meta, leakCount + " 个钱包漏洞 · " + dueSoon + " 个临期 · " + retired + " 个退役");
+        views.setTextViewText(R.id.widget_health_score, context.getString(leakCount == 0 && dueSoon == 0 ? R.string.widget_health_good : R.string.widget_health_review));
+        views.setTextViewText(R.id.widget_health_meta, context.getString(R.string.widget_health_meta_format, leakCount, dueSoon, retired));
         views.setOnClickPendingIntent(R.id.widget_health_root, WidgetUtils.openApp(context, 7403));
         manager.updateAppWidget(id, views);
     }
