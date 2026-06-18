@@ -10,12 +10,13 @@
 - Gradle Wrapper：`8.14`
 - AndroidX：Core、Activity 等基础能力。
 - Google ML Kit：条码扫描、文字识别、中文文字识别、主体分割。
+- TensorFlow Lite：本地智能能力预留与辅助处理。
 
 当前仓库重点面向 Android APK 构建。README 中提到的多端方向是产品扩展方向；本仓库目前已提交的是 Android 构建壳和 Android 原生能力。
 
 ## 项目信息
 
-- 当前版本：`0.79.0+79`
+- 当前版本：`0.80`
 - Flutter 包名：`valora_assets`
 - Android applicationId：`com.valora.assets`
 - Android 最低版本：`minSdk 24`
@@ -137,6 +138,7 @@ build_windows.bat
 │   ├── product/                          # 产品规格、迁移说明和参考资料
 │   ├── reports/                          # 迭代报告、验证记录和修复记录
 │   ├── stickers/                         # 贴纸封面和抠图相关笔记
+│   ├── agent/                            # AI 协作提示词和辅助指南
 │   └── assets/                           # 文档图片资源与脱敏截图
 ├── tooling/android_patch/                # Android 构建壳修复用补丁文件
 ├── pubspec.yaml                          # Flutter 项目配置

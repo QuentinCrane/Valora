@@ -16,7 +16,7 @@ public class ValoraQuickWidgetProvider extends AppWidgetProvider {
     }
 
     private static void updateWidget(Context context, AppWidgetManager manager, int id) {
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_quick);
+        RemoteViews views = new RemoteViews(context.getPackageName(), WidgetUtils.layout(context, R.layout.widget_quick, R.layout.widget_quick_hyperos));
         views.setOnClickPendingIntent(R.id.widget_quick_root, WidgetUtils.openApp(context, 7404));
         views.setOnClickPendingIntent(R.id.widget_quick_asset, WidgetUtils.openAction(context, "com.valora.assets.ADD_ASSET", 7405));
         views.setOnClickPendingIntent(R.id.widget_quick_wish, WidgetUtils.openAction(context, "com.valora.assets.ADD_WISH", 7406));

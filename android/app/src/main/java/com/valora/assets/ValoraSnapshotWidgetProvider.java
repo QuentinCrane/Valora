@@ -20,7 +20,7 @@ public class ValoraSnapshotWidgetProvider extends AppWidgetProvider {
         SharedPreferences prefs = WidgetUtils.prefs(context);
         int snapshots = prefs.getInt("snapshotCount", 0);
         int wishCount = prefs.getInt("wishCount", 0);
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_snapshot);
+        RemoteViews views = new RemoteViews(context.getPackageName(), WidgetUtils.layout(context, R.layout.widget_snapshot, R.layout.widget_snapshot_hyperos));
         views.setTextViewText(R.id.widget_snapshot_count, String.valueOf(snapshots));
         views.setTextViewText(R.id.widget_snapshot_meta, wishCount + " 个心愿 · 点击查看资产时光机");
         views.setOnClickPendingIntent(R.id.widget_snapshot_root, WidgetUtils.openApp(context, 7408));

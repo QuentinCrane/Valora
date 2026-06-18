@@ -1,7 +1,7 @@
 name: valora_assets
-version: 0.79.0+79
+version: 0.80.1+81
 publish_to: 'none'
-description: Flutter Android app for Valora personal asset lifecycle management.
+description: Release-candidate polished clean-room Flutter Android app for Valora personal asset lifecycle management.
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  liquid_glass_easy: 2.0.1
 
 flutter:
   uses-material-design: true

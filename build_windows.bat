@@ -1,6 +1,6 @@
 @echo off
 setlocal
-REM Valora Windows 构建脚本
+REM Valora v8 Windows 构建脚本
 REM 需要提前安装 Flutter stable、Android Studio / Android SDK，并把 flutter 加入 PATH。
 
 where flutter >nul 2>nul

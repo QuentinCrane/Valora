@@ -86,3 +86,11 @@ windows/flutter/ephemeral/
 
 # FVM local SDK cache
 .fvm/flutter_sdk
+
+# Local stray Flutter metadata copy; keep the canonical .metadata file only.
+metadata
+
+# Local AI handoff materials and manual doc backups are not public docs.
+docs/agent/
+docs/backups/
+docs/CODEX_*.md

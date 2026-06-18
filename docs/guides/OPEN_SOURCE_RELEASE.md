@@ -18,6 +18,7 @@
 - `README.md`：项目介绍、功能、结构、构建入口和发布建议。
 - `LICENSE`：默认 Apache License 2.0。
 - `NOTICE`：项目归属和补充声明。
+- `THIRD_PARTY_NOTICES.md`：第三方组件声明，当前包含 `liquid_glass_easy` 的用途、来源、版权声明和完整 MIT 许可文本。
 - `CONTRIBUTING.md`：贡献流程、检查命令和隐私要求。
 - `SECURITY.md`：安全报告方式和敏感区域。
 - `CHANGELOG.md`：公开版本变更记录入口。
@@ -37,6 +38,12 @@ flutter analyze
 flutter build apk --debug
 ```
 
+确认第三方声明已同步：
+
+- README / Release notes 中保留第三方组件致谢。
+- `THIRD_PARTY_NOTICES.md` 中列出 `liquid_glass_easy`，并保留 `Copyright (c) 2025 Ahmed Gamil` 与完整 MIT 许可文本。
+- 如果后续要补 App 内声明页，可在设置页增加“第三方开源声明”入口；当前发布整理不改动源码。
+
 确认不要提交：
 
 - `android/local.properties`
@@ -53,7 +60,7 @@ flutter build apk --debug
 APK 安装包不提交到源码仓库。需要公开下载时，在 GitHub Releases 中上传附件，建议命名为：
 
 ```text
-Valora-v0.79.0-android.apk
+Valora-v0.80-android.apk
 ```
 
 ## 展示素材建议
@@ -105,4 +112,4 @@ git push -u origin main
 - 是否继续使用 Apache License 2.0，还是改为 MIT / GPL-3.0 / 其他协议。
 - 是否公开历史报告和 AI 协作提示词。
 - 是否在发布前补充脱敏截图。
-- 是否添加首个 `v0.79.0` Git tag 和 Release notes，并把 APK 上传到对应 Release。
+- 是否添加 `v0.80.0` Git tag 和 Release notes，并把 APK 上传到对应 Release。

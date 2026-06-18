@@ -19,7 +19,7 @@ flutter build apk --release
 
 APK 输出路径: `build\app\outputs\flutter-apk\app-release.apk`
 
-公开分发时不要把 APK 提交到源码仓库。建议重命名为 `Valora-v0.79.0-android.apk` 后上传到 GitHub Releases。
+公开分发时不要把 APK 提交到源码仓库。建议重命名为 `Valora-v0.80-android.apk` 后上传到 GitHub Releases。
 
 ---
 

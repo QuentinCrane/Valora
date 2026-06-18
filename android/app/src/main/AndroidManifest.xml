@@ -97,6 +97,12 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/valora_snapshot_widget_info" />
         </receiver>
 
+        <receiver android:name=".ValoraMiniWidgetProvider" android:label="@string/widget_mini_name" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/valora_mini_widget_info" />
+        </receiver>
 
 
         <provider

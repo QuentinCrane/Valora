@@ -20,7 +20,7 @@ public class ValoraDueWidgetProvider extends AppWidgetProvider {
         SharedPreferences prefs = WidgetUtils.prefs(context);
         int dueSoon = prefs.getInt("dueSoonCount", 0);
         int assetCount = prefs.getInt("assetCount", 0);
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_due);
+        RemoteViews views = new RemoteViews(context.getPackageName(), WidgetUtils.layout(context, R.layout.widget_due, R.layout.widget_due_hyperos));
         views.setTextViewText(R.id.widget_due_count, String.valueOf(dueSoon));
         views.setTextViewText(R.id.widget_due_meta, dueSoon == 0 ? assetCount + " 件资产暂无临期" : dueSoon + " 件资产需要复盘");
         views.setOnClickPendingIntent(R.id.widget_due_root, WidgetUtils.openApp(context, 7407));

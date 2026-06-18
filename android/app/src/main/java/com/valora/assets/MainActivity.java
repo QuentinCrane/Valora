@@ -9,7 +9,6 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.ColorStateList;
 import android.content.SharedPreferences;
 import android.content.ContentValues;
 import android.database.Cursor;
@@ -18,7 +17,6 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
@@ -28,20 +26,13 @@ import android.os.Vibrator;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.Gravity;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
-import android.widget.TextView;
-import android.widget.Button;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
-
-import com.google.android.material.datepicker.MaterialDatePicker;
-import com.google.android.material.datepicker.CalendarConstraints;
-import com.google.android.material.button.MaterialButton;
 
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions;
 
@@ -100,11 +91,11 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipInputStream;
 
-import io.flutter.embedding.android.FlutterFragmentActivity;
+import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.MethodChannel;
 
-public class MainActivity extends FlutterFragmentActivity {
+public class MainActivity extends FlutterActivity {
     private static final String STORE_CHANNEL = "valora/local_store";
     private static final String NATIVE_CHANNEL = "valora/native";
     private static final String PREFS_NAME = "valora_assets_store";
@@ -155,7 +146,11 @@ public class MainActivity extends FlutterFragmentActivity {
         new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), STORE_CHANNEL)
                 .setMethodCallHandler((call, result) -> {
                     if ("loadJson".equals(call.method)) {
-                        result.success(storeDb.loadJson());
+                        try {
+                            result.success(storeDb.loadJson());
+                        } catch (Exception e) {
+                            result.error("load_json_error", e.getMessage(), null);
+                        }
                     } else if ("saveJson".equals(call.method)) {
                         String json = call.argument("json");
                         result.success(storeDb.saveJson(json == null ? "" : json));
@@ -181,7 +176,9 @@ public class MainActivity extends FlutterFragmentActivity {
                     startSingleResult(result, REQ_PICK_IMAGE, buildPickImageIntent());
                     break;
                 case "pickNativeDate":
-                    showNativeDatePicker(arg(call.argument("initialDate"), ""), arg(call.argument("title"), "选择日期"), result);
+                    // Date picking is implemented by the custom Flutter iOS-style picker.
+                    // Keep the method for old Dart callers, but avoid shipping Material DatePicker.
+                    result.success(null);
                     break;
                 case "capturePhoto":
                     startSingleResult(result, REQ_CAPTURE_PHOTO, new Intent(MediaStore.ACTION_IMAGE_CAPTURE));
@@ -343,7 +340,7 @@ public class MainActivity extends FlutterFragmentActivity {
                 }
                 return "";
             } catch (Exception e) {
-                return "";
+                throw new RuntimeException("Failed to read local Valora JSON", e);
             } finally {
                 if (cursor != null) cursor.close();
             }
@@ -378,154 +375,6 @@ public class MainActivity extends FlutterFragmentActivity {
         }
     }
 
-
-    private void forceBlueMaterialDatePicker(MaterialDatePicker<?> picker) {
-        // Material Components 1.14.0 removed the old show-listener hook on
-        // MaterialDatePicker. Keep this method as a no-op so native date picking
-        // still compiles and relies on ThemeOverlay_Valora_DatePicker styles.
-    }
-
-    private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
-
-    private void applyValoraDatePickerColors(MaterialDatePicker<?> picker, int primary, int primaryDark, int primarySoft) {
-        if (picker.getDialog() == null || picker.getDialog().getWindow() == null) return;
-        View decor = picker.getDialog().getWindow().getDecorView();
-        int headerId = getResources().getIdentifier("mtrl_picker_header", "id", getPackageName());
-        View header = headerId == 0 ? null : picker.getDialog().findViewById(headerId);
-        if (header != null) {
-            GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Color.WHITE, primarySoft});
-            bg.setCornerRadius(0);
-            header.setBackground(bg);
-        }
-        tintDatePickerViewTree(decor, primary, primaryDark, primarySoft);
-    }
-
-    private void tintDatePickerViewTree(View view, int primary, int primaryDark, int primarySoft) {
-        if (view == null) return;
-        String name = "";
-        try {
-            if (view.getId() != View.NO_ID) name = getResources().getResourceEntryName(view.getId());
-        } catch (Exception ignored) { }
-
-        if (view instanceof MaterialButton) {
-            MaterialButton button = (MaterialButton) view;
-            button.setTextColor(primaryDark);
-            button.setRippleColor(ColorStateList.valueOf(Color.argb(52, 124, 198, 242)));
-            button.setIconTint(ColorStateList.valueOf(primaryDark));
-            button.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
-            if (name.contains("confirm") || name.contains("save") || name.contains("positive")) {
-                button.setTextColor(primaryDark);
-            }
-        } else if (view instanceof Button) {
-            ((Button) view).setTextColor(primaryDark);
-        }
-
-        if (view instanceof TextView) {
-            TextView textView = (TextView) view;
-            // Keep Android/Material default font metrics; forcing font padding off can make day numbers look vertically misplaced on some ROMs.
-            textView.setIncludeFontPadding(true);
-            textView.setTextColor(view.isEnabled() ? primaryDark : Color.argb(120, 84, 112, 128));
-            CharSequence text = textView.getText();
-            boolean looksLikeDayCell = false;
-            if (text != null) {
-                String s = text.toString().trim();
-                looksLikeDayCell = s.matches("\\d{1,2}") || s.matches("\\d{4}");
-            }
-            if (looksLikeDayCell || name.contains("day") || name.contains("year") || name.contains("calendar")) {
-                textView.setGravity(Gravity.CENTER);
-                textView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-                if (view.isSelected() || view.isActivated() || name.contains("selected")) {
-                    GradientDrawable selectedBg = new GradientDrawable();
-                    selectedBg.setColor(primary);
-                    selectedBg.setCornerRadius(dp(12));
-                    textView.setBackground(selectedBg);
-                    textView.setTextColor(primaryDark);
-                }
-            }
-        }
-
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                tintDatePickerViewTree(group.getChildAt(i), primary, primaryDark, primarySoft);
-            }
-        }
-    }
-
-    private void showNativeDatePicker(String initialDate, String title, MethodChannel.Result result) {
-        try {
-            final Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-            utc.set(Calendar.HOUR_OF_DAY, 0);
-            utc.set(Calendar.MINUTE, 0);
-            utc.set(Calendar.SECOND, 0);
-            utc.set(Calendar.MILLISECOND, 0);
-            Pattern p = Pattern.compile("^(\\d{4})-(\\d{1,2})-(\\d{1,2})$");
-            Matcher m = p.matcher(initialDate == null ? "" : initialDate.trim());
-            if (m.find()) {
-                int y = Integer.parseInt(m.group(1));
-                int month = Integer.parseInt(m.group(2));
-                int day = Integer.parseInt(m.group(3));
-                utc.set(Calendar.YEAR, y);
-                utc.set(Calendar.MONTH, Math.max(0, Math.min(11, month - 1)));
-                utc.set(Calendar.DAY_OF_MONTH, Math.max(1, Math.min(31, day)));
-            }
-            Calendar startCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-            startCal.clear();
-            startCal.set(1970, Calendar.JANUARY, 1);
-            Calendar endCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-            endCal.clear();
-            endCal.set(2100, Calendar.DECEMBER, 31);
-            CalendarConstraints constraints = new CalendarConstraints.Builder()
-                    .setStart(startCal.getTimeInMillis())
-                    .setEnd(endCal.getTimeInMillis())
-                    .setOpenAt(utc.getTimeInMillis())
-                    .setFirstDayOfWeek(Calendar.MONDAY)
-                    .build();
-
-            final boolean[] replied = new boolean[]{false};
-            String safeTitle = (title == null || title.trim().isEmpty()) ? "选择日期" : title.trim();
-            MaterialDatePicker<Long> picker = MaterialDatePicker.Builder.datePicker()
-                    .setTitleText(safeTitle)
-                    .setPositiveButtonText("完成")
-                    .setNegativeButtonText("取消")
-                    .setSelection(utc.getTimeInMillis())
-                    .setCalendarConstraints(constraints)
-                    .setInputMode(MaterialDatePicker.INPUT_MODE_CALENDAR)
-                    .setTheme(R.style.ThemeOverlay_Valora_DatePicker)
-                    .build();
-            forceBlueMaterialDatePicker(picker);
-            picker.addOnPositiveButtonClickListener(selection -> {
-                if (replied[0]) return;
-                replied[0] = true;
-                Calendar selected = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-                selected.setTimeInMillis(selection == null ? utc.getTimeInMillis() : selection);
-                result.success(String.format(java.util.Locale.US, "%04d-%02d-%02d",
-                        selected.get(Calendar.YEAR),
-                        selected.get(Calendar.MONTH) + 1,
-                        selected.get(Calendar.DAY_OF_MONTH)));
-            });
-            picker.addOnNegativeButtonClickListener(v -> {
-                if (replied[0]) return;
-                replied[0] = true;
-                result.success(null);
-            });
-            picker.addOnCancelListener(v -> {
-                if (replied[0]) return;
-                replied[0] = true;
-                result.success(null);
-            });
-            picker.addOnDismissListener(v -> {
-                if (replied[0]) return;
-                replied[0] = true;
-                result.success(null);
-            });
-            picker.show(getSupportFragmentManager(), "Valora_material3_date_picker");
-        } catch (Exception e) {
-            result.error("date_picker_error", e.getMessage(), null);
-        }
-    }
 
     private Intent buildPickImageIntent() {
         // Prefer Android's system Photo Picker on Android 13+ so the cover/sticker workflow
@@ -1661,7 +1510,7 @@ public class MainActivity extends FlutterFragmentActivity {
         String json = arg(args.get("json"), "{}");
         String csv = arg(args.get("csv"), "");
         String markdown = arg(args.get("markdown"), "");
-        String fileName = sanitizeArchiveFileName(arg(args.get("fileName"), "valora_complete_backup.zip"));
+        String fileName = sanitizeArchiveFileName(arg(args.get("fileName"), "zhipu_complete_backup.zip"));
         Object rawPaths = args.get("mediaPaths");
         List<String> mediaPaths = new ArrayList<>();
         if (rawPaths instanceof List) {
@@ -1676,11 +1525,13 @@ public class MainActivity extends FlutterFragmentActivity {
             File zip = new File(shareDir, fileName.endsWith(".zip") ? fileName : fileName + ".zip");
             ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zip));
             addTextEntry(zos, "backup/valora_backup.json", json);
-            // Preserve JSON import compatibility with earlier backup names.
+            // 兼容中文品牌名“值谱”以及历史 zhipu 备份命名：新包同时写入两份同内容 JSON。
             addTextEntry(zos, "backup/zhipu_backup.json", json);
             addTextEntry(zos, "backup/valora_assets.csv", csv);
+            addTextEntry(zos, "backup/zhipu_assets.csv", csv);
             addTextEntry(zos, "backup/valora_report.md", markdown);
-            addTextEntry(zos, "README.txt", "值谱完整资料包 / Valora complete backup\n\n包含：\n- backup/valora_backup.json：可恢复的结构化数据\n- backup/valora_assets.csv：资产表格\n- backup/valora_report.md：资产报告\n- backup/media_manifest.tsv：媒体原路径与 ZIP 路径映射，用于跨设备恢复图片\n- sqlite/：应用当前 SQLite 数据库副本\n- media/：本地封面、贴纸、手动勾勒图片等媒体文件\n\n兼容性：当前版本恢复时仍支持读取历史的 backup/zhipu_backup.json。\n");
+            addTextEntry(zos, "backup/zhipu_report.md", markdown);
+            addTextEntry(zos, "README.txt", "值谱完整资料包 / Valora complete backup\n\n包含：\n- backup/valora_backup.json 与 backup/zhipu_backup.json：可恢复的结构化数据\n- backup/valora_assets.csv 与 backup/zhipu_assets.csv：资产表格\n- backup/valora_report.md 与 backup/zhipu_report.md：资产报告\n- backup/media_manifest.tsv：媒体原路径与 ZIP 路径映射，用于跨设备恢复图片\n- sqlite/：应用当前 SQLite 数据库副本\n- media/：本地封面、贴纸、手动勾勒图片等媒体文件\n\n说明：恢复时优先使用 JSON + media 重建当前 SQLite，不会直接覆盖运行中的数据库文件。\n");
             addSqliteFiles(zos);
             String mediaManifest = addMediaFiles(zos, mediaPaths);
             addTextEntry(zos, "backup/media_manifest.tsv", mediaManifest);
@@ -1698,8 +1549,8 @@ public class MainActivity extends FlutterFragmentActivity {
     }
 
     private String sanitizeArchiveFileName(String name) {
-        String clean = name == null ? "valora_complete_backup.zip" : name.replaceAll("[^a-zA-Z0-9._-]", "_");
-        if (clean.trim().length() == 0) clean = "valora_complete_backup.zip";
+        String clean = name == null ? "zhipu_complete_backup.zip" : name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (clean.trim().length() == 0) clean = "zhipu_complete_backup.zip";
         return clean;
     }
 
@@ -1941,7 +1792,7 @@ public class MainActivity extends FlutterFragmentActivity {
             File root = getFilesDir();
             String canonicalFile = file.getCanonicalPath();
             String canonicalRoot = root.getCanonicalPath();
-            if (!canonicalFile.startsWith(canonicalRoot)) return "";
+            if (!canonicalFile.equals(canonicalRoot) && !canonicalFile.startsWith(canonicalRoot + File.separator)) return "";
             FileInputStream in = new FileInputStream(file);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
@@ -2069,6 +1920,7 @@ public class MainActivity extends FlutterFragmentActivity {
         ValoraQuickWidgetProvider.updateAll(this, appWidgetManager);
         ValoraDueWidgetProvider.updateAll(this, appWidgetManager);
         ValoraSnapshotWidgetProvider.updateAll(this, appWidgetManager);
+        ValoraMiniWidgetProvider.updateAll(this, appWidgetManager);
     }
 
     private boolean requestNotificationPermission() {

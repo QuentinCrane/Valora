@@ -19,7 +19,7 @@ const double kRadiusLg = 28;
 const double kPagePad = 10;
 
 String localizedAppName(Locale locale) =>
-    locale.languageCode.toLowerCase() == 'en' ? 'Valora' : '值谱';
+    _localeKey(locale) == 'en' ? tr('app.name.en') : tr('app.name');
 
 Locale currentPlatformLocale() {
   final locales = WidgetsBinding.instance.platformDispatcher.locales;
@@ -28,46 +28,37 @@ Locale currentPlatformLocale() {
 }
 
 String appDisplayName(BuildContext context) {
-  // Do not use Localizations.localeOf(context) here: without a full localization
-  // setup MaterialApp may resolve it to English by default, which made the
-  // Chinese build show "Valora" on the home page. Use the platform locale so
-  // Chinese systems show "值谱", while English systems still show "Valora".
-  return localizedAppName(currentPlatformLocale());
+  return localizedAppName(Localizations.localeOf(context));
 }
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   NativeBridge.configureSystemUi();
   ErrorWidget.builder = (details) => Material(
-    color: kBg,
-    child: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const LogoMark(size: 64),
-            const SizedBox(height: 14),
-            const Text(
-              '页面渲染遇到问题',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
+        color: kBg,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const LogoMark(size: 64),
+                const SizedBox(height: 14),
+                Text(tr('error.title'),
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.normal)),
+                const SizedBox(height: 8),
+                Text(tr('error.description')),
+                const SizedBox(height: 12),
+                Expanded(
+                    child: SingleChildScrollView(
+                        child: Text(details.exceptionAsString(),
+                            style: const TextStyle(fontSize: 12)))),
+              ],
             ),
-            const SizedBox(height: 8),
-            const Text('这通常不会影响本地数据。请返回上一页，或把下面的错误信息发给开发者继续修复。'),
-            const SizedBox(height: 12),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Text(
-                  details.exceptionAsString(),
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
-    ),
-  );
+      );
   runApp(const ValoraApp());
 }
 
@@ -108,9 +99,21 @@ class _ValoraAppState extends State<ValoraApp> {
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
                 onGenerateTitle: (context) => appDisplayName(context),
+                locale: store.settings.language.locale,
+                localeResolutionCallback: resolveAppLocale,
                 theme: buildAppTheme(Brightness.light),
                 darkTheme: buildAppTheme(Brightness.dark),
                 themeMode: store.resolvedThemeMode,
+                localizationsDelegates: const [
+                  AppLocalizationsDelegate(),
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                supportedLocales: const [
+                  Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+                  Locale('en'),
+                ],
                 home: snapshot.connectionState == ConnectionState.done
                     ? const ShellPage()
                     : const BootPage(),
@@ -125,19 +128,19 @@ class _ValoraAppState extends State<ValoraApp> {
 
 ThemeData buildAppTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
-  final scheme = ColorScheme.fromSeed(seedColor: kBrand, brightness: brightness)
-      .copyWith(
-        surface: dark ? kCardDark : Colors.white,
-        onSurface: dark ? Colors.white.withOpacity(.94) : kText,
-        surfaceContainerHighest: dark ? kSoftDark : kSoft,
-        primary: dark ? const Color(0xFF8FD4FF) : kBrand,
-        onPrimary: dark ? const Color(0xFF062033) : kBrandInk,
-        secondary: dark ? const Color(0xFF4DAEE2) : kBrandStrong,
-        onSecondary: dark ? Colors.white.withOpacity(.94) : kText,
-        outline: dark
-            ? const Color(0xFF7CC6F2).withOpacity(.20)
-            : Colors.black.withOpacity(.08),
-      );
+  final scheme =
+      ColorScheme.fromSeed(seedColor: kBrand, brightness: brightness).copyWith(
+    surface: dark ? kCardDark : Colors.white,
+    onSurface: dark ? Colors.white.withOpacity(.94) : kText,
+    surfaceContainerHighest: dark ? kSoftDark : kSoft,
+    primary: dark ? const Color(0xFF8FD4FF) : kBrand,
+    onPrimary: dark ? const Color(0xFF062033) : kBrandInk,
+    secondary: dark ? const Color(0xFF4DAEE2) : kBrandStrong,
+    onSecondary: dark ? Colors.white.withOpacity(.94) : kText,
+    outline: dark
+        ? const Color(0xFF7CC6F2).withOpacity(.20)
+        : Colors.black.withOpacity(.08),
+  );
   final theme = ThemeData(
     useMaterial3: true,
     brightness: brightness,
@@ -152,7 +155,7 @@ ThemeData buildAppTheme(Brightness brightness) {
       'HarmonyOS Sans SC',
       'MiSans',
       'Roboto',
-      'sans-serif',
+      'sans-serif'
     ],
     visualDensity: VisualDensity.standard,
     pageTransitionsTheme: const PageTransitionsTheme(
@@ -164,66 +167,45 @@ ThemeData buildAppTheme(Brightness brightness) {
   return theme.copyWith(
     textTheme: theme.textTheme.copyWith(
       displaySmall: theme.textTheme.displaySmall?.copyWith(
-        fontSize: 23,
-        fontWeight: FontWeight.normal,
-        letterSpacing: -0.45,
-        height: 1.05,
-      ),
+          fontSize: 23,
+          fontWeight: FontWeight.normal,
+          letterSpacing: -0.45,
+          height: 1.05),
       headlineMedium: theme.textTheme.headlineMedium?.copyWith(
-        fontSize: 19,
-        fontWeight: FontWeight.normal,
-        letterSpacing: -0.2,
-        height: 1.12,
-      ),
+          fontSize: 19,
+          fontWeight: FontWeight.normal,
+          letterSpacing: -0.2,
+          height: 1.12),
       headlineSmall: theme.textTheme.headlineSmall?.copyWith(
-        fontSize: 17,
-        fontWeight: FontWeight.normal,
-        letterSpacing: -0.12,
-        height: 1.16,
-      ),
+          fontSize: 17,
+          fontWeight: FontWeight.normal,
+          letterSpacing: -0.12,
+          height: 1.16),
       titleLarge: theme.textTheme.titleLarge?.copyWith(
-        fontSize: 17,
-        fontWeight: FontWeight.normal,
-        letterSpacing: -0.12,
-        height: 1.18,
-      ),
+          fontSize: 17,
+          fontWeight: FontWeight.normal,
+          letterSpacing: -0.12,
+          height: 1.18),
       titleMedium: theme.textTheme.titleMedium?.copyWith(
-        fontSize: 15,
-        fontWeight: FontWeight.normal,
-        letterSpacing: -0.06,
-        height: 1.2,
-      ),
+          fontSize: 15,
+          fontWeight: FontWeight.normal,
+          letterSpacing: -0.06,
+          height: 1.2),
       titleSmall: theme.textTheme.titleSmall?.copyWith(
-        fontSize: 13.5,
-        fontWeight: FontWeight.normal,
-        letterSpacing: 0,
-        height: 1.18,
-      ),
+          fontSize: 13.5,
+          fontWeight: FontWeight.normal,
+          letterSpacing: 0,
+          height: 1.18),
       bodyLarge: theme.textTheme.bodyLarge?.copyWith(
-        fontSize: 14.2,
-        fontWeight: FontWeight.normal,
-        height: 1.36,
-      ),
+          fontSize: 14.2, fontWeight: FontWeight.normal, height: 1.36),
       bodyMedium: theme.textTheme.bodyMedium?.copyWith(
-        fontSize: 13.2,
-        fontWeight: FontWeight.normal,
-        height: 1.34,
-      ),
+          fontSize: 13.2, fontWeight: FontWeight.normal, height: 1.34),
       bodySmall: theme.textTheme.bodySmall?.copyWith(
-        fontSize: 11.8,
-        fontWeight: FontWeight.normal,
-        height: 1.28,
-      ),
+          fontSize: 11.8, fontWeight: FontWeight.normal, height: 1.28),
       labelLarge: theme.textTheme.labelLarge?.copyWith(
-        fontSize: 13,
-        fontWeight: FontWeight.normal,
-        letterSpacing: .02,
-      ),
+          fontSize: 13, fontWeight: FontWeight.normal, letterSpacing: .02),
       labelMedium: theme.textTheme.labelMedium?.copyWith(
-        fontSize: 11.8,
-        fontWeight: FontWeight.normal,
-        letterSpacing: .02,
-      ),
+          fontSize: 11.8, fontWeight: FontWeight.normal, letterSpacing: .02),
     ),
     appBarTheme: AppBarTheme(
       elevation: 0,
@@ -241,13 +223,9 @@ ThemeData buildAppTheme(Brightness brightness) {
       filled: true,
       fillColor: dark ? kSoftDark.withOpacity(.88) : Colors.white,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide.none,
-      ),
+          borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide.none,
-      ),
+          borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
         borderSide: const BorderSide(color: kBrandStrong, width: 1.2),
@@ -267,9 +245,8 @@ ThemeData buildAppTheme(Brightness brightness) {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: dark ? Colors.white : kText,
-        side: BorderSide(
-          color: (dark ? Colors.white : kText).withOpacity(0.08),
-        ),
+        side:
+            BorderSide(color: (dark ? Colors.white : kText).withOpacity(0.08)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       ),
@@ -279,9 +256,7 @@ ThemeData buildAppTheme(Brightness brightness) {
       selectedColor: kBrand,
       backgroundColor: dark ? kSoftDark.withOpacity(.84) : kSoft,
       labelStyle: TextStyle(
-        color: dark ? Colors.white : kText,
-        fontWeight: FontWeight.normal,
-      ),
+          color: dark ? Colors.white : kText, fontWeight: FontWeight.normal),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       side: BorderSide.none,
     ),
@@ -290,68 +265,51 @@ ThemeData buildAppTheme(Brightness brightness) {
         filled: true,
         fillColor: dark ? kSoftDark.withOpacity(.88) : Colors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide.none,
-        ),
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide.none,
-        ),
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
-          borderSide: const BorderSide(color: kBrandStrong, width: 1.1),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
+            borderRadius: BorderRadius.circular(22),
+            borderSide: const BorderSide(color: kBrandStrong, width: 1.1)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
       menuStyle: MenuStyle(
         elevation: const MaterialStatePropertyAll(0),
         backgroundColor: MaterialStatePropertyAll(
-          dark ? kCardDark.withOpacity(.98) : Colors.white,
-        ),
+            dark ? kCardDark.withOpacity(.98) : Colors.white),
         shape: MaterialStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        ),
-        padding: const MaterialStatePropertyAll(
-          EdgeInsets.symmetric(vertical: 8),
-        ),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
+        padding:
+            const MaterialStatePropertyAll(EdgeInsets.symmetric(vertical: 8)),
       ),
     ),
     menuTheme: MenuThemeData(
       style: MenuStyle(
         elevation: const MaterialStatePropertyAll(0),
         backgroundColor: MaterialStatePropertyAll(
-          dark ? kCardDark.withOpacity(.98) : Colors.white,
-        ),
+            dark ? kCardDark.withOpacity(.98) : Colors.white),
         shape: MaterialStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        ),
-        side: MaterialStatePropertyAll(
-          BorderSide(
-            color: (dark ? Colors.white : Colors.black).withOpacity(.06),
-          ),
-        ),
-        padding: const MaterialStatePropertyAll(
-          EdgeInsets.symmetric(vertical: 8),
-        ),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
+        side: MaterialStatePropertyAll(BorderSide(
+            color: (dark ? Colors.white : Colors.black).withOpacity(.06))),
+        padding:
+            const MaterialStatePropertyAll(EdgeInsets.symmetric(vertical: 8)),
       ),
     ),
     popupMenuTheme: PopupMenuThemeData(
       elevation: 0,
       color: dark ? kCardDark.withOpacity(.98) : Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(
-          color: (dark ? Colors.white : Colors.black).withOpacity(.06),
-        ),
-      ),
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(
+              color: (dark ? Colors.white : Colors.black).withOpacity(.06))),
       textStyle: TextStyle(
-        color: dark ? Colors.white : kText,
-        fontSize: 14,
-        fontWeight: FontWeight.normal,
-      ),
+          color: dark ? Colors.white : kText,
+          fontSize: 14,
+          fontWeight: FontWeight.normal),
     ),
     dialogTheme: DialogThemeData(
       elevation: 0,
@@ -359,49 +317,40 @@ ThemeData buildAppTheme(Brightness brightness) {
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       titleTextStyle: TextStyle(
-        color: dark ? Colors.white : kText,
-        fontSize: 18,
-        fontWeight: FontWeight.normal,
-      ),
+          color: dark ? Colors.white : kText,
+          fontSize: 18,
+          fontWeight: FontWeight.normal),
     ),
     datePickerTheme: DatePickerThemeData(
       backgroundColor: dark ? kCardDark : Colors.white,
       surfaceTintColor: Colors.transparent,
       headerBackgroundColor: dark ? kDarkBlueSoft : const Color(0xFFDFF3FF),
       headerForegroundColor: dark ? Colors.white : kBrandInk,
-      dayForegroundColor: MaterialStateProperty.resolveWith(
-        (states) => states.contains(MaterialState.selected)
-            ? kBrandInk
-            : (dark ? Colors.white.withOpacity(.92) : kBrandInk),
-      ),
+      dayForegroundColor: MaterialStateProperty.resolveWith((states) =>
+          states.contains(MaterialState.selected)
+              ? kBrandInk
+              : (dark ? Colors.white.withOpacity(.92) : kBrandInk)),
       dayBackgroundColor: MaterialStateProperty.resolveWith(
-        (states) => states.contains(MaterialState.selected)
-            ? kBrand
-            : states.contains(MaterialState.disabled)
-            ? Colors.transparent
-            : null,
-      ),
-      todayForegroundColor: MaterialStatePropertyAll(
-        dark ? Colors.white : kBrandInk,
-      ),
-      todayBackgroundColor: MaterialStatePropertyAll(
-        kBrand.withOpacity(dark ? .18 : .22),
-      ),
+          (states) => states.contains(MaterialState.selected)
+              ? kBrand
+              : states.contains(MaterialState.disabled)
+                  ? Colors.transparent
+                  : null),
+      todayForegroundColor:
+          MaterialStatePropertyAll(dark ? Colors.white : kBrandInk),
+      todayBackgroundColor:
+          MaterialStatePropertyAll(kBrand.withOpacity(dark ? .18 : .22)),
       todayBorder: const BorderSide(color: kBrandStrong, width: 1),
-      yearForegroundColor: MaterialStateProperty.resolveWith(
-        (states) => states.contains(MaterialState.selected)
-            ? kBrandInk
-            : (dark ? Colors.white.withOpacity(.92) : kBrandInk),
-      ),
+      yearForegroundColor: MaterialStateProperty.resolveWith((states) =>
+          states.contains(MaterialState.selected)
+              ? kBrandInk
+              : (dark ? Colors.white.withOpacity(.92) : kBrandInk)),
       yearBackgroundColor: MaterialStateProperty.resolveWith(
-        (states) => states.contains(MaterialState.selected) ? kBrand : null,
-      ),
+          (states) => states.contains(MaterialState.selected) ? kBrand : null),
       dayShape: MaterialStatePropertyAll(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
       yearShape: MaterialStatePropertyAll(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
     ),
     bottomSheetTheme: BottomSheetThemeData(
@@ -409,41 +358,35 @@ ThemeData buildAppTheme(Brightness brightness) {
       modalBackgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(34))),
       clipBehavior: Clip.antiAlias,
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      backgroundColor: dark
-          ? kCardDark.withOpacity(.96)
-          : const Color(0xFF111214),
+      backgroundColor:
+          dark ? kCardDark.withOpacity(.96) : const Color(0xFF111214),
       contentTextStyle: TextStyle(
-        color: Colors.white.withOpacity(.94),
-        fontWeight: FontWeight.normal,
-      ),
+          color: Colors.white.withOpacity(.94), fontWeight: FontWeight.normal),
     ),
     switchTheme: SwitchThemeData(
       trackOutlineColor: const MaterialStatePropertyAll(Colors.transparent),
-      thumbColor: MaterialStateProperty.resolveWith(
-        (states) => states.contains(MaterialState.selected)
-            ? (dark ? Colors.white : kBrandInk)
-            : Colors.white,
-      ),
-      trackColor: MaterialStateProperty.resolveWith(
-        (states) => states.contains(MaterialState.selected)
-            ? kBrand
-            : (dark ? Colors.white12 : const Color(0xFFE6E7EA)),
-      ),
+      thumbColor: MaterialStateProperty.resolveWith((states) =>
+          states.contains(MaterialState.selected)
+              ? (dark ? Colors.white : kBrandInk)
+              : Colors.white),
+      trackColor: MaterialStateProperty.resolveWith((states) =>
+          states.contains(MaterialState.selected)
+              ? kBrand
+              : (dark ? Colors.white12 : const Color(0xFFE6E7EA))),
     ),
   );
 }
 
 class AppScope extends InheritedNotifier<AppStore> {
   const AppScope({super.key, required AppStore store, required Widget child})
-    : super(notifier: store, child: child);
+      : super(notifier: store, child: child);
 
   static AppStore of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
@@ -462,14 +405,14 @@ class BootPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const GradientScaffold(
+    return GradientScaffold(
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            LogoMark(size: 72),
-            SizedBox(height: 16),
-            Text('正在整理你的资产谱系…'),
+            const LogoMark(size: 72),
+            const SizedBox(height: 16),
+            Text(tr('boot.loading')),
           ],
         ),
       ),
@@ -495,7 +438,7 @@ class GradientScaffold extends StatelessWidget {
                     Color(0xFF071D2B),
                     Color(0xFF061522),
                     Color(0xFF0A2435),
-                    kBgDark,
+                    kBgDark
                   ]
                 : const [Colors.white, Colors.white, Colors.white],
             stops: dark ? const [0, .42, .76, 1] : null,
@@ -563,33 +506,23 @@ void warningHaptic() {
   HapticFeedback.heavyImpact();
 }
 
-Route<T> softRoute<T>(
-  Widget page, {
-  ValoraRouteStyle style = ValoraRouteStyle.auto,
-}) {
-  final resolved = style == ValoraRouteStyle.auto
-      ? valoraRouteStyleFor(page)
-      : style;
+Route<T> softRoute<T>(Widget page,
+    {ValoraRouteStyle style = ValoraRouteStyle.auto}) {
+  final resolved =
+      style == ValoraRouteStyle.auto ? valoraRouteStyleFor(page) : style;
 
-  // Use MaterialPageRoute instead of a custom PageRouteBuilder.
-  // Flutter's PredictiveBackPageTransitionsBuilder only participates in the
-  // platform predictive-back pipeline for Material/Cupertino style routes. A
-  // custom PageRouteBuilder + GestureDetector looks similar, but is not the
-  // Android system predictive back gesture described by Google.
+  // 预测式返回必须保留 MaterialPageRoute，交给 Flutter 的
+  // PredictiveBackPageTransitionsBuilder 接入 Android 系统返回进度。
+  // 自定义 PageRouteBuilder 会让系统预测式返回退化成普通返回动画。
   return MaterialPageRoute<T>(
-    settings: RouteSettings(
-      name: 'valora:${resolved.name}:${page.runtimeType}',
-    ),
+    settings:
+        RouteSettings(name: 'valora:${resolved.name}:${page.runtimeType}'),
     builder: (_) => PredictiveBackBoundary(style: resolved, child: page),
   );
 }
 
-Path smoothPathFromValues(
-  List<double> values,
-  Size size, {
-  double topPadding = 0,
-  double bottomPadding = 0,
-}) {
+Path smoothPathFromValues(List<double> values, Size size,
+    {double topPadding = 0, double bottomPadding = 0}) {
   final path = Path();
   if (values.isEmpty || size.width <= 0 || size.height <= 0) return path;
   final maxV = math.max(values.reduce(math.max), 1.0);
@@ -616,8 +549,6 @@ Path smoothPathFromValues(
 
 DateTime dateOnly(DateTime value) =>
     DateTime(value.year, value.month, value.day);
-String dateTextCn(DateTime value) =>
-    '${value.year}年${value.month.toString().padLeft(2, '0')}月${value.day.toString().padLeft(2, '0')}日';
 DateTime? parseFlexibleDate(String raw) {
   var value = raw.trim();
   if (value.isEmpty) return null;
@@ -660,8 +591,7 @@ DateTime? parseFlexibleDate(String raw) {
         month < 1 ||
         month > 12 ||
         day < 1 ||
-        day > 31)
-      return null;
+        day > 31) return null;
     final d = DateTime(year, month, day);
     if (d.year == year && d.month == month && d.day == day) return dateOnly(d);
     return null;
@@ -711,6 +641,54 @@ DateTime today() => DateTime.now();
 String dateText(DateTime value) =>
     '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 String dateStorageText(DateTime value) => dateText(dateOnly(value));
+
+const List<String> _englishMonthNames = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const List<String> _englishMonthShortNames = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+bool get _dateLocaleIsEnglish => _localeKey(_activeLocale) == 'en';
+
+String datePickerYearWheelLabel(int year) =>
+    _dateLocaleIsEnglish ? '$year' : '$year年';
+
+String datePickerMonthWheelLabel(int month) => _dateLocaleIsEnglish
+    ? _englishMonthNames[(month - 1).clamp(0, 11).toInt()]
+    : '${month.toString().padLeft(2, '0')}月';
+
+String datePickerMonthTitle(DateTime month) => _dateLocaleIsEnglish
+    ? '${_englishMonthNames[(month.month - 1).clamp(0, 11).toInt()]} ${month.year}'
+    : '${month.year}年 ${month.month.toString().padLeft(2, '0')}月';
+
+String datePickerSelectedTitle(DateTime date) => _dateLocaleIsEnglish
+    ? '${_englishMonthShortNames[(date.month - 1).clamp(0, 11).toInt()]} ${date.day}'
+    : '${date.month.toString().padLeft(2, '0')}月${date.day.toString().padLeft(2, '0')}日';
+
 int dateEpochDay(DateTime value) =>
     DateTime.utc(value.year, value.month, value.day).millisecondsSinceEpoch ~/
     Duration.millisecondsPerDay;
@@ -720,9 +698,8 @@ DateTime? dateFromEpochDay(dynamic raw) {
   final day = int.tryParse(text);
   if (day == null || day <= 1) return null;
   final utc = DateTime.fromMillisecondsSinceEpoch(
-    day * Duration.millisecondsPerDay,
-    isUtc: true,
-  );
+      day * Duration.millisecondsPerDay,
+      isUtc: true);
   if (_looksLikeEpochDefault(utc)) return null;
   return DateTime(utc.year, utc.month, utc.day);
 }
@@ -733,8 +710,8 @@ DateTime parseDate(String raw, {DateTime? fallback}) =>
     parseFlexibleDate(raw) ?? fallback ?? today();
 DateTime? parseUserDateOrNull(String raw) =>
     parseFlexibleDate(raw.trim()) == null
-    ? null
-    : dateOnly(parseFlexibleDate(raw.trim())!);
+        ? null
+        : dateOnly(parseFlexibleDate(raw.trim())!);
 DateTime? parseOptionalUserDate(String raw) {
   final text = raw.trim();
   if (text.isEmpty) return null;
@@ -748,6 +725,11 @@ DateTime? parseOptionalPersistedDate(dynamic raw) {
   if (raw == null) return null;
   final text = raw.toString().trim();
   if (text.isEmpty || text == 'null') return null;
+
+  if (RegExp(r'^\d{6}$|^\d{8}$').hasMatch(text)) {
+    final compact = parseFlexibleDate(text);
+    if (compact != null && !_looksLikeEpochDefault(compact)) return compact;
+  }
 
   // Some old bridge / JSON paths may accidentally persist milliseconds or seconds.
   // Treat 0 / 1 / epoch-like values as missing instead of converting them to 1970-01-01.
@@ -763,6 +745,37 @@ DateTime? parseOptionalPersistedDate(dynamic raw) {
   final parsed = parseFlexibleDate(text);
   if (parsed == null || _looksLikeEpochDefault(parsed)) return null;
   return parsed;
+}
+
+DateTime? parseOptionalPersistedDateTime(dynamic raw) {
+  if (raw == null) return null;
+  final text = raw.toString().trim();
+  if (text.isEmpty || text == 'null') return null;
+
+  final numeric = int.tryParse(text);
+  if (numeric != null) {
+    if (numeric <= 0) return null;
+    final fromMillis = numeric > 100000000000
+        ? DateTime.fromMillisecondsSinceEpoch(numeric)
+        : DateTime.fromMillisecondsSinceEpoch(numeric * 1000);
+    return _looksLikeEpochDefault(fromMillis) ? null : fromMillis;
+  }
+
+  final direct =
+      DateTime.tryParse(text) ?? DateTime.tryParse(text.replaceFirst(' ', 'T'));
+  if (direct != null && !_looksLikeEpochDefault(direct)) return direct;
+
+  final dateOnlyValue = parseFlexibleDate(text);
+  if (dateOnlyValue == null || _looksLikeEpochDefault(dateOnlyValue))
+    return null;
+  return dateOnly(dateOnlyValue);
+}
+
+DateTime parsePersistedDateTime(dynamic raw, {DateTime? fallback}) {
+  final parsed = parseOptionalPersistedDateTime(raw);
+  if (parsed != null) return parsed;
+  if (fallback != null && !_looksLikeEpochDefault(fallback)) return fallback;
+  return DateTime.now();
 }
 
 DateTime parsePersistedDate(dynamic raw, {DateTime? fallback}) {
@@ -791,12 +804,19 @@ int diffDaysInclusive(DateTime start, DateTime end) {
 
 double asDouble(dynamic value, {double fallback = 0}) {
   if (value is num) return value.toDouble();
-  return double.tryParse(value?.toString() ?? '') ?? fallback;
+  final text = value?.toString().trim() ?? '';
+  final normalized = text
+      .replaceAll('，', ',')
+      .replaceAll(RegExp(r'[,¥￥元\s]'), '')
+      .replaceAll(RegExp(r'[^0-9+\-.]'), '');
+  return double.tryParse(normalized) ?? fallback;
 }
 
 int asInt(dynamic value, {int fallback = 0}) {
   if (value is num) return value.round();
-  return int.tryParse(value?.toString() ?? '') ?? fallback;
+  final text = value?.toString().trim() ?? '';
+  final normalized = text.replaceAll(RegExp(r'[^0-9+-]'), '');
+  return int.tryParse(normalized) ?? fallback;
 }
 
 List<String> splitTags(String raw) => raw
@@ -818,10 +838,8 @@ String money(double value, AppSettings settings) {
   final parts = fixed.split('.');
   var integer = parts.first;
   if (settings.useThousandsSeparator) {
-    integer = integer.replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (m) => ',',
-    );
+    integer =
+        integer.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',');
   }
   if (settings.decimalPlaces == 0) return '${settings.currencyUnit}$integer';
   return '${settings.currencyUnit}$integer.${parts.length > 1 ? parts.last : ''.padRight(settings.decimalPlaces, '0')}';
@@ -829,28 +847,30 @@ String money(double value, AppSettings settings) {
 
 String durationCalendarText(int days) {
   final safeDays = math.max(days, 0);
-  if (safeDays < 30) return '$safeDays 天';
+  if (safeDays < 30) return '$safeDays ${tr('time.day')}';
   final years = safeDays ~/ 365;
   final months = (safeDays % 365) ~/ 30;
   final restDays = (safeDays % 365) % 30;
   if (years > 0) {
-    if (months > 0) return '$years 年 $months 个月';
-    if (restDays > 0 && years == 0) return '$years 年 $restDays 天';
-    return '$years 年';
+    if (months > 0)
+      return '$years ${tr('time.year')} $months ${tr('time.month')}';
+    if (restDays > 0 && years == 0)
+      return '$years ${tr('time.year')} $restDays ${tr('time.day')}';
+    return '$years ${tr('time.year')}';
   }
   if (months > 0 && restDays > 0 && safeDays < 90)
-    return '$months 个月 $restDays 天';
-  return '$months 个月';
+    return '$months ${tr('time.month')} $restDays ${tr('time.day')}';
+  return '$months ${tr('time.month')}';
 }
 
 String durationText(int days, DurationMode mode) {
   final safeDays = math.max(days, 0);
   if (mode == DurationMode.weeks)
-    return '${(safeDays / 7).toStringAsFixed(safeDays >= 70 ? 0 : 1)} 周';
+    return '${(safeDays / 7).toStringAsFixed(safeDays >= 70 ? 0 : 1)} ${tr('time.week')}';
   if (mode == DurationMode.months)
-    return '${(safeDays / 30).toStringAsFixed(safeDays >= 300 ? 0 : 1)} 月';
+    return '${(safeDays / 30).toStringAsFixed(safeDays >= 300 ? 0 : 1)} ${tr('time.month')}';
   if (mode == DurationMode.years) return durationCalendarText(safeDays);
-  return '$safeDays 天';
+  return '$safeDays ${tr('time.day')}';
 }
 
 String durationWithCalendarText(int days, DurationMode mode) {
@@ -864,6 +884,8 @@ enum AssetStatus { serving, retired, sold }
 
 enum WishStatus { active, archived }
 
+enum AssetValueMode { priced, priceless }
+
 enum TargetMode { none, daily, date, custom }
 
 enum ThemeSetting { light, dark, system }
@@ -873,6 +895,8 @@ enum DurationMode { days, weeks, months, years }
 enum HomeViewMode { grid, list, sticker }
 
 enum StickerEngineMode { compact, balanced, quality, hqExperimental }
+
+enum GlassEffectMode { classic, liquid }
 
 enum SortMode { dailyCost, price, days, recent }
 
@@ -888,11 +912,32 @@ extension AssetStatusX on AssetStatus {
     }
   }
 
+  String get localizedLabel => tr('AssetStatus.$name');
+
   String get value => name;
   static AssetStatus fromValue(String? value) {
     return AssetStatus.values.firstWhere(
+        (e) => e.name == value || e.label == value,
+        orElse: () => AssetStatus.serving);
+  }
+}
+
+extension AssetValueModeX on AssetValueMode {
+  String get label {
+    switch (this) {
+      case AssetValueMode.priced:
+        return '普通资产';
+      case AssetValueMode.priceless:
+        return '无价之宝';
+    }
+  }
+
+  String get localizedLabel => tr('AssetValueMode.$name');
+
+  static AssetValueMode fromValue(String? value) {
+    return AssetValueMode.values.firstWhere(
       (e) => e.name == value || e.label == value,
-      orElse: () => AssetStatus.serving,
+      orElse: () => AssetValueMode.priced,
     );
   }
 }
@@ -911,13 +956,39 @@ extension TargetModeX on TargetMode {
     }
   }
 
+  String get localizedLabel => tr('TargetMode.$name');
+
   static TargetMode fromValue(String? value) {
     return TargetMode.values.firstWhere(
-      (e) => e.name == value || e.label == value,
-      orElse: () => TargetMode.none,
-    );
+        (e) => e.name == value || e.label == value,
+        orElse: () => TargetMode.none);
   }
 }
+
+String assetDateLabel(Asset asset) =>
+    asset.isPriceless ? tr('asset.recordDate') : tr('asset.purchaseDate');
+
+String assetValueLabelText(Asset asset, AppSettings settings) =>
+    asset.isPriceless ? '∞' : money(asset.totalDisplayValue, settings);
+
+String assetBasePriceText(Asset asset, AppSettings settings) =>
+    asset.isPriceless ? '∞' : money(asset.price, settings);
+
+String assetMetricLabel(Asset asset) =>
+    asset.isPriceless ? tr('asset.sinceLast') : tr('asset.dailyCost');
+
+String assetMetricValueText(Asset asset, AppSettings settings) =>
+    asset.isPriceless
+        ? durationWithCalendarText(asset.serviceDays, settings.durationMode)
+        : '${money(asset.dailyCost, settings)} ${tr('time.perDay')}';
+
+String assetMetricCompactValue(Asset asset, AppSettings settings) =>
+    asset.isPriceless
+        ? '${asset.serviceDays}'
+        : money(asset.dailyCost, settings);
+
+String assetMetricCompactSuffix(Asset asset) =>
+    asset.isPriceless ? ' ${tr('time.day')}' : tr('time.perDay');
 
 extension StickerEngineModeX on StickerEngineMode {
   String get label {
@@ -932,6 +1003,10 @@ extension StickerEngineModeX on StickerEngineMode {
         return '高质量实验';
     }
   }
+
+  String get localizedLabel => tr('StickerEngineMode.$name');
+
+  String get localizedDescription => tr('StickerEngineMode.$name.desc');
 
   String get description {
     switch (this) {
@@ -948,9 +1023,38 @@ extension StickerEngineModeX on StickerEngineMode {
 
   static StickerEngineMode fromValue(String? value) {
     return StickerEngineMode.values.firstWhere(
-      (e) => e.name == value || e.label == value,
-      orElse: () => StickerEngineMode.balanced,
-    );
+        (e) => e.name == value || e.label == value,
+        orElse: () => StickerEngineMode.balanced);
+  }
+}
+
+extension GlassEffectModeX on GlassEffectMode {
+  String get label {
+    switch (this) {
+      case GlassEffectMode.classic:
+        return '经典毛玻璃';
+      case GlassEffectMode.liquid:
+        return '液态玻璃';
+    }
+  }
+
+  String get localizedLabel => tr('GlassEffectMode.$name');
+
+  String get localizedDescription => tr('GlassEffectMode.$name.desc');
+
+  String get description {
+    switch (this) {
+      case GlassEffectMode.classic:
+        return '使用 0.79 风格的轻量高斯模糊，稳定、省电、清晰';
+      case GlassEffectMode.liquid:
+        return '使用场景级液态玻璃折射效果，Dock、加号和保存按钮更有流动质感';
+    }
+  }
+
+  static GlassEffectMode fromValue(String? value) {
+    return GlassEffectMode.values.firstWhere(
+        (e) => e.name == value || e.label == value,
+        orElse: () => GlassEffectMode.liquid);
   }
 }
 
@@ -966,11 +1070,12 @@ extension HomeViewModeX on HomeViewMode {
     }
   }
 
+  String get localizedLabel => tr('HomeViewMode.$name');
+
   static HomeViewMode fromValue(String? value) {
     return HomeViewMode.values.firstWhere(
-      (e) => e.name == value || e.label == value,
-      orElse: () => HomeViewMode.grid,
-    );
+        (e) => e.name == value || e.label == value,
+        orElse: () => HomeViewMode.grid);
   }
 }
 
@@ -987,4 +1092,6 @@ extension SortModeX on SortMode {
         return '最新';
     }
   }
+
+  String get localizedLabel => tr('SortMode.$name');
 }
