@@ -1,6 +1,6 @@
 @echo off
 setlocal
-REM Valora v8 Windows 构建脚本
+REM Valora Windows 构建脚本
 REM 需要提前安装 Flutter stable、Android Studio / Android SDK，并把 flutter 加入 PATH。
 
 where flutter >nul 2>nul
@@ -10,14 +10,18 @@ if errorlevel 1 (
   exit /b 1
 )
 
+if not exist android\app\build.gradle (
+  echo [ERROR] Android 平台文件不完整，已停止以避免覆盖本地原生修改。
+  echo [HINT] Git 检出中请运行：git restore --source=HEAD --worktree -- android
+  echo [HINT] 若当前目录不是 Git 检出，请从干净的仓库副本恢复 android 目录。
+  exit /b 1
+)
+
 if not exist android\gradlew.bat (
-  echo [INFO] 未检测到 Gradle Wrapper，尝试用 flutter create 补齐 Android 构建壳。
-  flutter create --platforms=android --project-name valora_assets --org com.valora .
-  echo [INFO] 重新应用Valora Android Patch 文件。
-  xcopy /E /I /Y tooling\android_patch\app android\app >nul
-  copy /Y tooling\android_patch\build.gradle android\build.gradle >nul
-  copy /Y tooling\android_patch\settings.gradle android\settings.gradle >nul
-  copy /Y tooling\android_patch\gradle.properties android\gradle.properties >nul
+  echo [ERROR] 未检测到 Gradle Wrapper，已停止以避免覆盖本地原生修改。
+  echo [HINT] Git 检出中请运行：git restore --source=HEAD --worktree -- android
+  echo [HINT] 若当前目录不是 Git 检出，请从干净的仓库副本恢复 android 目录。
+  exit /b 1
 )
 
 echo [INFO] 检查 Flutter 环境...

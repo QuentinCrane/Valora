@@ -136,11 +136,8 @@ build_windows.bat
 ├── docs/
 │   ├── guides/                           # 使用、开发和构建指南
 │   ├── product/                          # 产品规格、迁移说明和参考资料
-│   ├── reports/                          # 迭代报告、验证记录和修复记录
 │   ├── stickers/                         # 贴纸封面和抠图相关笔记
-│   ├── agent/                            # AI 协作提示词和辅助指南
 │   └── assets/                           # 文档图片资源与脱敏截图
-├── tooling/android_patch/                # Android 构建壳修复用补丁文件
 ├── pubspec.yaml                          # Flutter 项目配置
 └── build_windows.bat / build_android.sh  # 本地构建脚本
 ```
@@ -187,7 +184,13 @@ flutter analyze
 flutter build apk --debug
 ```
 
-如果遇到 Android 构建壳损坏或 Gradle Wrapper 缺失，可以运行构建脚本，它会尝试用 `flutter create` 补齐 Android 壳并重新应用 `tooling/android_patch` 中的项目补丁。
+如果 Android 构建壳或 Gradle Wrapper 缺失，构建脚本会停止而不会覆盖本地原生修改。在 Git 检出中运行以下命令恢复受版本控制的 Android 文件：
+
+```bash
+git restore --source=HEAD --worktree -- android
+```
+
+如果当前目录不是 Git 检出，请从干净的仓库副本恢复 `android/` 目录后再构建。
 
 ## 开源前技术检查
 

@@ -6,18 +6,18 @@ if ! command -v flutter >/dev/null 2>&1; then
   exit 1
 fi
 
-repair_android_shell() {
-  echo "[INFO] Re-applying Valora Android patch files."
-  cp -a tooling/android_patch/app android/
-  cp -a tooling/android_patch/build.gradle android/build.gradle
-  cp -a tooling/android_patch/settings.gradle android/settings.gradle
-  cp -a tooling/android_patch/gradle.properties android/gradle.properties
-}
+if [ ! -f android/app/build.gradle ] || [ ! -f android/settings.gradle ]; then
+  echo "[ERROR] Android platform files are incomplete; refusing to overwrite local native changes." >&2
+  echo "[HINT] In a Git checkout, run: git restore --source=HEAD --worktree -- android" >&2
+  echo "[HINT] Otherwise, restore android from a clean checkout." >&2
+  exit 1
+fi
 
 if [ ! -f android/gradlew ]; then
-  echo "[INFO] Gradle Wrapper not found. Running flutter create to repair Android build shell."
-  flutter create --platforms=android --project-name valora_assets --org com.valora .
-  repair_android_shell
+  echo "[ERROR] Gradle Wrapper is missing; refusing to overwrite local native changes." >&2
+  echo "[HINT] In a Git checkout, run: git restore --source=HEAD --worktree -- android" >&2
+  echo "[HINT] Otherwise, restore android from a clean checkout." >&2
+  exit 1
 fi
 
 flutter doctor || true
