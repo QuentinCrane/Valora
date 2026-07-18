@@ -9,7 +9,6 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.ColorStateList;
 import android.content.SharedPreferences;
 import android.content.ContentValues;
 import android.database.Cursor;
@@ -18,7 +17,6 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
@@ -28,20 +26,13 @@ import android.os.Vibrator;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.Gravity;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
-import android.widget.TextView;
-import android.widget.Button;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
-
-import com.google.android.material.datepicker.MaterialDatePicker;
-import com.google.android.material.datepicker.CalendarConstraints;
-import com.google.android.material.button.MaterialButton;
 
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions;
 
@@ -100,11 +91,11 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipInputStream;
 
-import io.flutter.embedding.android.FlutterFragmentActivity;
+import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.MethodChannel;
 
-public class MainActivity extends FlutterFragmentActivity {
+public class MainActivity extends FlutterActivity {
     private static final String STORE_CHANNEL = "valora/local_store";
     private static final String NATIVE_CHANNEL = "valora/native";
     private static final String PREFS_NAME = "valora_assets_store";
@@ -155,7 +146,11 @@ public class MainActivity extends FlutterFragmentActivity {
         new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), STORE_CHANNEL)
                 .setMethodCallHandler((call, result) -> {
                     if ("loadJson".equals(call.method)) {
-                        result.success(storeDb.loadJson());
+                        try {
+                            result.success(storeDb.loadJson());
+                        } catch (Exception e) {
+                            result.error("load_json_error", e.getMessage(), null);
+                        }
                     } else if ("saveJson".equals(call.method)) {
                         String json = call.argument("json");
                         result.success(storeDb.saveJson(json == null ? "" : json));
@@ -181,7 +176,9 @@ public class MainActivity extends FlutterFragmentActivity {
                     startSingleResult(result, REQ_PICK_IMAGE, buildPickImageIntent());
                     break;
                 case "pickNativeDate":
-                    showNativeDatePicker(arg(call.argument("initialDate"), ""), arg(call.argument("title"), "选择日期"), result);
+                    // Date picking is implemented by the custom Flutter iOS-style picker.
+                    // Keep the method for old Dart callers, but avoid shipping Material DatePicker.
+                    result.success(null);
                     break;
                 case "capturePhoto":
                     startSingleResult(result, REQ_CAPTURE_PHOTO, new Intent(MediaStore.ACTION_IMAGE_CAPTURE));
@@ -238,8 +235,8 @@ public class MainActivity extends FlutterFragmentActivity {
                 case "importDataArchive":
                     Intent openArchive = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                     openArchive.addCategory(Intent.CATEGORY_OPENABLE);
-                    // 不限制 MIME。很多国产文件管理器会把 .zip 标成 application/octet-stream、application/x-zip、甚至 */*，
-                    // 之前加 EXTRA_MIME_TYPES 会导致部分设备根本选不到 ZIP。
+                    // 不限制 MIME。許多國產檔案管理器會把 .zip 標成 application/octet-stream、application/x-zip，甚至 */*，
+                    // 之前加 EXTRA_MIME_TYPES 會導致部分裝置根本選不到 ZIP。
                     openArchive.setType("*/*");
                     openArchive.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     openArchive.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
@@ -257,8 +254,8 @@ public class MainActivity extends FlutterFragmentActivity {
                     break;
                 case "scheduleNotification":
                     scheduleNotification(
-                            arg(call.argument("title"), "Valora提醒"),
-                            arg(call.argument("text"), "该复盘资产了"),
+                            arg(call.argument("title"), getString(R.string.notification_default_title)),
+                            arg(call.argument("text"), getString(R.string.notification_default_text)),
                             longArg(call.argument("delayMillis"), 60000L)
                     );
                     result.success(true);
@@ -343,7 +340,7 @@ public class MainActivity extends FlutterFragmentActivity {
                 }
                 return "";
             } catch (Exception e) {
-                return "";
+                throw new RuntimeException("Failed to read local Valora JSON", e);
             } finally {
                 if (cursor != null) cursor.close();
             }
@@ -378,154 +375,6 @@ public class MainActivity extends FlutterFragmentActivity {
         }
     }
 
-
-    private void forceBlueMaterialDatePicker(MaterialDatePicker<?> picker) {
-        // Material Components 1.14.0 removed the old show-listener hook on
-        // MaterialDatePicker. Keep this method as a no-op so native date picking
-        // still compiles and relies on ThemeOverlay_Valora_DatePicker styles.
-    }
-
-    private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
-
-    private void applyValoraDatePickerColors(MaterialDatePicker<?> picker, int primary, int primaryDark, int primarySoft) {
-        if (picker.getDialog() == null || picker.getDialog().getWindow() == null) return;
-        View decor = picker.getDialog().getWindow().getDecorView();
-        int headerId = getResources().getIdentifier("mtrl_picker_header", "id", getPackageName());
-        View header = headerId == 0 ? null : picker.getDialog().findViewById(headerId);
-        if (header != null) {
-            GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Color.WHITE, primarySoft});
-            bg.setCornerRadius(0);
-            header.setBackground(bg);
-        }
-        tintDatePickerViewTree(decor, primary, primaryDark, primarySoft);
-    }
-
-    private void tintDatePickerViewTree(View view, int primary, int primaryDark, int primarySoft) {
-        if (view == null) return;
-        String name = "";
-        try {
-            if (view.getId() != View.NO_ID) name = getResources().getResourceEntryName(view.getId());
-        } catch (Exception ignored) { }
-
-        if (view instanceof MaterialButton) {
-            MaterialButton button = (MaterialButton) view;
-            button.setTextColor(primaryDark);
-            button.setRippleColor(ColorStateList.valueOf(Color.argb(52, 124, 198, 242)));
-            button.setIconTint(ColorStateList.valueOf(primaryDark));
-            button.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
-            if (name.contains("confirm") || name.contains("save") || name.contains("positive")) {
-                button.setTextColor(primaryDark);
-            }
-        } else if (view instanceof Button) {
-            ((Button) view).setTextColor(primaryDark);
-        }
-
-        if (view instanceof TextView) {
-            TextView textView = (TextView) view;
-            // Keep Android/Material default font metrics; forcing font padding off can make day numbers look vertically misplaced on some ROMs.
-            textView.setIncludeFontPadding(true);
-            textView.setTextColor(view.isEnabled() ? primaryDark : Color.argb(120, 84, 112, 128));
-            CharSequence text = textView.getText();
-            boolean looksLikeDayCell = false;
-            if (text != null) {
-                String s = text.toString().trim();
-                looksLikeDayCell = s.matches("\\d{1,2}") || s.matches("\\d{4}");
-            }
-            if (looksLikeDayCell || name.contains("day") || name.contains("year") || name.contains("calendar")) {
-                textView.setGravity(Gravity.CENTER);
-                textView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-                if (view.isSelected() || view.isActivated() || name.contains("selected")) {
-                    GradientDrawable selectedBg = new GradientDrawable();
-                    selectedBg.setColor(primary);
-                    selectedBg.setCornerRadius(dp(12));
-                    textView.setBackground(selectedBg);
-                    textView.setTextColor(primaryDark);
-                }
-            }
-        }
-
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                tintDatePickerViewTree(group.getChildAt(i), primary, primaryDark, primarySoft);
-            }
-        }
-    }
-
-    private void showNativeDatePicker(String initialDate, String title, MethodChannel.Result result) {
-        try {
-            final Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-            utc.set(Calendar.HOUR_OF_DAY, 0);
-            utc.set(Calendar.MINUTE, 0);
-            utc.set(Calendar.SECOND, 0);
-            utc.set(Calendar.MILLISECOND, 0);
-            Pattern p = Pattern.compile("^(\\d{4})-(\\d{1,2})-(\\d{1,2})$");
-            Matcher m = p.matcher(initialDate == null ? "" : initialDate.trim());
-            if (m.find()) {
-                int y = Integer.parseInt(m.group(1));
-                int month = Integer.parseInt(m.group(2));
-                int day = Integer.parseInt(m.group(3));
-                utc.set(Calendar.YEAR, y);
-                utc.set(Calendar.MONTH, Math.max(0, Math.min(11, month - 1)));
-                utc.set(Calendar.DAY_OF_MONTH, Math.max(1, Math.min(31, day)));
-            }
-            Calendar startCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-            startCal.clear();
-            startCal.set(1970, Calendar.JANUARY, 1);
-            Calendar endCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-            endCal.clear();
-            endCal.set(2100, Calendar.DECEMBER, 31);
-            CalendarConstraints constraints = new CalendarConstraints.Builder()
-                    .setStart(startCal.getTimeInMillis())
-                    .setEnd(endCal.getTimeInMillis())
-                    .setOpenAt(utc.getTimeInMillis())
-                    .setFirstDayOfWeek(Calendar.MONDAY)
-                    .build();
-
-            final boolean[] replied = new boolean[]{false};
-            String safeTitle = (title == null || title.trim().isEmpty()) ? "选择日期" : title.trim();
-            MaterialDatePicker<Long> picker = MaterialDatePicker.Builder.datePicker()
-                    .setTitleText(safeTitle)
-                    .setPositiveButtonText("完成")
-                    .setNegativeButtonText("取消")
-                    .setSelection(utc.getTimeInMillis())
-                    .setCalendarConstraints(constraints)
-                    .setInputMode(MaterialDatePicker.INPUT_MODE_CALENDAR)
-                    .setTheme(R.style.ThemeOverlay_Valora_DatePicker)
-                    .build();
-            forceBlueMaterialDatePicker(picker);
-            picker.addOnPositiveButtonClickListener(selection -> {
-                if (replied[0]) return;
-                replied[0] = true;
-                Calendar selected = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-                selected.setTimeInMillis(selection == null ? utc.getTimeInMillis() : selection);
-                result.success(String.format(java.util.Locale.US, "%04d-%02d-%02d",
-                        selected.get(Calendar.YEAR),
-                        selected.get(Calendar.MONTH) + 1,
-                        selected.get(Calendar.DAY_OF_MONTH)));
-            });
-            picker.addOnNegativeButtonClickListener(v -> {
-                if (replied[0]) return;
-                replied[0] = true;
-                result.success(null);
-            });
-            picker.addOnCancelListener(v -> {
-                if (replied[0]) return;
-                replied[0] = true;
-                result.success(null);
-            });
-            picker.addOnDismissListener(v -> {
-                if (replied[0]) return;
-                replied[0] = true;
-                result.success(null);
-            });
-            picker.show(getSupportFragmentManager(), "Valora_material3_date_picker");
-        } catch (Exception e) {
-            result.error("date_picker_error", e.getMessage(), null);
-        }
-    }
 
     private Intent buildPickImageIntent() {
         // Prefer Android's system Photo Picker on Android 13+ so the cover/sticker workflow
@@ -792,7 +641,7 @@ public class MainActivity extends FlutterFragmentActivity {
                         if (detailed) {
                             StickerCandidate only = new StickerCandidate();
                             only.uri = path;
-                            only.label = "兜底";
+                            only.label = getString(R.string.sticker_label_fallback);
                             only.engine = "Heuristic";
                             only.score = 0.42;
                             only.width = fallback.getWidth();
@@ -821,7 +670,7 @@ public class MainActivity extends FlutterFragmentActivity {
                     if (detailed) {
                         StickerCandidate only = new StickerCandidate();
                         only.uri = path;
-                        only.label = "兜底";
+                        only.label = getString(R.string.sticker_label_fallback);
                         only.engine = "Heuristic";
                         only.score = 0.42;
                         only.width = fallback.getWidth();
@@ -849,7 +698,7 @@ public class MainActivity extends FlutterFragmentActivity {
     private void generateStickerCandidates(Bitmap source, StickerEngineConfig config, CandidateSuccess success, CandidateFailure failure) {
         final List<StickerCandidate> candidates = new ArrayList<>();
         try {
-            // 预留本地 TFLite 模型入口；若未来模型文件存在，可在这里接入。
+            // 預留本機 TFLite 模型入口；若未來模型檔案存在，可在這裡接入。
             candidates.addAll(generateOptionalLocalModelCandidates(source, config));
         } catch (Exception ignored) {}
 
@@ -865,9 +714,9 @@ public class MainActivity extends FlutterFragmentActivity {
                         try {
                             candidates.addAll(generateMlKitCandidates(source, segmentation.getForegroundBitmap(), segmentation.getForegroundConfidenceMask(), config));
                             if (candidates.isEmpty()) {
-                                candidates.add(generateHeuristicCandidate(source, "兜底", "Heuristic"));
+                                candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
                             } else {
-                                candidates.add(generateHeuristicCandidate(source, "补充兜底", "Heuristic"));
+                                candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_extra_fallback), "Heuristic"));
                             }
                             success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
                         } catch (Exception e) {
@@ -878,7 +727,7 @@ public class MainActivity extends FlutterFragmentActivity {
                     })
                     .addOnFailureListener(e -> {
                         try {
-                            candidates.add(generateHeuristicCandidate(source, "兜底", "Heuristic"));
+                            candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
                             success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
                         } catch (Exception inner) {
                             failure.accept(inner);
@@ -888,7 +737,7 @@ public class MainActivity extends FlutterFragmentActivity {
                     });
         } catch (Throwable mlInitError) {
             try {
-                candidates.add(generateHeuristicCandidate(source, "兜底", "Heuristic"));
+                candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
                 success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
             } catch (Exception e) {
                 failure.accept(e);
@@ -907,7 +756,12 @@ public class MainActivity extends FlutterFragmentActivity {
         source.getPixels(srcPixels, 0, w, 0, 0, w, h);
         final List<StickerCandidate> out = new ArrayList<>();
         final float[] thresholds = config.thresholds;
-        final String[] labels = new String[]{"保守", "均衡", "激进", "精细"};
+        final String[] labels = new String[]{
+                getString(R.string.sticker_label_conservative),
+                getString(R.string.sticker_label_balanced),
+                getString(R.string.sticker_label_strong),
+                getString(R.string.sticker_label_fine)
+        };
         if (confidenceMask != null && confidenceMask.capacity() >= w * h) {
             float[] maskValues = new float[w * h];
             confidenceMask.rewind();
@@ -929,7 +783,7 @@ public class MainActivity extends FlutterFragmentActivity {
             scaledFg.getPixels(fgPixels, 0, w, 0, 0, w, h);
             boolean[] mask = new boolean[w * h];
             for (int i = 0; i < mask.length; i++) mask[i] = Color.alpha(fgPixels[i]) > 32;
-            StickerCandidate candidate = buildMaskStickerCandidate(source, srcPixels, mask, "均衡", "MLKit alpha");
+            StickerCandidate candidate = buildMaskStickerCandidate(source, srcPixels, mask, getString(R.string.sticker_label_balanced), "MLKit alpha");
             if (candidate != null) out.add(candidate);
             if (scaledFg != foregroundBitmap) scaledFg.recycle();
         }
@@ -1386,8 +1240,8 @@ public class MainActivity extends FlutterFragmentActivity {
     }
 
     private boolean[] featherBoundary(boolean[] fg, int w, int h) {
-        // 这里仍返回布尔 mask，真正的半透明边缘在 renderStickerBitmap 中根据邻域动态减淡。
-        // 单独保留这个函数是为了后续如果要接入 TFLite alpha matting，可以只替换这里。
+        // 這裡仍返回布林 mask，真正的半透明邊緣在 renderStickerBitmap 中根據鄰域動態減淡。
+        // 單獨保留這個函式是為了後續如果要接入 TFLite alpha matting，可以只替換這裡。
         return fg;
     }
 
@@ -1536,7 +1390,8 @@ public class MainActivity extends FlutterFragmentActivity {
                                 + "\"format\":\"" + escape(String.valueOf(b.getFormat())) + "\""
                                 + "}");
                     })
-                    .addOnFailureListener(e -> result.error("barcode_scan_error", e.getMessage(), null));
+                    .addOnFailureListener(e -> result.error("barcode_scan_error", e.getMessage(), null))
+                    .addOnCompleteListener(task -> scanner.close());
         } catch (Exception e) {
             result.error("barcode_scan_error", e.getMessage(), null);
         }
@@ -1560,7 +1415,8 @@ public class MainActivity extends FlutterFragmentActivity {
                                 + "\"nameCandidate\":\"" + escape(title) + "\""
                                 + "}");
                     })
-                    .addOnFailureListener(e -> result.error("ocr_error", e.getMessage(), null));
+                    .addOnFailureListener(e -> result.error("ocr_error", e.getMessage(), null))
+                    .addOnCompleteListener(task -> recognizer.close());
         } catch (Exception e) {
             result.error("ocr_error", e.getMessage(), null);
         }
@@ -1657,11 +1513,11 @@ public class MainActivity extends FlutterFragmentActivity {
     @SuppressWarnings("unchecked")
     private void shareDataArchive(Object arguments) {
         Map<String, Object> args = arguments instanceof Map ? (Map<String, Object>) arguments : new HashMap<>();
-        String title = arg(args.get("title"), "Valora完整资料包");
+        String title = arg(args.get("title"), getString(R.string.archive_share_title));
         String json = arg(args.get("json"), "{}");
         String csv = arg(args.get("csv"), "");
         String markdown = arg(args.get("markdown"), "");
-        String fileName = sanitizeArchiveFileName(arg(args.get("fileName"), "valora_complete_backup.zip"));
+        String fileName = sanitizeArchiveFileName(arg(args.get("fileName"), "zhipu_complete_backup.zip"));
         Object rawPaths = args.get("mediaPaths");
         List<String> mediaPaths = new ArrayList<>();
         if (rawPaths instanceof List) {
@@ -1676,9 +1532,13 @@ public class MainActivity extends FlutterFragmentActivity {
             File zip = new File(shareDir, fileName.endsWith(".zip") ? fileName : fileName + ".zip");
             ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zip));
             addTextEntry(zos, "backup/valora_backup.json", json);
+            // 相容中文品牌名「值譜」以及歷史 zhipu 備份命名：新包同時寫入兩份同內容 JSON。
+            addTextEntry(zos, "backup/zhipu_backup.json", json);
             addTextEntry(zos, "backup/valora_assets.csv", csv);
+            addTextEntry(zos, "backup/zhipu_assets.csv", csv);
             addTextEntry(zos, "backup/valora_report.md", markdown);
-            addTextEntry(zos, "README.txt", "Valora完整资料包\n\n包含：\n- backup/valora_backup.json：可恢复的结构化数据\n- backup/valora_assets.csv：资产表格\n- backup/valora_report.md：资产报告\n- backup/media_manifest.tsv：媒体原路径与 ZIP 路径映射，用于跨设备恢复图片\n- sqlite/：应用当前 SQLite 数据库副本\n- media/：本地封面、贴纸、手动勾勒图片等媒体文件\n\n说明：恢复时优先使用 JSON + media 重建当前 SQLite，不会直接覆盖运行中的数据库文件。\n");
+            addTextEntry(zos, "backup/zhipu_report.md", markdown);
+            addTextEntry(zos, "README.txt", getString(R.string.archive_readme));
             addSqliteFiles(zos);
             String mediaManifest = addMediaFiles(zos, mediaPaths);
             addTextEntry(zos, "backup/media_manifest.tsv", mediaManifest);
@@ -1691,13 +1551,13 @@ public class MainActivity extends FlutterFragmentActivity {
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(send, title));
         } catch (Exception e) {
-            shareText(title, "完整资料包生成失败：" + e.getMessage() + "\n\n" + markdown);
+            shareText(title, getString(R.string.archive_share_failed, e.getMessage()) + "\n\n" + markdown);
         }
     }
 
     private String sanitizeArchiveFileName(String name) {
-        String clean = name == null ? "valora_complete_backup.zip" : name.replaceAll("[^a-zA-Z0-9._-]", "_");
-        if (clean.trim().length() == 0) clean = "valora_complete_backup.zip";
+        String clean = name == null ? "zhipu_complete_backup.zip" : name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (clean.trim().length() == 0) clean = "zhipu_complete_backup.zip";
         return clean;
     }
 
@@ -1782,12 +1642,24 @@ public class MainActivity extends FlutterFragmentActivity {
     }
 
 
+    private boolean isCompatibleBackupJsonEntry(String lower) {
+        if (lower == null) return false;
+        if (lower.equals("backup/valora_backup.json") || lower.endsWith("/valora_backup.json") || lower.equals("valora_backup.json")) return true;
+        if (lower.equals("backup/zhipu_backup.json") || lower.endsWith("/zhipu_backup.json") || lower.equals("zhipu_backup.json")) return true;
+        if (lower.equals("backup/backup.json") || lower.endsWith("/backup.json") || lower.equals("backup.json")) return true;
+        // 相容歷史中文 / 拼音品牌包：只在 backup 目錄或根目錄接受 *_backup.json，避免誤讀媒體側邊檔案。
+        if (lower.endsWith("_backup.json")) {
+            return !lower.contains("/") || lower.startsWith("backup/") || lower.contains("/backup/");
+        }
+        return false;
+    }
+
     private void restoreDataArchiveFromUri(Uri uri, MethodChannel.Result result) {
         ZipInputStream zis = null;
         try {
             InputStream raw = getContentResolver().openInputStream(uri);
             if (raw == null) {
-                result.success("{\"ok\":false,\"message\":\"无法读取 ZIP 文件\"}");
+                result.success("{\"ok\":false,\"message\":\"" + escape(getString(R.string.archive_restore_read_failed)) + "\"}");
                 return;
             }
             zis = new ZipInputStream(raw);
@@ -1813,7 +1685,7 @@ public class MainActivity extends FlutterFragmentActivity {
                     continue;
                 }
                 String lower = entryName.toLowerCase(java.util.Locale.US);
-                if (lower.equals("backup/valora_backup.json") || lower.endsWith("/valora_backup.json") || lower.equals("valora_backup.json")) {
+                if (isCompatibleBackupJsonEntry(lower)) {
                     ByteArrayOutputStream bout = new ByteArrayOutputStream();
                     int n;
                     while ((n = zis.read(buf)) >= 0) bout.write(buf, 0, n);
@@ -1857,7 +1729,7 @@ public class MainActivity extends FlutterFragmentActivity {
             zis.close();
             zis = null;
             if (backupJson.trim().length() == 0) {
-                result.success("{\"ok\":false,\"message\":\"ZIP 中没有找到 backup/valora_backup.json。请确认选择的是Valora导出的完整资料包，而不是普通压缩包。\"}");
+                result.success("{\"ok\":false,\"message\":\"" + escape(getString(R.string.archive_restore_no_json)) + "\"}");
                 return;
             }
             applyMediaManifest(mediaManifest, mediaEntryMap, mediaMap);
@@ -1870,13 +1742,13 @@ public class MainActivity extends FlutterFragmentActivity {
             String jsonPath = "file://" + jsonFile.getAbsolutePath();
             StringBuilder sb = new StringBuilder();
             sb.append("{\"ok\":true");
-            sb.append(",\"message\":\"已读取完整资料包\"");
+            sb.append(",\"message\":\"").append(escape(getString(R.string.archive_restore_read_ok))).append("\"");
             sb.append(",\"mediaCount\":").append(mediaCount);
             sb.append(",\"sqliteCount\":").append(sqliteCount);
             sb.append(",\"entryCount\":").append(totalEntries);
             sb.append(",\"jsonSize\":").append(rewrittenJson.length());
             sb.append(",\"jsonPath\":\"").append(escape(jsonPath)).append("\"");
-            // 小型备份直接回传，较大的备份让 Flutter 从 jsonPath 读取，避免 MethodChannel 大字符串不稳定。
+            // 小型備份直接回傳，較大的備份讓 Flutter 從 jsonPath 讀取，避免 MethodChannel 大字串不穩定。
             if (rewrittenJson.length() < 256000) {
                 sb.append(",\"json\":\"").append(escape(rewrittenJson)).append("\"");
             }
@@ -1927,7 +1799,7 @@ public class MainActivity extends FlutterFragmentActivity {
             File root = getFilesDir();
             String canonicalFile = file.getCanonicalPath();
             String canonicalRoot = root.getCanonicalPath();
-            if (!canonicalFile.startsWith(canonicalRoot)) return "";
+            if (!canonicalFile.equals(canonicalRoot) && !canonicalFile.startsWith(canonicalRoot + File.separator)) return "";
             FileInputStream in = new FileInputStream(file);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
@@ -1944,7 +1816,7 @@ public class MainActivity extends FlutterFragmentActivity {
     private String rewriteArchiveMediaPaths(String json, Map<String, String> mediaMap) {
         if (json == null || json.length() == 0 || mediaMap == null || mediaMap.isEmpty()) return json == null ? "" : json;
         String result = json;
-        // 1. 先做精确替换：v50 的 media_manifest.tsv 会提供旧设备完整 file:// 路径和绝对路径。
+        // 1. 先做精確替換：v50 的 media_manifest.tsv 會提供舊裝置完整 file:// 路徑和絕對路徑。
         List<Map.Entry<String, String>> entries = new ArrayList<>(mediaMap.entrySet());
         Collections.sort(entries, (a, b) -> Integer.compare(b.getKey() == null ? 0 : b.getKey().length(), a.getKey() == null ? 0 : a.getKey().length()));
         for (Map.Entry<String, String> item : entries) {
@@ -1955,7 +1827,7 @@ public class MainActivity extends FlutterFragmentActivity {
                 result = result.replace(key, restored);
             } catch (Exception ignored) {}
         }
-        // 2. 再做旧版 ZIP 兼容：v49 没有 manifest，只能通过文件名尽量匹配旧绝对路径。
+        // 2. 再做舊版 ZIP 相容：v49 沒有 manifest，只能透過檔名盡量匹配舊絕對路徑。
         for (Map.Entry<String, String> item : entries) {
             String fileName = item.getKey();
             String restored = item.getValue();
@@ -1989,7 +1861,7 @@ public class MainActivity extends FlutterFragmentActivity {
 
     private void writeClipboardText(String text) {
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Valora", text));
+        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText(getString(R.string.app_name), text));
     }
 
     private void scheduleNotification(String title, String text, long delayMillis) {
@@ -2015,14 +1887,14 @@ public class MainActivity extends FlutterFragmentActivity {
         Intent addAsset = new Intent(this, MainActivity.class).setAction("com.valora.assets.ADD_ASSET");
         Intent addWish = new Intent(this, MainActivity.class).setAction("com.valora.assets.ADD_WISH");
         ShortcutInfo s1 = new ShortcutInfo.Builder(this, "add_asset")
-                .setShortLabel("新增资产")
-                .setLongLabel("新增Valora资产")
+                .setShortLabel(getString(R.string.shortcut_add_asset_short))
+                .setLongLabel(getString(R.string.shortcut_add_asset_long))
                 .setIcon(Icon.createWithResource(this, R.drawable.ic_shortcut_add))
                 .setIntent(addAsset)
                 .build();
         ShortcutInfo s2 = new ShortcutInfo.Builder(this, "add_wish")
-                .setShortLabel("新增心愿")
-                .setLongLabel("新增Valora心愿")
+                .setShortLabel(getString(R.string.shortcut_add_wish_short))
+                .setLongLabel(getString(R.string.shortcut_add_wish_long))
                 .setIcon(Icon.createWithResource(this, R.drawable.ic_shortcut_wish))
                 .setIntent(addWish)
                 .build();
@@ -2055,6 +1927,7 @@ public class MainActivity extends FlutterFragmentActivity {
         ValoraQuickWidgetProvider.updateAll(this, appWidgetManager);
         ValoraDueWidgetProvider.updateAll(this, appWidgetManager);
         ValoraSnapshotWidgetProvider.updateAll(this, appWidgetManager);
+        ValoraMiniWidgetProvider.updateAll(this, appWidgetManager);
     }
 
     private boolean requestNotificationPermission() {
@@ -2080,6 +1953,7 @@ public class MainActivity extends FlutterFragmentActivity {
         startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
     }
 
+    @SuppressWarnings("deprecation")
     private String intentToJson(Intent intent) {
         if (intent == null) return "";
         String action = intent.getAction();
@@ -2088,6 +1962,10 @@ public class MainActivity extends FlutterFragmentActivity {
         Uri uri = intent.getData();
         if (uri == null && intent.getClipData() != null && intent.getClipData().getItemCount() > 0) {
             uri = intent.getClipData().getItemAt(0).getUri();
+        }
+        if (uri == null && Intent.ACTION_SEND.equals(action)) {
+            Object stream = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (stream instanceof Uri) uri = (Uri) stream;
         }
         return "{"
                 + "\"action\":\"" + escape(action) + "\","

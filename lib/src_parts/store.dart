@@ -59,6 +59,7 @@ class AnalyticsSnapshot {
   final Map<String, int> tagDistribution;
   final List<Asset> topDailyAssets;
   final List<AssetTrendPoint> valueTrend;
+  final List<AssetTrendPoint> dailyCostTrend;
   final List<AssetInsight> insights;
 
   const AnalyticsSnapshot({
@@ -72,6 +73,7 @@ class AnalyticsSnapshot {
     required this.tagDistribution,
     required this.topDailyAssets,
     required this.valueTrend,
+    required this.dailyCostTrend,
     required this.insights,
   });
 }
@@ -281,6 +283,9 @@ class AppStore extends ChangeNotifier {
 
   String _analyticsKey() {
     final buffer = StringBuffer()
+      ..write('day:')
+      ..write(dateEpochDay(DateTime.now()))
+      ..write('|')
       ..write(settings.includeRetiredInTotal)
       ..write('|')
       ..write(settings.durationMode.name)
@@ -353,6 +358,7 @@ class AppStore extends ChangeNotifier {
       tagDistribution: Map<String, int>.unmodifiable(tagDistribution()),
       topDailyAssets: List<Asset>.unmodifiable(topDaily),
       valueTrend: List<AssetTrendPoint>.unmodifiable(assetValueTrend()),
+      dailyCostTrend: List<AssetTrendPoint>.unmodifiable(dailyCostTrend()),
       insights: List<AssetInsight>.unmodifiable(assetInsights()),
     );
     _analyticsSnapshotKey = key;
@@ -708,28 +714,94 @@ class AppStore extends ChangeNotifier {
     if (assets.isEmpty) return const [];
     final sorted = [...assets]
       ..sort((a, b) => a.purchaseDate.compareTo(b.purchaseDate));
-    final start = DateTime(sorted.first.purchaseDate.year,
-        sorted.first.purchaseDate.month, sorted.first.purchaseDate.day);
-    final end = DateTime.now();
-    final totalDays = math.max(end.difference(start).inDays, 1);
-    final step = math.max((totalDays / math.max(segments - 1, 1)).ceil(), 1);
+    final start = dateOnly(sorted.first.purchaseDate);
+    final end = dateOnly(DateTime.now());
+    final totalDays = math.max(end.difference(start).inDays, 0);
+    final sampleCount = math.max(1, math.min(segments, totalDays + 1));
     final points = <AssetTrendPoint>[];
-    for (var i = 0; i < segments; i++) {
-      final cursor =
-          i == segments - 1 ? end : start.add(Duration(days: i * step));
+    for (var i = 0; i < sampleCount; i++) {
+      final offset = sampleCount == 1
+          ? totalDays
+          : (totalDays * i / (sampleCount - 1)).round();
+      final cursor = start.add(Duration(days: offset));
       final value = assets.fold(0.0, (sum, asset) {
-        if (asset.purchaseDate.isAfter(cursor)) return sum;
+        final purchaseDate = dateOnly(asset.purchaseDate);
+        if (purchaseDate.isAfter(cursor)) return sum;
         if (asset.status == AssetStatus.sold &&
             asset.soldAt != null &&
-            !asset.soldAt!.isAfter(cursor)) return sum;
+            !dateOnly(asset.soldAt!).isAfter(cursor)) return sum;
         if (!settings.includeRetiredInTotal &&
-            asset.status == AssetStatus.retired) return sum;
+            asset.status == AssetStatus.retired &&
+            (asset.retiredAt == null ||
+                !dateOnly(asset.retiredAt!).isAfter(cursor))) return sum;
         if (!asset.includeInTotal) return sum;
         if (asset.isPriceless) return sum;
-        return sum + asset.price + asset.addonTotal;
+        final addonValue = asset.addons.fold(0.0, (addonSum, addon) {
+          if (!addon.includeInTotal) return addonSum;
+          final addonDate =
+              addon.effectivePurchaseDate(purchaseDate) ?? purchaseDate;
+          return dateOnly(addonDate).isAfter(cursor)
+              ? addonSum
+              : addonSum + addon.price;
+        });
+        return sum + asset.price + addonValue;
       });
       points.add(AssetTrendPoint(
           label: '${cursor.month}/${cursor.day}', value: value));
+    }
+    return points;
+  }
+
+  List<AssetTrendPoint> dailyCostTrend({int segments = 8}) {
+    final dailyAssets =
+        assets.where((a) => !a.isPriceless && a.includeInDailyCost).toList();
+    if (dailyAssets.isEmpty) return const [];
+    dailyAssets.sort((a, b) => a.purchaseDate.compareTo(b.purchaseDate));
+    final start = dateOnly(dailyAssets.first.purchaseDate);
+    final end = dateOnly(DateTime.now());
+    final totalDays = math.max(end.difference(start).inDays, 0);
+    final sampleCount = math.max(1, math.min(segments, totalDays + 1));
+    final points = <AssetTrendPoint>[];
+    DateTime? previousCursor;
+    for (var i = 0; i < sampleCount; i++) {
+      final offset = sampleCount == 1
+          ? totalDays
+          : (totalDays * i / (sampleCount - 1)).round();
+      final cursor = start.add(Duration(days: offset));
+      if (previousCursor != null &&
+          dateEpochDay(previousCursor) == dateEpochDay(cursor)) {
+        continue;
+      }
+      previousCursor = cursor;
+      final activeDailyCosts = <double>[];
+      for (final asset in dailyAssets) {
+        final purchaseDate = dateOnly(asset.purchaseDate);
+        if (purchaseDate.isAfter(cursor)) continue;
+        var serviceEnd = cursor;
+        if (asset.status == AssetStatus.retired &&
+            asset.retiredAt != null &&
+            !dateOnly(asset.retiredAt!).isAfter(cursor)) {
+          serviceEnd = dateOnly(asset.retiredAt!);
+        }
+        if (asset.status == AssetStatus.sold &&
+            asset.soldAt != null &&
+            !dateOnly(asset.soldAt!).isAfter(cursor)) {
+          serviceEnd = dateOnly(asset.soldAt!);
+        }
+        final days = diffDaysInclusive(purchaseDate, serviceEnd);
+        final recovered = asset.status == AssetStatus.sold &&
+                asset.soldAt != null &&
+                !dateOnly(asset.soldAt!).isAfter(cursor)
+            ? (asset.soldPrice ?? 0)
+            : 0.0;
+        final netCost = asset.price + asset.dailyAddonTotal - recovered;
+        activeDailyCosts.add(netCost / math.max(days, 1));
+      }
+      if (activeDailyCosts.isEmpty) continue;
+      final average = activeDailyCosts.fold(0.0, (sum, value) => sum + value) /
+          activeDailyCosts.length;
+      points.add(AssetTrendPoint(
+          label: '${cursor.month}/${cursor.day}', value: average));
     }
     return points;
   }
@@ -1029,6 +1101,25 @@ class AppStore extends ChangeNotifier {
 
   Future<void> deleteAsset(String id) async {
     assets.removeWhere((a) => a.id == id);
+    for (var i = 0; i < wishes.length; i++) {
+      if (wishes[i].convertedAssetId == id) {
+        wishes[i] = wishes[i].copyWith(
+          archived: false,
+          clearConvertedAt: true,
+          clearConvertedAssetId: true,
+        );
+      }
+    }
+    for (var i = recoveryRecords.length - 1; i >= 0; i--) {
+      final record = recoveryRecords[i];
+      if (!record.assetIds.contains(id)) continue;
+      final remainingIds = record.assetIds.where((item) => item != id).toList();
+      if (remainingIds.isEmpty) {
+        recoveryRecords.removeAt(i);
+      } else {
+        recoveryRecords[i] = record.copyWith(assetIds: remainingIds);
+      }
+    }
     await save();
     _invalidateAnalytics();
     notifyListeners();
@@ -1057,7 +1148,11 @@ class AppStore extends ChangeNotifier {
     final index = wishes.indexWhere((w) => w.id == wishId);
     if (index < 0) return null;
     final wish = wishes[index];
-    if (wish.convertedAssetId != null) return wish.convertedAssetId;
+    final convertedAssetId = wish.convertedAssetId;
+    if (convertedAssetId != null &&
+        assets.any((asset) => asset.id == convertedAssetId)) {
+      return convertedAssetId;
+    }
     final assetId = newId('asset');
     final asset = Asset(
       id: assetId,
@@ -1139,6 +1234,11 @@ class AppStore extends ChangeNotifier {
         );
       }
     }
+    for (var i = 0; i < wishes.length; i++) {
+      if (wishes[i].categoryId == id) {
+        wishes[i] = wishes[i].copyWith(clearCategoryId: true);
+      }
+    }
     await save();
     _invalidateAnalytics();
     notifyListeners();
@@ -1163,6 +1263,12 @@ class AppStore extends ChangeNotifier {
       if (assets[i].tagIds.contains(id))
         assets[i] = assets[i]
             .copyWith(tagIds: assets[i].tagIds.where((e) => e != id).toList());
+    }
+    for (var i = 0; i < wishes.length; i++) {
+      if (wishes[i].tagIds.contains(id)) {
+        wishes[i] = wishes[i]
+            .copyWith(tagIds: wishes[i].tagIds.where((e) => e != id).toList());
+      }
     }
     await save();
     _invalidateAnalytics();

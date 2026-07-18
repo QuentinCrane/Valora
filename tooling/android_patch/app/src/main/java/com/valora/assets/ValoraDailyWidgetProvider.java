@@ -21,9 +21,9 @@ public class ValoraDailyWidgetProvider extends AppWidgetProvider {
         String currency = prefs.getString("currency", "¥");
         String daily = prefs.getString("averageDailyCost", "0.00");
         int serving = prefs.getInt("servingCount", 0);
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_daily);
+        RemoteViews views = new RemoteViews(context.getPackageName(), WidgetUtils.layout(context, R.layout.widget_daily, R.layout.widget_daily_hyperos));
         views.setTextViewText(R.id.widget_daily_cost, currency + daily);
-        views.setTextViewText(R.id.widget_daily_meta, serving + " 件服役中资产正在产生使用成本");
+        views.setTextViewText(R.id.widget_daily_meta, context.getString(R.string.widget_daily_meta_format, serving));
         views.setOnClickPendingIntent(R.id.widget_daily_root, WidgetUtils.openApp(context, 7402));
         manager.updateAppWidget(id, views);
     }

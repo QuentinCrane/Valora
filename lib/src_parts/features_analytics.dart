@@ -93,6 +93,14 @@ class AnalyticsHomePage extends StatelessWidget {
                   height: 190,
                   child: ValueTrendChart(points: analytics.valueTrend)))),
       const SizedBox(height: 12),
+      ChartPanel(
+          title: tr('analytics.dailyCostTrend'),
+          subtitle: tr('analytics.dailyCostTrendDesc'),
+          onTap: () => showDailyCostTrendDetail(context, store),
+          child: SizedBox(
+              height: 190,
+              child: ValueTrendChart(points: analytics.dailyCostTrend))),
+      const SizedBox(height: 12),
       LifecycleTimelineCard(store: store),
       const SizedBox(height: 12),
       ValueQuadrantCard(store: store),
@@ -291,6 +299,27 @@ void showValueTrendDetail(BuildContext context, AppStore store) {
                 child: Row(children: [
                   Expanded(child: Text(p.label)),
                   Text(money(p.value, store.settings),
+                      style: const TextStyle(fontWeight: FontWeight.normal))
+                ]),
+              )),
+      ]));
+}
+
+void showDailyCostTrendDetail(BuildContext context, AppStore store) {
+  final points = store.analyticsSnapshot.dailyCostTrend;
+  appSheet(context,
+      title: tr('analytics.dailyCostTrendDetail'),
+      subtitle: tr('analytics.dailyCostTrendDetailDesc'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (points.isEmpty)
+          Text(tr('analytics.noTrendData'),
+              style: const TextStyle(color: kMuted))
+        else
+          ...points.map((p) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(children: [
+                  Expanded(child: Text(p.label)),
+                  Text('${money(p.value, store.settings)} ${tr('time.perDay')}',
                       style: const TextStyle(fontWeight: FontWeight.normal))
                 ]),
               )),

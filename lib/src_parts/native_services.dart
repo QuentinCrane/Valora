@@ -23,8 +23,10 @@ class NativeBridge {
   static Future<String?> pickImage() => _call<String>('pickImage');
 
   static Future<String?> pickNativeDate({String? initialDate, String? title}) =>
-      _call<String>('pickNativeDate',
-          {'initialDate': initialDate ?? '', 'title': title ?? tr('common.pickDate')});
+      _call<String>('pickNativeDate', {
+        'initialDate': initialDate ?? '',
+        'title': title ?? tr('common.pickDate')
+      });
 
   static Future<String?> capturePhoto() => _call<String>('capturePhoto');
 
@@ -166,7 +168,17 @@ class NativeBridge {
 String buildAssetsCsv(AppStore store) {
   String cell(String value) => '"${value.replaceAll('"', '""')}"';
   final rows = <List<String>>[
-    [tr('csv.name'), tr('csv.category'), tr('csv.price'), tr('csv.currentValue'), tr('csv.date'), tr('csv.status'), tr('csv.dailyCost'), tr('csv.tags'), tr('csv.note')],
+    [
+      tr('csv.name'),
+      tr('csv.category'),
+      tr('csv.price'),
+      tr('csv.currentValue'),
+      tr('csv.date'),
+      tr('csv.status'),
+      tr('csv.dailyCost'),
+      tr('csv.tags'),
+      tr('csv.note')
+    ],
     ...store.assets.map((a) => [
           a.name,
           store.categoryName(a.categoryId),
@@ -174,7 +186,9 @@ String buildAssetsCsv(AppStore store) {
           a.isPriceless ? '∞' : a.assetValue.toStringAsFixed(2),
           dateText(a.purchaseDate),
           a.status.localizedLabel,
-          a.isPriceless ? tr('common.noDailyCost') : a.dailyCost.toStringAsFixed(2),
+          a.isPriceless
+              ? tr('common.noDailyCost')
+              : a.dailyCost.toStringAsFixed(2),
           a.tagIds.map(store.tagName).join('/'),
           a.note,
         ]),
@@ -186,10 +200,13 @@ String buildMarkdownReport(AppStore store) {
   final buffer = StringBuffer();
   buffer.writeln('# ${tr('report.title')}');
   buffer.writeln();
-  buffer.writeln('- ${tr('report.generatedAt')}${DateTime.now().toIso8601String()}');
+  buffer.writeln(
+      '- ${tr('report.generatedAt')}${DateTime.now().toIso8601String()}');
   buffer.writeln('- ${tr('report.assetCount')}${store.assets.length}');
-  buffer.writeln('- ${tr('report.wishCount')}${store.wishes.where((w) => !w.archived).length}');
-  buffer.writeln('- ${tr('report.totalValue')}${money(store.getTotalAssetValue(), store.settings)}');
+  buffer.writeln(
+      '- ${tr('report.wishCount')}${store.wishes.where((w) => !w.archived).length}');
+  buffer.writeln(
+      '- ${tr('report.totalValue')}${money(store.getTotalAssetValue(), store.settings)}');
   buffer.writeln(
       '- ${tr('report.avgDailyCost')}${money(store.getAverageDailyCost(), store.settings)}');
   buffer.writeln();
@@ -198,7 +215,8 @@ String buildMarkdownReport(AppStore store) {
   if (store.assets.isEmpty) {
     buffer.writeln(tr('report.noAssets'));
   } else {
-    buffer.writeln('| ${tr('csv.name')} | ${tr('csv.category')} | ${tr('csv.status')} | ${tr('csv.currentValue')} | ${tr('csv.dailyCost')} |');
+    buffer.writeln(
+        '| ${tr('csv.name')} | ${tr('csv.category')} | ${tr('csv.status')} | ${tr('csv.currentValue')} | ${tr('csv.dailyCost')} |');
     buffer.writeln('|---|---|---|---:|---:|');
     for (final a in store.assets) {
       buffer.writeln(
@@ -1044,20 +1062,18 @@ class _StickerAdjustPreviewState extends State<_StickerAdjustPreview> {
                             decoration: BoxDecoration(
                                 color: Colors.black.withOpacity(.38),
                                 borderRadius: BorderRadius.circular(999)),
-                            child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const SizedBox(
-                                      width: 12,
-                                      height: 12,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 1.6,
-                                          color: Colors.white)),
-                                  const SizedBox(width: 6),
-                                  Text(tr('sticker.updating'),
-                                      style: TextStyle(
-                                          fontSize: 11, color: Colors.white)),
-                                ]),
+                            child:
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                              const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 1.6, color: Colors.white)),
+                              const SizedBox(width: 6),
+                              Text(tr('sticker.updating'),
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.white)),
+                            ]),
                           ),
                         );
                       },
@@ -1079,7 +1095,10 @@ class _StickerAdjustPreviewState extends State<_StickerAdjustPreview> {
                     decoration: BoxDecoration(
                         color: Colors.black.withOpacity(.42),
                         borderRadius: BorderRadius.circular(999)),
-                    child: Text(widget.contain ? tr('sticker.contain') : tr('sticker.fill'),
+                    child: Text(
+                        widget.contain
+                            ? tr('sticker.contain')
+                            : tr('sticker.fill'),
                         style:
                             const TextStyle(fontSize: 11, color: Colors.white)),
                   ),
@@ -1207,8 +1226,7 @@ Future<String?> adjustStickerCover(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: Align(
                           alignment: Alignment.centerLeft,
-                          child: Text(
-                              tr('sticker.repairDesc'),
+                          child: Text(tr('sticker.repairDesc'),
                               style: TextStyle(fontSize: 12, color: kMuted))),
                     ),
                     const SizedBox(height: 10),
@@ -1317,7 +1335,8 @@ Future<String?> adjustStickerCover(
                                                     }),
                                             icon:
                                                 const Icon(Icons.undo_rounded),
-                                            label: Text(tr('sticker.undoTrim'))),
+                                            label:
+                                                Text(tr('sticker.undoTrim'))),
                                         const SizedBox(width: 8),
                                         OutlinedButton.icon(
                                             onPressed: strokes.isEmpty
@@ -1326,7 +1345,8 @@ Future<String?> adjustStickerCover(
                                                     () => strokes.clear()),
                                             icon: const Icon(
                                                 Icons.layers_clear_rounded),
-                                            label: Text(tr('sticker.clearTrim'))),
+                                            label:
+                                                Text(tr('sticker.clearTrim'))),
                                       ]),
                                     ],
                                   ])),
@@ -1344,9 +1364,12 @@ Future<String?> adjustStickerCover(
                                     SegmentedButton<bool>(
                                         segments: [
                                           ButtonSegment<bool>(
-                                              value: true, label: Text(tr('sticker.contain'))),
+                                              value: true,
+                                              label:
+                                                  Text(tr('sticker.contain'))),
                                           ButtonSegment<bool>(
-                                              value: false, label: Text(tr('sticker.fill'))),
+                                              value: false,
+                                              label: Text(tr('sticker.fill'))),
                                         ],
                                         selected: {
                                           contain
@@ -1393,13 +1416,15 @@ Future<String?> adjustStickerCover(
                                     const SizedBox(height: 10),
                                     Wrap(spacing: 8, runSpacing: 8, children: [
                                       ChoiceChip(
-                                          label: Text(tr('sticker.modeBalanced')),
+                                          label:
+                                              Text(tr('sticker.modeBalanced')),
                                           selected:
                                               recognitionMode == 'balanced',
                                           onSelected: (_) => setState(() =>
                                               recognitionMode = 'balanced')),
                                       ChoiceChip(
-                                          label: Text(tr('sticker.modeSubject')),
+                                          label:
+                                              Text(tr('sticker.modeSubject')),
                                           selected:
                                               recognitionMode == 'subject',
                                           onSelected: (_) => setState(() =>
@@ -1410,15 +1435,15 @@ Future<String?> adjustStickerCover(
                                           onSelected: (_) => setState(
                                               () => recognitionMode = 'edge')),
                                       ChoiceChip(
-                                          label: Text(tr('sticker.modeAggressive')),
+                                          label: Text(
+                                              tr('sticker.modeAggressive')),
                                           selected:
                                               recognitionMode == 'aggressive',
                                           onSelected: (_) => setState(() =>
                                               recognitionMode = 'aggressive')),
                                     ]),
                                     const SizedBox(height: 8),
-                                    Text(
-                                        tr('sticker.edgeOptimizationDesc'),
+                                    Text(tr('sticker.edgeOptimizationDesc'),
                                         style: TextStyle(
                                             fontSize: 11, color: kMuted)),
                                     const SizedBox(height: 10),
@@ -1442,8 +1467,10 @@ Future<String?> adjustStickerCover(
                                               edgeTune > 0.05
                                                   ? tr('sticker.edgeMore')
                                                   : edgeTune < -0.05
-                                                      ? tr('sticker.edgeCleaner')
-                                                      : tr('sticker.edgeDefault'),
+                                                      ? tr(
+                                                          'sticker.edgeCleaner')
+                                                      : tr(
+                                                          'sticker.edgeDefault'),
                                               textAlign: TextAlign.right,
                                               style: const TextStyle(
                                                   fontSize: 12,
@@ -1455,22 +1482,26 @@ Future<String?> adjustStickerCover(
                                     const SizedBox(height: 12),
                                     Wrap(spacing: 8, runSpacing: 8, children: [
                                       ChoiceChip(
-                                          label: Text(tr('sticker.cleanupNone')),
+                                          label:
+                                              Text(tr('sticker.cleanupNone')),
                                           selected: cleanupMode == 'none',
                                           onSelected: (_) => setState(
                                               () => cleanupMode = 'none')),
                                       ChoiceChip(
-                                          label: Text(tr('sticker.cleanupWhite')),
+                                          label:
+                                              Text(tr('sticker.cleanupWhite')),
                                           selected: cleanupMode == 'white',
                                           onSelected: (_) => setState(
                                               () => cleanupMode = 'white')),
                                       ChoiceChip(
-                                          label: Text(tr('sticker.cleanupBlack')),
+                                          label:
+                                              Text(tr('sticker.cleanupBlack')),
                                           selected: cleanupMode == 'black',
                                           onSelected: (_) => setState(
                                               () => cleanupMode = 'black')),
                                       ChoiceChip(
-                                          label: Text(tr('sticker.cleanupCorner')),
+                                          label:
+                                              Text(tr('sticker.cleanupCorner')),
                                           selected: cleanupMode == 'corner',
                                           onSelected: (_) => setState(
                                               () => cleanupMode = 'corner')),
@@ -1578,6 +1609,7 @@ Future<String?> adjustStickerCover(
 
 Future<String?> chooseStickerCandidate(
     BuildContext context, Map<String, dynamic> payload) async {
+  final keepCandidates = context.store.settings.keepStickerCandidates;
   final direct = (payload['selectedUri'] ?? '').toString().trim();
   final rawCandidates = payload['candidates'];
   final candidates = <Map<String, dynamic>>[];
@@ -1597,11 +1629,9 @@ Future<String?> chooseStickerCandidate(
     final uri = (candidates.first['uri'] ?? direct).toString().trim();
     if (uri.isEmpty) return null;
     cleanupUnusedStickerCandidates(payload, uri,
-        keepCandidates: context.store.settings.keepStickerCandidates);
+        keepCandidates: keepCandidates);
     final adjusted = await adjustStickerCover(context, uri);
-    if (adjusted != null &&
-        adjusted != uri &&
-        !context.store.settings.keepStickerCandidates) {
+    if (adjusted != null && adjusted != uri && !keepCandidates) {
       deleteGeneratedStickerFile(uri);
     }
     return adjusted;
@@ -1655,8 +1685,10 @@ Future<String?> chooseStickerCandidate(
                     itemBuilder: (context, index) {
                       final item = candidates[index];
                       final uri = (item['uri'] ?? '').toString();
-                      final label =
-                          (item['label'] ?? tr('sticker.candidate').replaceAll('{n}', '${index + 1}')).toString();
+                      final label = (item['label'] ??
+                              tr('sticker.candidate')
+                                  .replaceAll('{n}', '${index + 1}'))
+                          .toString();
                       final engine = (item['engine'] ?? '').toString();
                       final scoreValue = item['score'];
                       final scoreText = scoreValue is num
@@ -1735,7 +1767,10 @@ Future<String?> chooseStickerCandidate(
                                         size: 16, color: Color(0xFF7CC6F2))
                                 ]),
                                 const SizedBox(height: 2),
-                                Text(engine.isEmpty ? tr('sticker.localEngine') : engine,
+                                Text(
+                                    engine.isEmpty
+                                        ? tr('sticker.localEngine')
+                                        : engine,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -1761,12 +1796,11 @@ Future<String?> chooseStickerCandidate(
     },
   );
   if (selected != null && selected.trim().isNotEmpty) {
+    if (!context.mounted) return null;
     cleanupUnusedStickerCandidates(payload, selected,
-        keepCandidates: context.store.settings.keepStickerCandidates);
+        keepCandidates: keepCandidates);
     final adjusted = await adjustStickerCover(context, selected);
-    if (adjusted != null &&
-        adjusted != selected &&
-        !context.store.settings.keepStickerCandidates) {
+    if (adjusted != null && adjusted != selected && !keepCandidates) {
       deleteGeneratedStickerFile(selected);
     }
     return adjusted;
@@ -2161,8 +2195,7 @@ Future<String?> editFramedCover(BuildContext context, String sourceUri) async {
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: Text(
-                          tr('sticker.frameCropDesc'),
+                      child: Text(tr('sticker.frameCropDesc'),
                           style: TextStyle(fontSize: 12, color: kMuted)),
                     ),
                   ),
@@ -2339,6 +2372,7 @@ Future<String?> editFramedCover(BuildContext context, String sourceUri) async {
 Future<String?> createFramedCoverFromPicker(BuildContext context) async {
   final uri = await NativeBridge.pickImage();
   if (uri == null || uri.trim().isEmpty) return null;
+  if (!context.mounted) return null;
   return editFramedCover(context, uri);
 }
 
@@ -2648,8 +2682,7 @@ Future<String?> editManualTraceSticker(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: Text(
-                          tr('sticker.manualTraceDesc'),
+                      child: Text(tr('sticker.manualTraceDesc'),
                           style: TextStyle(fontSize: 12, color: kMuted)),
                     ),
                   ),
@@ -2705,8 +2738,7 @@ Future<String?> editManualTraceSticker(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700)),
                               const SizedBox(height: 8),
-                              Text(
-                                  tr('sticker.traceSteps'),
+                              Text(tr('sticker.traceSteps'),
                                   style: TextStyle(
                                       fontSize: 12,
                                       color: kMuted,
@@ -2741,7 +2773,8 @@ Future<String?> editManualTraceSticker(
                       child: FilledButton.icon(
                         onPressed: () async {
                           if (points.length < 3) {
-                            showNativeSnack(context, tr('sticker.needMinPoints'));
+                            showNativeSnack(
+                                context, tr('sticker.needMinPoints'));
                             return;
                           }
                           final out =
@@ -2767,6 +2800,7 @@ Future<String?> editManualTraceSticker(
 Future<String?> createManualTraceStickerFromPicker(BuildContext context) async {
   final uri = await NativeBridge.pickImage();
   if (uri == null || uri.trim().isEmpty) return null;
+  if (!context.mounted) return null;
   final traced = await editManualTraceSticker(context, uri);
   if (traced == null || traced.trim().isEmpty || !context.mounted)
     return traced;
@@ -2778,7 +2812,9 @@ Future<void> restoreJsonFromText(BuildContext context, String? text) async {
     showNativeSnack(context, tr('restore.noData'));
     return;
   }
-  final ok = await context.store.restoreFromJson(text);
+  final store = context.store;
+  final ok = await store.restoreFromJson(text);
+  if (!context.mounted) return;
   if (ok) {
     successHaptic();
     if (Navigator.canPop(context)) Navigator.pop(context);
@@ -2792,8 +2828,9 @@ Future<void> restoreJsonFromText(BuildContext context, String? text) async {
 Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
   final store = context.store;
   final payload = await NativeBridge.importDataArchive();
+  if (!context.mounted) return;
   if (payload.isEmpty) {
-    if (context.mounted) showNativeSnack(context, tr('restore.noZip'));
+    showNativeSnack(context, tr('restore.noZip'));
     return;
   }
   final ok = payload['ok'] == true;
@@ -2801,7 +2838,8 @@ Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
   if (!ok) {
     warningHaptic();
     if (context.mounted)
-      showNativeSnack(context, message.isEmpty ? tr('restore.zipReadFailed') : message);
+      showNativeSnack(
+          context, message.isEmpty ? tr('restore.zipReadFailed') : message);
     return;
   }
   var jsonText = (payload['json'] ?? '').toString();
@@ -2815,8 +2853,7 @@ Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
   }
   if (jsonText.trim().isEmpty) {
     warningHaptic();
-    if (context.mounted)
-      showNativeSnack(context, tr('restore.zipNoJson'));
+    if (context.mounted) showNativeSnack(context, tr('restore.zipNoJson'));
     return;
   }
   int countList(String key) {
@@ -2839,11 +2876,19 @@ Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
   final categoryCount = countList('categories');
   final tagCount = countList('tags');
 
+  if (!context.mounted) return;
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: Text(tr('restore.confirmTitle')),
-      content: Text(tr('restore.confirmContent').replaceAll('{assets}', '$assetCount').replaceAll('{wishes}', '$wishCount').replaceAll('{categories}', '$categoryCount').replaceAll('{tags}', '$tagCount').replaceAll('{media}', '$mediaCount').replaceAll('{entries}', '$entryCount').replaceAll('{sqlite}', '$sqliteCount')),
+      content: Text(tr('restore.confirmContent')
+          .replaceAll('{assets}', '$assetCount')
+          .replaceAll('{wishes}', '$wishCount')
+          .replaceAll('{categories}', '$categoryCount')
+          .replaceAll('{tags}', '$tagCount')
+          .replaceAll('{media}', '$mediaCount')
+          .replaceAll('{entries}', '$entryCount')
+          .replaceAll('{sqlite}', '$sqliteCount')),
       actions: [
         TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -2854,22 +2899,22 @@ Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
       ],
     ),
   );
-  if (confirmed != true) return;
+  if (confirmed != true || !context.mounted) return;
 
   try {
     await store.createSnapshot('${tr('restore.autoSnapshot')} ${dateStamp()}');
   } catch (_) {}
 
   final restored = await store.restoreFromJson(jsonText);
+  if (!context.mounted) return;
   if (restored) {
     successHaptic();
     if (Navigator.canPop(context)) Navigator.pop(context);
-    if (context.mounted)
-      showNativeSnack(
-          context, '${tr('restore.zipSuccess').replaceAll('{a}', '$assetCount').replaceAll('{m}', '$mediaCount')}');
+    showNativeSnack(context,
+        '${tr('restore.zipSuccess').replaceAll('{a}', '$assetCount').replaceAll('{m}', '$mediaCount')}');
   } else {
     warningHaptic();
-    if (context.mounted) showNativeSnack(context, tr('restore.zipJsonFailed'));
+    showNativeSnack(context, tr('restore.zipJsonFailed'));
   }
 }
 
@@ -2922,6 +2967,7 @@ class NativeFeaturePanel extends StatelessWidget {
               averageDailyCost: store.getAverageDailyCost(),
               currency: store.settings.currencyUnit,
             );
+            if (!context.mounted) return;
             showNativeSnack(context, tr('native.widgetRefreshed'));
           },
         ),
@@ -2955,7 +3001,12 @@ class NativeFeaturePanel extends StatelessWidget {
                 fileName: 'zhipu_backup_${dateStamp()}.json',
                 text: store.exportJson(),
                 mimeType: 'application/json');
-            showNativeSnack(context, uri == null ? tr('common.exportCancelled') : tr('common.exportedToFile'));
+            if (!context.mounted) return;
+            showNativeSnack(
+                context,
+                uri == null
+                    ? tr('common.exportCancelled')
+                    : tr('common.exportedToFile'));
           },
         ),
         SettingRow(
@@ -2972,8 +3023,12 @@ class NativeFeaturePanel extends StatelessWidget {
           label: tr('native.restoreJson'),
           description: tr('native.restoreJsonDesc'),
           trailing: const ValuePill('JSON'),
-          onTap: () async => restoreJsonFromText(context,
-              await NativeBridge.importTextFile(mimeType: 'application/json')),
+          onTap: () async {
+            final text =
+                await NativeBridge.importTextFile(mimeType: 'application/json');
+            if (!context.mounted) return;
+            await restoreJsonFromText(context, text);
+          },
         ),
         SettingRow(
           icon: Icons.table_chart_rounded,
@@ -2986,8 +3041,12 @@ class NativeFeaturePanel extends StatelessWidget {
                 fileName: 'valora_assets_${dateStamp()}.csv',
                 text: buildAssetsCsv(store),
                 mimeType: 'text/csv');
-            showNativeSnack(context,
-                uri == null ? tr('common.exportCancelled') : tr('common.csvExported'));
+            if (!context.mounted) return;
+            showNativeSnack(
+                context,
+                uri == null
+                    ? tr('common.exportCancelled')
+                    : tr('common.csvExported'));
           },
         ),
         SettingRow(
@@ -3013,7 +3072,10 @@ void showNativeMediaSheet(BuildContext context) {
               final uri = await NativeBridge.pickImage();
               if (context.mounted)
                 showNativeSnack(
-                    context, uri == null ? tr('media.noImage') : '${tr('media.savedCover')}$uri');
+                    context,
+                    uri == null
+                        ? tr('media.noImage')
+                        : '${tr('media.savedCover')}$uri');
             },
             icon: const Icon(Icons.photo_library_rounded),
             label: Text(tr('media.openGallery'))),
@@ -3023,7 +3085,10 @@ void showNativeMediaSheet(BuildContext context) {
               final uri = await NativeBridge.capturePhoto();
               if (context.mounted)
                 showNativeSnack(
-                    context, uri == null ? tr('media.photoCancelled') : '${tr('media.photoSaved')}$uri');
+                    context,
+                    uri == null
+                        ? tr('media.photoCancelled')
+                        : '${tr('media.photoSaved')}$uri');
             },
             icon: const Icon(Icons.photo_camera_rounded),
             label: Text(tr('media.takePhoto'))),
@@ -3037,7 +3102,10 @@ void showNativeMediaSheet(BuildContext context) {
                   : null;
               if (context.mounted)
                 showNativeSnack(
-                    context, uri == null ? tr('media.noSticker') : '${tr('media.stickerSelected')}$uri');
+                    context,
+                    uri == null
+                        ? tr('media.noSticker')
+                        : '${tr('media.stickerSelected')}$uri');
             },
             icon: const Icon(Icons.auto_fix_high_rounded),
             label: Text(tr('media.testSticker'))),
@@ -3062,14 +3130,16 @@ void showNativeMediaSheet(BuildContext context) {
                   nativeJsonMap(await NativeBridge.recognizeReceiptFromImage());
               final price = data['priceCandidate']?.toString() ?? '';
               if (context.mounted)
-                showNativeSnack(context,
-                    price.isEmpty ? tr('media.ocrNoPrice') : '${tr('media.ocrPrice')}$price');
+                showNativeSnack(
+                    context,
+                    price.isEmpty
+                        ? tr('media.ocrNoPrice')
+                        : '${tr('media.ocrPrice')}$price');
             },
             icon: const Icon(Icons.receipt_long_rounded),
             label: Text(tr('media.ocrReceipt'))),
         const SizedBox(height: 10),
-        Text(
-            tr('media.ocrHint'),
+        Text(tr('media.ocrHint'),
             style: TextStyle(color: kMuted, fontSize: 12, height: 1.45)),
       ]));
 }
@@ -3077,8 +3147,7 @@ void showNativeMediaSheet(BuildContext context) {
 void showNativeAutomationSheet(BuildContext context) {
   appSheet(context,
       title: tr('auto.title'),
-      subtitle:
-          tr('auto.subtitle'),
+      subtitle: tr('auto.subtitle'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         FilledButton.icon(
             onPressed: () async {
@@ -3087,7 +3156,8 @@ void showNativeAutomationSheet(BuildContext context) {
                   text: tr('auto.notifBody'),
                   delayMillis: 60000);
               if (context.mounted)
-                showNativeSnack(context, ok ? tr('auto.testScheduled') : tr('auto.testFailed'));
+                showNativeSnack(context,
+                    ok ? tr('auto.testScheduled') : tr('auto.testFailed'));
             },
             icon: const Icon(Icons.alarm_rounded),
             label: Text(tr('auto.testReminder'))),
@@ -3096,7 +3166,11 @@ void showNativeAutomationSheet(BuildContext context) {
             onPressed: () async {
               final ok = await NativeBridge.createShortcuts();
               if (context.mounted)
-                showNativeSnack(context, ok ? tr('auto.shortcutCreated') : tr('auto.shortcutFailed'));
+                showNativeSnack(
+                    context,
+                    ok
+                        ? tr('auto.shortcutCreated')
+                        : tr('auto.shortcutFailed'));
             },
             icon: const Icon(Icons.add_to_home_screen_rounded),
             label: Text(tr('auto.createShortcut'))),
@@ -3105,7 +3179,8 @@ void showNativeAutomationSheet(BuildContext context) {
             onPressed: () async {
               final ok = await NativeBridge.requestNotificationPermission();
               if (context.mounted)
-                showNativeSnack(context, ok ? tr('auto.permRequested') : tr('auto.permNotNeeded'));
+                showNativeSnack(context,
+                    ok ? tr('auto.permRequested') : tr('auto.permNotNeeded'));
             },
             icon: const Icon(Icons.verified_rounded),
             label: Text(tr('auto.requestPerm'))),
@@ -3126,7 +3201,8 @@ void showClipboardImportSheet(BuildContext context) {
             onPressed: () async {
               final text = await NativeBridge.readClipboard();
               if (text == null || text.trim().isEmpty) {
-                if (context.mounted) showNativeSnack(context, tr('clipboard.empty'));
+                if (context.mounted)
+                  showNativeSnack(context, tr('clipboard.empty'));
                 return;
               }
               if (text.trimLeft().startsWith('{')) {
@@ -3145,7 +3221,8 @@ void showClipboardImportSheet(BuildContext context) {
         OutlinedButton.icon(
             onPressed: () async {
               await NativeBridge.writeClipboard(context.store.exportJson());
-              if (context.mounted) showNativeSnack(context, tr('clipboard.copied'));
+              if (context.mounted)
+                showNativeSnack(context, tr('clipboard.copied'));
             },
             icon: const Icon(Icons.copy_all_rounded),
             label: Text(tr('clipboard.copyJson'))),
@@ -3205,7 +3282,8 @@ void showNativeSystemSheet(BuildContext context) {
         const SizedBox(height: 8),
         OutlinedButton.icon(
             onPressed: () async => NativeBridge.shareText(
-                title: tr('system.shareSummary'), text: buildMarkdownReport(store)),
+                title: tr('system.shareSummary'),
+                text: buildMarkdownReport(store)),
             icon: const Icon(Icons.ios_share_rounded),
             label: Text(tr('system.shareText'))),
         const SizedBox(height: 8),
@@ -3214,7 +3292,10 @@ void showNativeSystemSheet(BuildContext context) {
               final info = await NativeBridge.getInitialIntentInfo();
               if (context.mounted)
                 showNativeSnack(
-                    context, info == null || info.isEmpty ? tr('system.noShareData') : info);
+                    context,
+                    info == null || info.isEmpty
+                        ? tr('system.noShareData')
+                        : info);
             },
             icon: const Icon(Icons.call_received_rounded),
             label: Text(tr('system.readIntent'))),
@@ -3239,15 +3320,18 @@ void showReportExportSheet(BuildContext context) {
                   text: report,
                   mimeType: 'text/markdown');
               if (context.mounted)
-                showNativeSnack(context,
-                    uri == null ? tr('common.exportCancelled') : tr('report.exported'));
+                showNativeSnack(
+                    context,
+                    uri == null
+                        ? tr('common.exportCancelled')
+                        : tr('report.exported'));
             },
             icon: const Icon(Icons.save_alt_rounded),
             label: Text(tr('report.saveFile'))),
         const SizedBox(height: 8),
         OutlinedButton.icon(
-            onPressed: () async =>
-                NativeBridge.shareText(title: tr('report.shareTitle'), text: report),
+            onPressed: () async => NativeBridge.shareText(
+                title: tr('report.shareTitle'), text: report),
             icon: const Icon(Icons.share_rounded),
             label: Text(tr('report.shareVia'))),
       ]));

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_daily_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="14dp"
+    android:background="@drawable/widget_hyperos_dark_background">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/widget_daily_label" android:textColor="#C8FFFFFF" android:textSize="11sp" android:includeFontPadding="false" />
+    <TextView android:id="@+id/widget_daily_cost" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="¥0.00" android:textColor="#FFFFFFFF" android:textSize="28sp" android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false" />
+    <TextView android:id="@+id/widget_daily_meta" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="6dp" android:text="@string/widget_daily_meta_empty" android:textColor="#B8FFFFFF" android:textSize="11sp" android:maxLines="2" android:ellipsize="end" />
+</LinearLayout>

@@ -3,7 +3,12 @@ part of '../main.dart';
 class ComposePage extends StatefulWidget {
   final ComposeTab initialTab;
   final String? initialName;
-  const ComposePage({super.key, required this.initialTab, this.initialName});
+  final String? initialIcon;
+  const ComposePage(
+      {super.key,
+      required this.initialTab,
+      this.initialName,
+      this.initialIcon});
   @override
   State<ComposePage> createState() => _ComposePageState();
 }
@@ -38,8 +43,13 @@ class _ComposePageState extends State<ComposePage> {
     super.initState();
     tab = widget.initialTab;
     name = TextEditingController(text: widget.initialName ?? '');
+    final initialIcon = widget.initialIcon?.trim() ?? '';
     icon = TextEditingController(
-        text: widget.initialTab == ComposeTab.asset ? '📦' : '✨');
+        text: initialIcon.isNotEmpty
+            ? initialIcon
+            : widget.initialTab == ComposeTab.asset
+                ? '📦'
+                : '✨');
     price = TextEditingController();
     purchaseDate = TextEditingController(text: dateText(DateTime.now()));
     tagsText = TextEditingController();
@@ -262,7 +272,9 @@ class _ComposePageState extends State<ComposePage> {
                             ? null
                             : v == null || v.trim().isEmpty
                                 ? tr('compose.required')
-                                : null,
+                                : (parseUserDouble(v)?.isFinite ?? false)
+                                    ? null
+                                    : tr('common.invalidNumber'),
                         style: TextStyle(
                             fontSize: priceless ? 25 : 18,
                             fontWeight: FontWeight.normal),
@@ -566,9 +578,6 @@ class _ComposePageState extends State<ComposePage> {
     );
     final saveWidth =
         math.min(media.size.width - 144, 230.0).clamp(184.0, 230.0).toDouble();
-    final saveScale = _savePressed ? 1.035 : 1.0;
-    final saveGlassWidth = saveWidth * saveScale;
-    final saveGlassHeight = 58.0 * saveScale;
 
     if (!useLiquidGlass) {
       return GradientScaffold(
@@ -1453,9 +1462,8 @@ class _WishEditorPageState extends State<WishEditorPage> {
     super.didChangeDependencies();
     final item = widget.initial;
     if (tagsText.text.isEmpty && item != null)
-      tagsText.text = item.tagIds
-          .map((id) => context.store.tagName(id))
-          .join('、');
+      tagsText.text =
+          item.tagIds.map((id) => context.store.tagName(id)).join('、');
   }
 
   @override
@@ -1619,9 +1627,6 @@ class _WishEditorPageState extends State<WishEditorPage> {
       onPressChanged: (v) => setState(() => _wishSavePressed = v),
     );
     final saveWidth = media.size.width - 32;
-    final saveScale = _wishSavePressed ? 1.035 : 1.0;
-    final saveGlassWidth = saveWidth * saveScale;
-    final saveGlassHeight = 58.0 * saveScale;
     if (!useLiquidGlass) {
       return GradientScaffold(
         child: Stack(children: [

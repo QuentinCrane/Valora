@@ -4,33 +4,38 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="14dp"
+    android:padding="16dp"
     android:background="@drawable/widget_background">
 
     <TextView
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Valora"
-        android:textColor="#141518"
-        android:textSize="14sp"
-        />
+        android:text="@string/app_name"
+        android:textColor="#8B8C92"
+        android:textSize="12sp"
+        android:includeFontPadding="false" />
 
     <TextView
         android:id="@+id/widget_total"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
         android:text="¥0.00"
         android:textColor="#141518"
-        android:textSize="28sp"
-        />
+        android:textSize="30sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:includeFontPadding="false" />
 
     <TextView
         android:id="@+id/widget_meta"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="0 件资产 · 0 个心愿"
-        android:textColor="#8B8C92"
-        android:textSize="12sp" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:text="@string/widget_total_meta_empty"
+        android:textColor="#72747B"
+        android:textSize="12sp"
+        android:maxLines="2"
+        android:ellipsize="end" />
 </LinearLayout>

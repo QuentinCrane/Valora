@@ -208,7 +208,8 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
       if (context.mounted) showNativeSnack(context, tl('已刷新所有桌面小组件'));
     }
 
-    Widget stickerEngineSection() => SettingsSection(title: tl('贴纸与封面'), children: [
+    Widget stickerEngineSection() =>
+        SettingsSection(title: tl('贴纸与封面'), children: [
           SettingRow(
             icon: Icons.auto_awesome_rounded,
             iconBg: const Color(0xFFAEE6FF),
@@ -251,8 +252,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 icon: Icons.category_rounded,
                 iconBg: const Color(0xFFC8EBFF),
                 label: tr('settings.categoryTags'),
-                description:
-                    tlf('{categories} 个分类 · {tags} 个标签', {
+                description: tlf('{categories} 个分类 · {tags} 个标签', {
                   'categories': '${store.categories.length}',
                   'tags': '${store.tags.length}',
                 }),
@@ -405,8 +405,8 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 iconBg: const Color(0xFF98E0FF),
                 label: tr('settings.decimalPlaces'),
                 description: tr('settings.decimalPlaces.desc'),
-                trailing: ValuePill(tlf('{count} 位',
-                    {'count': '${store.settings.decimalPlaces}'})),
+                trailing: ValuePill(tlf(
+                    '{count} 位', {'count': '${store.settings.decimalPlaces}'})),
                 onTap: () => showDecimalDialog(context)),
             SettingSwitchRow(
                 icon: Icons.format_list_numbered_rounded,
@@ -722,7 +722,8 @@ void showCloudSyncEditor(BuildContext context) {
             controller: urlCtl,
             keyboardType: TextInputType.url,
             decoration: InputDecoration(
-                labelText: tl('服务器地址'), hintText: 'https://dav.example.com/dav/')),
+                labelText: tl('服务器地址'),
+                hintText: 'https://dav.example.com/dav/')),
         const SizedBox(height: 10),
         TextField(
             controller: userCtl,
@@ -738,8 +739,7 @@ void showCloudSyncEditor(BuildContext context) {
             decoration: InputDecoration(
                 labelText: tl('云端文件路径'), hintText: 'zhipu/zhipu_backup.json')),
         const SizedBox(height: 10),
-        Text(
-            tl('提示：坚果云通常要使用“应用密码”；Nextcloud 地址一般类似 /remote.php/dav/files/用户名/。当前版本会把配置保存在本机 JSON 中，正式发布前建议再接入 Android Keystore 加密。'),
+        Text(tl('提示：坚果云通常要使用“应用密码”；Nextcloud 地址一般类似 /remote.php/dav/files/用户名/。当前版本会把配置保存在本机 JSON 中，正式发布前建议再接入 Android Keystore 加密。'),
             style: TextStyle(
                 fontSize: 12, height: 1.38, color: kMuted.withOpacity(.95))),
         const SizedBox(height: 14),
@@ -1232,7 +1232,8 @@ void showCurrencyDialog(BuildContext context) {
                       InputDecoration(labelText: tl('例如 ¥ / \$ / RMB'))),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.pop(d), child: Text(tr('common.cancel'))),
+                    onPressed: () => Navigator.pop(d),
+                    child: Text(tr('common.cancel'))),
                 FilledButton(
                     onPressed: () {
                       context.store.updateSettings(context.store.settings
@@ -1259,7 +1260,8 @@ void showDecimalDialog(BuildContext context) {
                   decoration: const InputDecoration(labelText: '0-3')),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.pop(d), child: Text(tr('common.cancel'))),
+                    onPressed: () => Navigator.pop(d),
+                    child: Text(tr('common.cancel'))),
                 FilledButton(
                     onPressed: () {
                       context.store.updateSettings(context.store.settings
@@ -1557,6 +1559,7 @@ Widget _presetChip(
 
 void showSmartCategoryCreateSheet(BuildContext context,
     {String? initialName, ValueChanged<String>? onCreated}) {
+  final store = context.store;
   final ctl = TextEditingController(text: initialName?.trim() ?? '');
   var iconValue = _suggestCategoryIcon(ctl.text);
   var colorValue = _suggestColor(ctl.text);
@@ -1681,18 +1684,20 @@ void showSmartCategoryCreateSheet(BuildContext context,
           width: double.infinity,
           child: FilledButton.icon(
               onPressed: () async {
-                final label = ctl.text.trim().isEmpty ? tl('新分类') : ctl.text.trim();
+                final label =
+                    ctl.text.trim().isEmpty ? tl('新分类') : ctl.text.trim();
                 final now = DateTime.now().toIso8601String();
                 final id = newId('cat');
-                await context.store.upsertCategory(Category(
+                await store.upsertCategory(Category(
                   id: id,
                   name: label,
                   icon: iconValue,
                   color: colorValue,
-                  sortOrder: context.store.categories.length,
+                  sortOrder: store.categories.length,
                   createdAt: now,
                   updatedAt: now,
                 ));
+                if (!sheetContext.mounted) return;
                 successHaptic();
                 Navigator.pop(sheetContext);
                 onCreated?.call(id);
@@ -1705,6 +1710,7 @@ void showSmartCategoryCreateSheet(BuildContext context,
 
 void showSmartTagCreateSheet(BuildContext context,
     {String? initialName, ValueChanged<String>? onCreated}) {
+  final store = context.store;
   final ctl = TextEditingController(text: initialName?.trim() ?? '');
   var colorValue = _suggestColor(ctl.text);
   var manualColor = false;
@@ -1739,15 +1745,25 @@ void showSmartTagCreateSheet(BuildContext context,
       const SizedBox(height: 12),
       Wrap(spacing: 8, runSpacing: 8, children: [
         _presetChip(
-            icon: '🚇', label: tl('通勤'), onTap: () => applyPreset('通勤', setLocal)),
+            icon: '🚇',
+            label: tl('通勤'),
+            onTap: () => applyPreset('通勤', setLocal)),
         _presetChip(
-            icon: '💼', label: tl('办公'), onTap: () => applyPreset('办公', setLocal)),
+            icon: '💼',
+            label: tl('办公'),
+            onTap: () => applyPreset('办公', setLocal)),
         _presetChip(
-            icon: '📚', label: tl('学习'), onTap: () => applyPreset('学习', setLocal)),
+            icon: '📚',
+            label: tl('学习'),
+            onTap: () => applyPreset('学习', setLocal)),
         _presetChip(
-            icon: '⭐', label: tl('收藏'), onTap: () => applyPreset('收藏', setLocal)),
+            icon: '⭐',
+            label: tl('收藏'),
+            onTap: () => applyPreset('收藏', setLocal)),
         _presetChip(
-            icon: '🧰', label: tl('维修'), onTap: () => applyPreset('维修', setLocal)),
+            icon: '🧰',
+            label: tl('维修'),
+            onTap: () => applyPreset('维修', setLocal)),
         _presetChip(
             icon: '🕰️',
             label: tl('长期持有'),
@@ -1767,16 +1783,18 @@ void showSmartTagCreateSheet(BuildContext context,
           width: double.infinity,
           child: FilledButton.icon(
               onPressed: () async {
-                final label = ctl.text.trim().isEmpty ? tl('新标签') : ctl.text.trim();
+                final label =
+                    ctl.text.trim().isEmpty ? tl('新标签') : ctl.text.trim();
                 final now = DateTime.now().toIso8601String();
                 final id = newId('tag');
-                await context.store.upsertTag(Tag(
+                await store.upsertTag(Tag(
                     id: id,
                     name: label,
                     color: colorValue,
-                    sortOrder: context.store.tags.length,
+                    sortOrder: store.tags.length,
                     createdAt: now,
                     updatedAt: now));
+                if (!sheetContext.mounted) return;
                 successHaptic();
                 Navigator.pop(sheetContext);
                 onCreated?.call(label);
@@ -1853,7 +1871,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     final ctl = TextEditingController(text: category.name);
     var iconValue = category.icon;
     var colorValue = category.color;
-    appSheet(context, title: tl('编辑分类'), subtitle: tl('直接点选图标和颜色，不需要手动输入十六进制色值。'),
+    appSheet(context,
+        title: tl('编辑分类'), subtitle: tl('直接点选图标和颜色，不需要手动输入十六进制色值。'),
         child: StatefulBuilder(builder: (context, setLocal) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -1955,29 +1974,51 @@ class _CategoryManagerState extends State<CategoryManager> {
           const SizedBox(height: 12),
           Wrap(spacing: 8, runSpacing: 8, children: [
             _presetChip(
-                icon: '💻', label: tl('电子数码'), onTap: () => applyPreset('电子数码')),
+                icon: '💻',
+                label: tl('电子数码'),
+                onTap: () => applyPreset('电子数码')),
             _presetChip(
-                icon: '🎧', label: tl('影音娱乐'), onTap: () => applyPreset('影音娱乐')),
+                icon: '🎧',
+                label: tl('影音娱乐'),
+                onTap: () => applyPreset('影音娱乐')),
             _presetChip(
-                icon: '📷', label: tl('影像创作'), onTap: () => applyPreset('影像创作')),
+                icon: '📷',
+                label: tl('影像创作'),
+                onTap: () => applyPreset('影像创作')),
             _presetChip(
-                icon: '🎮', label: tl('游戏兴趣'), onTap: () => applyPreset('游戏兴趣')),
+                icon: '🎮',
+                label: tl('游戏兴趣'),
+                onTap: () => applyPreset('游戏兴趣')),
             _presetChip(
-                icon: '📚', label: tl('学习办公'), onTap: () => applyPreset('学习办公')),
+                icon: '📚',
+                label: tl('学习办公'),
+                onTap: () => applyPreset('学习办公')),
             _presetChip(
-                icon: '👕', label: tl('穿搭配饰'), onTap: () => applyPreset('穿搭配饰')),
+                icon: '👕',
+                label: tl('穿搭配饰'),
+                onTap: () => applyPreset('穿搭配饰')),
             _presetChip(
-                icon: '🏠', label: tl('家居生活'), onTap: () => applyPreset('家居生活')),
+                icon: '🏠',
+                label: tl('家居生活'),
+                onTap: () => applyPreset('家居生活')),
             _presetChip(
-                icon: '🚗', label: tl('出行交通'), onTap: () => applyPreset('出行交通')),
+                icon: '🚗',
+                label: tl('出行交通'),
+                onTap: () => applyPreset('出行交通')),
             _presetChip(
-                icon: '🏃', label: tl('健康运动'), onTap: () => applyPreset('健康运动')),
+                icon: '🏃',
+                label: tl('健康运动'),
+                onTap: () => applyPreset('健康运动')),
             _presetChip(
-                icon: '🧰', label: tl('工具维修'), onTap: () => applyPreset('工具维修')),
+                icon: '🧰',
+                label: tl('工具维修'),
+                onTap: () => applyPreset('工具维修')),
             _presetChip(
                 icon: '⭐', label: tl('收藏纪念'), onTap: () => applyPreset('收藏纪念')),
             _presetChip(
-                icon: '💳', label: tl('软件服务'), onTap: () => applyPreset('软件服务')),
+                icon: '💳',
+                label: tl('软件服务'),
+                onTap: () => applyPreset('软件服务')),
           ]),
           const SizedBox(height: 14),
           SectionLabel(tl('直接选图标')),
@@ -2159,8 +2200,8 @@ class _TagManagerState extends State<TagManager> {
             Expanded(
                 child: TextField(
                     controller: name,
-                    decoration: InputDecoration(
-                        labelText: tl('标签名称，例如 通勤 / 收藏 / 办公')),
+                    decoration:
+                        InputDecoration(labelText: tl('标签名称，例如 通勤 / 收藏 / 办公')),
                     onChanged: (v) => setState(() {
                           if (!manualColor) selectedColor = _suggestColor(v);
                         }))),
@@ -2175,11 +2216,14 @@ class _TagManagerState extends State<TagManager> {
                 icon: '💼', label: tl('办公'), onTap: () => applyPreset('办公')),
             _presetChip(
                 icon: '📚', label: tl('学习'), onTap: () => applyPreset('学习')),
-            _presetChip(icon: '⭐', label: tl('收藏'), onTap: () => applyPreset('收藏')),
+            _presetChip(
+                icon: '⭐', label: tl('收藏'), onTap: () => applyPreset('收藏')),
             _presetChip(
                 icon: '🧰', label: tl('维修'), onTap: () => applyPreset('维修')),
             _presetChip(
-                icon: '🕰️', label: tl('长期持有'), onTap: () => applyPreset('长期持有')),
+                icon: '🕰️',
+                label: tl('长期持有'),
+                onTap: () => applyPreset('长期持有')),
           ]),
           const SizedBox(height: 14),
           SectionLabel(tl('直接选颜色')),
@@ -2260,7 +2304,8 @@ class _BackupManagerState extends State<BackupManager> {
                   decoration: InputDecoration(labelText: tl('快照名称'))),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.pop(d), child: Text(tr('common.cancel'))),
+                    onPressed: () => Navigator.pop(d),
+                    child: Text(tr('common.cancel'))),
                 FilledButton(
                     onPressed: () async {
                       await context.store.renameSnapshot(record.id, ctl.text);
@@ -2278,11 +2323,12 @@ class _BackupManagerState extends State<BackupManager> {
         context: context,
         builder: (d) => AlertDialog(
               title: Text(tl('删除快照')),
-              content: Text(tlf('确定删除「{label}」吗？这个操作不会影响当前资产数据。',
-                  {'label': record.label})),
+              content: Text(tlf(
+                  '确定删除「{label}」吗？这个操作不会影响当前资产数据。', {'label': record.label})),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.pop(d), child: Text(tr('common.cancel'))),
+                    onPressed: () => Navigator.pop(d),
+                    child: Text(tr('common.cancel'))),
                 FilledButton(
                     onPressed: () async {
                       await context.store.deleteSnapshot(record.id);
@@ -2297,7 +2343,7 @@ class _BackupManagerState extends State<BackupManager> {
 
   Future<void> restoreSnapshot(SnapshotRecord record) async {
     final ok = await context.store.restoreSnapshot(record);
-    if (!context.mounted) return;
+    if (!mounted) return;
     showNativeSnack(context, ok ? tl('已恢复快照') : tl('快照损坏'));
     if (ok) Navigator.pop(context);
   }
@@ -2327,16 +2373,16 @@ class _BackupManagerState extends State<BackupManager> {
             child: OutlinedButton(
                 onPressed: () async {
                   await NativeBridge.writeClipboard(store.exportJson());
-                  if (context.mounted) showNativeSnack(context, tl('JSON 已复制到剪贴板'));
+                  if (context.mounted)
+                    showNativeSnack(context, tl('JSON 已复制到剪贴板'));
                 },
                 child: Text(tl('复制 JSON')))),
         const SizedBox(width: 8),
         Expanded(
             child: FilledButton(
                 onPressed: () async {
-                  await store
-                      .createSnapshot(tlf('本机快照 {date}',
-                          {'date': dateText(DateTime.now())}));
+                  await store.createSnapshot(
+                      tlf('本机快照 {date}', {'date': dateText(DateTime.now())}));
                   if (context.mounted) setState(() {});
                 },
                 child: Text(tl('创建快照')))),
@@ -2352,7 +2398,10 @@ class _BackupManagerState extends State<BackupManager> {
                       mimeType: 'application/json');
                   if (context.mounted)
                     showNativeSnack(
-                        context, uri == null ? tr('common.exportCancelled') : tl('已导出到系统文件'));
+                        context,
+                        uri == null
+                            ? tr('common.exportCancelled')
+                            : tl('已导出到系统文件'));
                 },
                 child: Text(tl('保存 JSON')))),
         const SizedBox(width: 8),
@@ -2360,7 +2409,8 @@ class _BackupManagerState extends State<BackupManager> {
             child: OutlinedButton(
                 onPressed: () async {
                   await NativeBridge.shareText(
-                      title: tlf('{app} JSON 备份', {'app': appDisplayName(context)}),
+                      title: tlf(
+                          '{app} JSON 备份', {'app': appDisplayName(context)}),
                       text: store.exportJson());
                 },
                 child: Text(tl('分享 JSON')))),
@@ -2399,7 +2449,8 @@ class _BackupManagerState extends State<BackupManager> {
               style: const TextStyle(color: kMuted, fontSize: 12)),
       ]),
       if (store.snapshots.isEmpty)
-        Text(tl('还没有快照。创建后可以在这里恢复、重命名或删除。'), style: const TextStyle(color: kMuted)),
+        Text(tl('还没有快照。创建后可以在这里恢复、重命名或删除。'),
+            style: const TextStyle(color: kMuted)),
       ...store.snapshots.map((s) => ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Container(
@@ -2423,7 +2474,8 @@ class _BackupManagerState extends State<BackupManager> {
               itemBuilder: (_) => [
                 PopupMenuItem(value: 'restore', child: Text(tl('恢复快照'))),
                 PopupMenuItem(value: 'rename', child: Text(tl('重命名'))),
-                PopupMenuItem(value: 'delete', child: Text(tr('common.delete'))),
+                PopupMenuItem(
+                    value: 'delete', child: Text(tr('common.delete'))),
               ],
             ),
           )),
@@ -2439,7 +2491,8 @@ void confirmReset(BuildContext context) {
               content: Text(tl('会删除当前资产、心愿、分类、标签和快照，保留一个完全空白的 App。')),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.pop(d), child: Text(tr('common.cancel'))),
+                    onPressed: () => Navigator.pop(d),
+                    child: Text(tr('common.cancel'))),
                 FilledButton(
                     onPressed: () async {
                       mediumHaptic();
@@ -3328,10 +3381,11 @@ class _TutorialBubble extends StatelessWidget {
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                            Text(tlf('第 {index} / {total} 步', {
-                              'index': '${index + 1}',
-                              'total': '$total',
-                            }),
+                            Text(
+                                tlf('第 {index} / {total} 步', {
+                                  'index': '${index + 1}',
+                                  'total': '$total',
+                                }),
                                 style: const TextStyle(
                                     color: kMuted, fontSize: 12, height: 1.1)),
                             const SizedBox(height: 4),

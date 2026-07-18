@@ -4,9 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="14dp"
+    android:padding="15dp"
     android:background="@drawable/widget_dark_background">
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="日均成本" android:textColor="#FFFFFFFF" android:textSize="14sp" />
-    <TextView android:id="@+id/widget_daily_cost" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="¥0.00" android:textColor="#FFFFFFFF" android:textSize="30sp" />
-    <TextView android:id="@+id/widget_daily_meta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="0 件服役中资产" android:textColor="#B8FFFFFF" android:textSize="12sp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/widget_daily_label" android:textColor="#C8FFFFFF" android:textSize="12sp" android:includeFontPadding="false" />
+    <TextView android:id="@+id/widget_daily_cost" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="¥0.00" android:textColor="#FFFFFFFF" android:textSize="30sp" android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false" />
+    <TextView android:id="@+id/widget_daily_meta" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="7dp" android:text="@string/widget_daily_meta_empty" android:textColor="#B8FFFFFF" android:textSize="11sp" android:maxLines="2" android:ellipsize="end" />
 </LinearLayout>

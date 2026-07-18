@@ -83,9 +83,8 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
     super.didChangeDependencies();
     final item = widget.initial;
     if (tagsText.text.isEmpty && item != null) {
-      tagsText.text = item.tagIds
-          .map((id) => context.store.tagName(id))
-          .join('、');
+      tagsText.text =
+          item.tagIds.map((id) => context.store.tagName(id)).join('、');
     }
   }
 
@@ -212,14 +211,18 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                 AppCard(
                     child: Column(children: [
                   AppField(
-                      controller: name, label: tr('editor.assetName'), requiredField: true),
+                      controller: name,
+                      label: tr('editor.assetName'),
+                      requiredField: true),
                   const SizedBox(height: 12),
                   RoundedSelectField<String?>(
                     label: tr('editor.category'),
                     value: categoryId,
                     options: [
                       SelectOption<String?>(
-                          value: null, label: tr('editor.uncategorized'), iconText: '📦'),
+                          value: null,
+                          label: tr('editor.uncategorized'),
+                          iconText: '📦'),
                       ...store.categories.map((c) => SelectOption<String?>(
                           value: c.id,
                           label: store.categoryName(c.id),
@@ -273,8 +276,8 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                               key: const ValueKey('asset.price.priceless'),
                               initialValue: '∞',
                               readOnly: true,
-                              decoration:
-                                  InputDecoration(labelText: tr('editor.value')),
+                              decoration: InputDecoration(
+                                  labelText: tr('editor.value')),
                             )
                           : AppField(
                               key: const ValueKey('asset.price.normal'),
@@ -287,7 +290,9 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                     Expanded(
                         child: DateFormField(
                             controller: purchaseDate,
-                            label: priceless ? tr('editor.recordDate') : tr('editor.purchaseDate'),
+                            label: priceless
+                                ? tr('editor.recordDate')
+                                : tr('editor.purchaseDate'),
                             requiredField: true,
                             onChanged: () => setState(() {}))),
                   ]),
@@ -296,7 +301,16 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                     label: tr('editor.status'),
                     value: status,
                     options: statusOptions,
-                    onChanged: (v) => setState(() => status = v),
+                    onChanged: (v) => setState(() {
+                      status = v;
+                      if (v == AssetStatus.retired &&
+                          retiredAt.text.trim().isEmpty) {
+                        retiredAt.text = dateText(DateTime.now());
+                      }
+                      if (v == AssetStatus.sold && soldAt.text.trim().isEmpty) {
+                        soldAt.text = dateText(DateTime.now());
+                      }
+                    }),
                   ),
                   if (status == AssetStatus.retired) ...[
                     const SizedBox(height: 12),
@@ -335,7 +349,8 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                       controller: note,
                       minLines: 3,
                       maxLines: 5,
-                      decoration: InputDecoration(labelText: tr('editor.note'))),
+                      decoration:
+                          InputDecoration(labelText: tr('editor.note'))),
                 ])),
                 const SizedBox(height: 12),
                 AppCard(
@@ -482,9 +497,6 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
       onPressChanged: (v) => setState(() => _savePressed = v),
     );
     final saveWidth = media.size.width - 32;
-    final saveScale = _savePressed ? 1.035 : 1.0;
-    final saveGlassWidth = saveWidth * saveScale;
-    final saveGlassHeight = 58.0 * saveScale;
     if (!useLiquidGlass) {
       return GradientScaffold(
         child: Stack(children: [
@@ -559,7 +571,10 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
         : 0;
     if (mounted)
       showNativeSnack(
-          context, count > 1 ? '${tr('editor.stickerSelectedFrom')} $count ${tr('editor.candidates')}' : tr('editor.aiStickerGenerated'));
+          context,
+          count > 1
+              ? '${tr('editor.stickerSelectedFrom')} $count ${tr('editor.candidates')}'
+              : tr('editor.aiStickerGenerated'));
   }
 
   Future<void> scanBarcodeIntoForm() async {
@@ -594,9 +609,19 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
       ctl.text = parts.join('、');
     }
 
-    appSheet(context, title: tr('editor.tagsTitle'), subtitle: tr('editor.tagsSubtitle'),
+    appSheet(context,
+        title: tr('editor.tagsTitle'), subtitle: tr('editor.tagsSubtitle'),
         child: StatefulBuilder(builder: (context, setLocal) {
-      final presets = [tr('tag.commute'), tr('tag.office'), tr('tag.study'), tr('tag.collection'), tr('tag.dusty'), tr('tag.repair'), tr('tag.accessory'), tr('tag.longTerm')];
+      final presets = [
+        tr('tag.commute'),
+        tr('tag.office'),
+        tr('tag.study'),
+        tr('tag.collection'),
+        tr('tag.dusty'),
+        tr('tag.repair'),
+        tr('tag.accessory'),
+        tr('tag.longTerm')
+      ];
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         TextField(
             controller: ctl,
@@ -676,11 +701,15 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
       if (name.text.trim().isEmpty && titleText.isNotEmpty)
         name.text = titleText.take(24);
       tagsText.text = appendTagText(tagsText.text, tr('editor.tagReceiptOcr'));
-      note.text = appendLine(note.text, '${tr('editor.ocrLabel')}：\n${fullText.take(500)}');
+      note.text = appendLine(
+          note.text, '${tr('editor.ocrLabel')}：\n${fullText.take(500)}');
     });
     if (mounted)
       showNativeSnack(
-          context, priceText.isEmpty ? tr('editor.ocrWrittenToNote') : '${tr('editor.ocrPriceFilled')}：$priceText');
+          context,
+          priceText.isEmpty
+              ? tr('editor.ocrWrittenToNote')
+              : '${tr('editor.ocrPriceFilled')}：$priceText');
   }
 
   void addAddon() => editAddon(null);
@@ -704,18 +733,22 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
         context: context,
         builder: (dialogContext) => StatefulBuilder(
             builder: (context, setLocal) => AlertDialog(
-                  title: Text(existing == null ? tr('editor.addAddon') : tr('editor.editAddon')),
+                  title: Text(existing == null
+                      ? tr('editor.addAddon')
+                      : tr('editor.editAddon')),
                   content: SingleChildScrollView(
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                     TextField(
                         controller: nameCtl,
-                        decoration: InputDecoration(labelText: tr('editor.addonName'))),
+                        decoration:
+                            InputDecoration(labelText: tr('editor.addonName'))),
                     const SizedBox(height: 10),
                     TextField(
                         controller: priceCtl,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
-                        decoration: InputDecoration(labelText: tr('editor.addonPrice'))),
+                        decoration: InputDecoration(
+                            labelText: tr('editor.addonPrice'))),
                     const SizedBox(height: 10),
                     SwitchListTile(
                       value: followParent,
@@ -724,7 +757,8 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                         setLocal(() => followParent = v);
                       },
                       title: Text(tr('editor.followParentDate')),
-                      subtitle: Text('${tr('editor.parentPurchaseTime')}：${dateText(parentDate)}'),
+                      subtitle: Text(
+                          '${tr('editor.parentPurchaseTime')}：${dateText(parentDate)}'),
                     ),
                     if (!followParent)
                       DateFormField(
@@ -767,7 +801,8 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                           if (!followParent &&
                               dateCtl.text.trim().isNotEmpty &&
                               parsedDate == null) {
-                            showNativeSnack(context, tr('editor.invalidAddonDate'));
+                            showNativeSnack(
+                                context, tr('editor.invalidAddonDate'));
                             return;
                           }
                           final next = AddonItem(
@@ -792,7 +827,9 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                           });
                           Navigator.pop(dialogContext);
                         },
-                        child: Text(existing == null ? tr('common.add') : tr('common.save'))),
+                        child: Text(existing == null
+                            ? tr('common.add')
+                            : tr('common.save'))),
                   ],
                 )));
   }
@@ -818,6 +855,35 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
         valueMode == AssetValueMode.priceless && status == AssetStatus.sold
             ? AssetStatus.serving
             : status;
+    final statusDate = savedStatus == AssetStatus.retired
+        ? (parsedRetiredAt ?? dateOnly(now))
+        : savedStatus == AssetStatus.sold
+            ? (parsedSoldAt ?? dateOnly(now))
+            : null;
+    if (statusDate != null && statusDate.isBefore(parsedPurchaseDate)) {
+      showNativeSnack(context, tr('editor.dateBeforePurchase'));
+      return;
+    }
+    if (valueMode != AssetValueMode.priceless &&
+        targetMode == TargetMode.daily &&
+        (targetDaily.text.trim().isEmpty || asDouble(targetDaily.text) <= 0)) {
+      showNativeSnack(context, tr('compose.targetDailyCostRequired'));
+      return;
+    }
+    if (targetMode == TargetMode.date && parsedTargetDate == null) {
+      showNativeSnack(context, tr('compose.targetDateRequired'));
+      return;
+    }
+    if (parsedTargetDate != null &&
+        parsedTargetDate.isBefore(parsedPurchaseDate)) {
+      showNativeSnack(context, tr('editor.dateBeforePurchase'));
+      return;
+    }
+    if (targetMode == TargetMode.custom &&
+        (targetDays.text.trim().isEmpty || asInt(targetDays.text) <= 0)) {
+      showNativeSnack(context, tr('compose.targetCustomDaysRequired'));
+      return;
+    }
     final enteredTags = splitTags(tagsText.text);
     final tagIds = <String>[];
     for (final name in enteredTags) {
@@ -839,7 +905,9 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
     }
     final item = Asset(
       id: widget.initial?.id ?? newId('asset'),
-      name: name.text.trim().isEmpty ? tr('editor.unnamedAsset') : name.text.trim(),
+      name: name.text.trim().isEmpty
+          ? tr('editor.unnamedAsset')
+          : name.text.trim(),
       iconValue: icon.text.trim().isEmpty ? '📦' : icon.text.trim(),
       valueMode: valueMode,
       price: valueMode == AssetValueMode.priceless ? 0 : asDouble(price.text),
@@ -853,13 +921,8 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
           valueMode == AssetValueMode.priceless ? false : includeInTotal,
       includeInDailyCost:
           valueMode == AssetValueMode.priceless ? false : includeInDailyCost,
-      retiredAt:
-          savedStatus == AssetStatus.retired && retiredAt.text.trim().isNotEmpty
-              ? parsedRetiredAt
-              : null,
-      soldAt: savedStatus == AssetStatus.sold && soldAt.text.trim().isNotEmpty
-          ? parsedSoldAt
-          : null,
+      retiredAt: savedStatus == AssetStatus.retired ? statusDate : null,
+      soldAt: savedStatus == AssetStatus.sold ? statusDate : null,
       soldPrice:
           savedStatus == AssetStatus.sold && soldPrice.text.trim().isNotEmpty
               ? asDouble(soldPrice.text)
@@ -905,9 +968,16 @@ class AppField extends StatelessWidget {
         keyboardType: number
             ? const TextInputType.numberWithOptions(decimal: true)
             : TextInputType.text,
-        validator: requiredField
-            ? (v) => (v == null || v.trim().isEmpty) ? tr('common.required') : null
-            : null,
+        validator: (v) {
+          final text = v?.trim() ?? '';
+          if (requiredField && text.isEmpty) return tr('common.required');
+          if (number &&
+              text.isNotEmpty &&
+              !(parseUserDouble(text)?.isFinite ?? false)) {
+            return tr('common.invalidNumber');
+          }
+          return null;
+        },
         decoration: InputDecoration(labelText: label),
       );
 }

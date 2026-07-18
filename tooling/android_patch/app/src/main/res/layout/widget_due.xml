@@ -4,9 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="14dp"
+    android:padding="15dp"
     android:background="@drawable/widget_blue_background">
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="到期提醒" android:textColor="#141518" android:textSize="14sp" />
-    <TextView android:id="@+id/widget_due_count" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="0" android:textColor="#141518" android:textSize="34sp" />
-    <TextView android:id="@+id/widget_due_meta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="暂无临期资产" android:textColor="#7A7B82" android:textSize="12sp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/widget_due_label" android:textColor="#72747B" android:textSize="12sp" android:includeFontPadding="false" />
+    <TextView android:id="@+id/widget_due_count" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="0" android:textColor="#141518" android:textSize="34sp" android:maxLines="1" android:includeFontPadding="false" />
+    <TextView android:id="@+id/widget_due_meta" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="6dp" android:text="@string/widget_due_empty" android:textColor="#72747B" android:textSize="11sp" android:maxLines="2" android:ellipsize="end" />
 </LinearLayout>

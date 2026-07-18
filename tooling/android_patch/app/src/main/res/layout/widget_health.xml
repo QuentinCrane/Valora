@@ -4,9 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="14dp"
+    android:padding="15dp"
     android:background="@drawable/widget_blue_background">
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="资产体检" android:textColor="#141518" android:textSize="14sp" />
-    <TextView android:id="@+id/widget_health_score" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="良好" android:textColor="#141518" android:textSize="30sp" />
-    <TextView android:id="@+id/widget_health_meta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="0 个钱包漏洞" android:textColor="#7A7B82" android:textSize="12sp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/widget_health_label" android:textColor="#72747B" android:textSize="12sp" android:includeFontPadding="false" />
+    <TextView android:id="@+id/widget_health_score" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="@string/widget_health_good" android:textColor="#141518" android:textSize="29sp" android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false" />
+    <TextView android:id="@+id/widget_health_meta" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="7dp" android:text="@string/widget_health_empty_meta" android:textColor="#72747B" android:textSize="11sp" android:maxLines="2" android:ellipsize="end" />
 </LinearLayout>

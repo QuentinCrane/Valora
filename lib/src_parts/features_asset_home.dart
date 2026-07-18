@@ -805,7 +805,6 @@ class LifecycleDashboardCard extends StatelessWidget {
     final totalValue = store.getTotalAssetValue();
     final recovered = store.getLifecycleRecoveredValue();
     final consumed = store.getLifecycleNetConsumption().toDouble();
-    final netPosition = store.getNetAssetPosition();
     final maxValue = math.max(math.max(totalCost, totalValue + recovered), 1.0);
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

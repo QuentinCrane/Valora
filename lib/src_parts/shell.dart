@@ -44,7 +44,7 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _handledInitialIntent) return;
       _handledInitialIntent = true;
-      _handleIntentInfo(await NativeBridge.getInitialIntentInfo() ?? '');
+      await _handleIntentInfo(await NativeBridge.getInitialIntentInfo() ?? '');
       if (!mounted) return;
       _prewarmAnalyticsSnapshot();
       await _maybeAutoStartOnboarding();
@@ -222,12 +222,37 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void _handleIntentInfo(String raw) {
+  Future<void> _handleIntentInfo(String raw) async {
     if (!mounted || raw.isEmpty) return;
     if (raw.contains('com.valora.assets.ADD_WISH')) {
       openCompose(context, ComposeTab.wish);
     } else if (raw.contains('com.valora.assets.ADD_ASSET')) {
       openCompose(context, ComposeTab.asset);
+    } else {
+      final payload = nativeJsonMap(raw);
+      if ((payload['action'] ?? '').toString() !=
+          'android.intent.action.SEND') {
+        return;
+      }
+      final mimeType = (payload['type'] ?? '').toString().toLowerCase();
+      final sharedUri = (payload['uri'] ?? '').toString().trim();
+      String? initialIcon;
+      if (sharedUri.isNotEmpty && mimeType.startsWith('image/')) {
+        initialIcon = await NativeBridge.persistImageUri(sharedUri);
+        if (!mounted) return;
+      }
+      var initialName = (payload['text'] ?? '')
+          .toString()
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      if (initialName.length > 80) initialName = initialName.substring(0, 80);
+      if (initialName.isEmpty && (initialIcon?.isEmpty ?? true)) return;
+      openCompose(
+        context,
+        ComposeTab.asset,
+        initialName: initialName.isEmpty ? null : initialName,
+        initialIcon: initialIcon,
+      );
     }
   }
 
@@ -676,9 +701,11 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     );
   }
 
-  void openCompose(BuildContext context, ComposeTab tab) {
+  void openCompose(BuildContext context, ComposeTab tab,
+      {String? initialName, String? initialIcon}) {
     mediumHaptic();
-    Navigator.of(context).push(softRoute<void>(ComposePage(initialTab: tab)));
+    Navigator.of(context).push(softRoute<void>(ComposePage(
+        initialTab: tab, initialName: initialName, initialIcon: initialIcon)));
   }
 }
 

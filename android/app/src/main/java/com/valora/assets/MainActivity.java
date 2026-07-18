@@ -1390,7 +1390,8 @@ public class MainActivity extends FlutterActivity {
                                 + "\"format\":\"" + escape(String.valueOf(b.getFormat())) + "\""
                                 + "}");
                     })
-                    .addOnFailureListener(e -> result.error("barcode_scan_error", e.getMessage(), null));
+                    .addOnFailureListener(e -> result.error("barcode_scan_error", e.getMessage(), null))
+                    .addOnCompleteListener(task -> scanner.close());
         } catch (Exception e) {
             result.error("barcode_scan_error", e.getMessage(), null);
         }
@@ -1414,7 +1415,8 @@ public class MainActivity extends FlutterActivity {
                                 + "\"nameCandidate\":\"" + escape(title) + "\""
                                 + "}");
                     })
-                    .addOnFailureListener(e -> result.error("ocr_error", e.getMessage(), null));
+                    .addOnFailureListener(e -> result.error("ocr_error", e.getMessage(), null))
+                    .addOnCompleteListener(task -> recognizer.close());
         } catch (Exception e) {
             result.error("ocr_error", e.getMessage(), null);
         }
@@ -1951,6 +1953,7 @@ public class MainActivity extends FlutterActivity {
         startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
     }
 
+    @SuppressWarnings("deprecation")
     private String intentToJson(Intent intent) {
         if (intent == null) return "";
         String action = intent.getAction();
@@ -1959,6 +1962,10 @@ public class MainActivity extends FlutterActivity {
         Uri uri = intent.getData();
         if (uri == null && intent.getClipData() != null && intent.getClipData().getItemCount() > 0) {
             uri = intent.getClipData().getItemAt(0).getUri();
+        }
+        if (uri == null && Intent.ACTION_SEND.equals(action)) {
+            Object stream = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (stream instanceof Uri) uri = (Uri) stream;
         }
         return "{"
                 + "\"action\":\"" + escape(action) + "\","

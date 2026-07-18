@@ -31,9 +31,9 @@ public class ValoraWidgetProvider extends AppWidgetProvider {
         int serving = prefs.getInt("servingCount", 0);
         int sold = prefs.getInt("soldCount", 0);
 
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_valora);
+        RemoteViews views = new RemoteViews(context.getPackageName(), WidgetUtils.layout(context, R.layout.widget_valora, R.layout.widget_valora_hyperos));
         views.setTextViewText(R.id.widget_total, currency + total);
-        views.setTextViewText(R.id.widget_meta, assetCount + " 件资产 · " + serving + " 服役 · " + sold + " 已卖 · 日均 " + currency + daily);
+        views.setTextViewText(R.id.widget_meta, context.getString(R.string.widget_total_meta_format, assetCount, serving, sold, currency, daily));
 
         Intent open = new Intent(context, MainActivity.class);
         PendingIntent pi = PendingIntent.getActivity(context, 7301, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);

@@ -555,10 +555,13 @@ class Wish {
           double? expectedPrice,
           String? note,
           String? categoryId,
+          bool clearCategoryId = false,
           List<String>? tagIds,
           bool? archived,
           DateTime? convertedAt,
+          bool clearConvertedAt = false,
           String? convertedAssetId,
+          bool clearConvertedAssetId = false,
           List<AddonItem>? addons}) =>
       Wish(
         id: id,
@@ -566,11 +569,14 @@ class Wish {
         iconValue: iconValue ?? this.iconValue,
         expectedPrice: expectedPrice ?? this.expectedPrice,
         note: note ?? this.note,
-        categoryId: categoryId ?? this.categoryId,
+        categoryId: clearCategoryId ? null : (categoryId ?? this.categoryId),
         tagIds: tagIds ?? this.tagIds,
         archived: archived ?? this.archived,
-        convertedAt: convertedAt ?? this.convertedAt,
-        convertedAssetId: convertedAssetId ?? this.convertedAssetId,
+        convertedAt:
+            clearConvertedAt ? null : (convertedAt ?? this.convertedAt),
+        convertedAssetId: clearConvertedAssetId
+            ? null
+            : (convertedAssetId ?? this.convertedAssetId),
         addons: addons ?? this.addons,
         createdAt: createdAt,
         updatedAt: DateTime.now(),
@@ -868,8 +874,7 @@ class AppSettings {
             orElse: () => map['darkMode'] == true
                 ? ThemeSetting.dark
                 : ThemeSetting.light),
-        language:
-            AppLanguageSettingX.fromValue(map['language']?.toString()),
+        language: AppLanguageSettingX.fromValue(map['language']?.toString()),
         includeRetiredInTotal: map['includeRetiredInTotal'] != false,
         reminderEnabled: map['reminderEnabled'] == true,
         hapticsEnabled: map['hapticsEnabled'] != false,

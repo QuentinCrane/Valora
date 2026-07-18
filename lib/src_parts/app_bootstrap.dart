@@ -812,11 +812,26 @@ double asDouble(dynamic value, {double fallback = 0}) {
   return double.tryParse(normalized) ?? fallback;
 }
 
+double? parseUserDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  final text = value?.toString().trim() ?? '';
+  if (text.isEmpty) return null;
+  final normalized =
+      text.replaceAll('，', ',').replaceAll(RegExp(r'[,¥￥元\s]'), '');
+  if (!RegExp(r'^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$').hasMatch(normalized)) {
+    return null;
+  }
+  return double.tryParse(normalized);
+}
+
 int asInt(dynamic value, {int fallback = 0}) {
   if (value is num) return value.round();
   final text = value?.toString().trim() ?? '';
-  final normalized = text.replaceAll(RegExp(r'[^0-9+-]'), '');
-  return int.tryParse(normalized) ?? fallback;
+  final normalized = text
+      .replaceAll('，', ',')
+      .replaceAll(RegExp(r'[,¥￥元\s]'), '')
+      .replaceAll(RegExp(r'[^0-9+\-.]'), '');
+  return double.tryParse(normalized)?.round() ?? fallback;
 }
 
 List<String> splitTags(String raw) => raw

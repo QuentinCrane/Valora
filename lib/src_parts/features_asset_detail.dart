@@ -231,8 +231,10 @@ class AssetDetailPage extends StatelessWidget {
                                                 const SizedBox(height: 2),
                                                 Text(
                                                     tlf('购买时间：{date}', {
-                                                      'date': a.effectivePurchaseDateLabel(
-                                                          asset.purchaseDate),
+                                                      'date': a
+                                                          .effectivePurchaseDateLabel(
+                                                              asset
+                                                                  .purchaseDate),
                                                     }),
                                                     style: const TextStyle(
                                                         color: kMuted,
@@ -437,8 +439,8 @@ class PricelessRecordCard extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
             tlf('从记录日期开始，已经过去 {duration}', {
-              'duration':
-                  durationWithCalendarText(asset.serviceDays, store.settings.durationMode),
+              'duration': durationWithCalendarText(
+                  asset.serviceDays, store.settings.durationMode),
             }),
             style: const TextStyle(color: kMuted, height: 1.35)),
         const SizedBox(height: 12),
@@ -447,7 +449,9 @@ class PricelessRecordCard extends StatelessWidget {
             label: '$targetLabel · $remainingLabel'),
         const SizedBox(height: 10),
         GridWrap(children: [
-          DetailCell(label: tr('detail.recordDate'), value: dateText(asset.purchaseDate)),
+          DetailCell(
+              label: tr('detail.recordDate'),
+              value: dateText(asset.purchaseDate)),
           DetailCell(
               label: tr('detail.sinceLast'),
               value: durationWithCalendarText(
@@ -458,7 +462,8 @@ class PricelessRecordCard extends StatelessWidget {
                   ? '—'
                   : dateText(asset.estimatedTargetDate!)),
           DetailCell(
-              label: tl('价值'), value: assetValueLabelText(asset, store.settings)),
+              label: tl('价值'),
+              value: assetValueLabelText(asset, store.settings)),
         ]),
       ]),
     );
@@ -497,8 +502,7 @@ class AssetLifecycleQuickActions extends StatelessWidget {
                 await store.markAssetServing(asset.id);
                 if (!context.mounted) return;
                 showNativeSnack(
-                    context,
-                    asset.isPriceless ? tl('已恢复记录') : tl('已恢复为服役中'));
+                    context, asset.isPriceless ? tl('已恢复记录') : tl('已恢复为服役中'));
               },
               icon: const Icon(Icons.play_circle_fill_rounded),
               label: Text(asset.isPriceless ? tl('恢复记录') : tl('恢复服役')),
@@ -510,8 +514,7 @@ class AssetLifecycleQuickActions extends StatelessWidget {
                 await store.markAssetRetired(asset.id);
                 if (!context.mounted) return;
                 showNativeSnack(
-                    context,
-                    asset.isPriceless ? tl('已暂停记录') : tl('已标记为退役'));
+                    context, asset.isPriceless ? tl('已暂停记录') : tl('已标记为退役'));
               },
               icon: const Icon(Icons.archive_rounded),
               label: Text(asset.isPriceless ? tl('暂停记录') : tl('标记退役')),
@@ -559,8 +562,17 @@ void showAssetSoldDialog(BuildContext context, Asset asset, AppStore store) {
               showNativeSnack(context, tl('卖出日期格式不正确'));
               return;
             }
+            if (parsedSoldDate.isBefore(dateOnly(asset.purchaseDate))) {
+              showNativeSnack(context, tr('editor.dateBeforePurchase'));
+              return;
+            }
+            final soldPrice = parseUserDouble(priceCtl.text);
+            if (soldPrice == null || !soldPrice.isFinite || soldPrice < 0) {
+              showNativeSnack(context, tr('common.invalidNumber'));
+              return;
+            }
             await store.markAssetSold(asset.id,
-                soldAt: parsedSoldDate, soldPrice: asDouble(priceCtl.text));
+                soldAt: parsedSoldDate, soldPrice: soldPrice);
             if (!context.mounted) return;
             Navigator.pop(dialogContext);
             showNativeSnack(context, tl('已记录卖出，资产复盘已更新'));
@@ -606,7 +618,8 @@ class AssetValueReplayCard extends StatelessWidget {
           ]),
           const SizedBox(height: 2),
           Text(tl('除了二手卖出，也可以把一组资产实际带来的收入记入回收，例如拍摄接单、游戏设备直播收益、工具维修收入等。'),
-              style: const TextStyle(color: kMuted, height: 1.32, fontSize: 12)),
+              style:
+                  const TextStyle(color: kMuted, height: 1.32, fontSize: 12)),
           const SizedBox(height: 10),
           Row(children: [
             Expanded(
@@ -630,7 +643,8 @@ class AssetValueReplayCard extends StatelessWidget {
             DetailCell(
                 label: tl('二手回收'), value: money(soldRecovered, store.settings)),
             DetailCell(
-                label: tl('使用收益'), value: money(earningRecovered, store.settings)),
+                label: tl('使用收益'),
+                value: money(earningRecovered, store.settings)),
             DetailCell(
                 label: tl('回收后日耗'),
                 value:
@@ -693,8 +707,7 @@ void showRecoveryRecordSheet(BuildContext context, AppStore store,
         SectionLabel(tl('参与资产')),
         const SizedBox(height: 8),
         if (recoverableAssets.isEmpty)
-          Text(tl('暂无可参与价值回收的普通资产'),
-              style: const TextStyle(color: kMuted))
+          Text(tl('暂无可参与价值回收的普通资产'), style: const TextStyle(color: kMuted))
         else
           Wrap(
               spacing: 8,
@@ -794,8 +807,9 @@ class AssetLifecycleEventCard extends StatelessWidget {
         (
           date: asset.expiresAt!,
           title: tl('到期/保修节点'),
-          subtitle:
-              '${dateText(asset.expiresAt!)} · ${tlf('提前 {days} 天提醒', {'days': '${asset.remindBeforeDays ?? 0}'})}',
+          subtitle: '${dateText(asset.expiresAt!)} · ${tlf('提前 {days} 天提醒', {
+                'days': '${asset.remindBeforeDays ?? 0}'
+              })}',
           icon: Icons.event_available_rounded,
           color: const Color(0xFFFFB020)
         ),
@@ -803,8 +817,10 @@ class AssetLifecycleEventCard extends StatelessWidget {
         (
           date: asset.retiredAt!,
           title: tr('AssetStatus.retired'),
-          subtitle:
-              '${dateText(asset.retiredAt!)} · ${tlf('持有 {duration}', {'duration': durationWithCalendarText(asset.serviceDays, store.settings.durationMode)})}',
+          subtitle: '${dateText(asset.retiredAt!)} · ${tlf('持有 {duration}', {
+                'duration': durationWithCalendarText(
+                    asset.serviceDays, store.settings.durationMode)
+              })}',
           icon: Icons.archive_rounded,
           color: const Color(0xFFFF8A65)
         ),
@@ -812,16 +828,19 @@ class AssetLifecycleEventCard extends StatelessWidget {
         (
           date: asset.soldAt!,
           title: tr('AssetStatus.sold'),
-          subtitle:
-              '${dateText(asset.soldAt!)} · ${tlf('回收 {value}', {'value': money(asset.soldPrice ?? 0, store.settings)})}',
+          subtitle: '${dateText(asset.soldAt!)} · ${tlf('回收 {value}', {
+                'value': money(asset.soldPrice ?? 0, store.settings)
+              })}',
           icon: Icons.swap_horiz_rounded,
           color: const Color(0xFF4ADE80)
         ),
       ...store.recoveryRecordsForAsset(asset.id).map((r) => (
             date: r.date,
             title: tl('使用收益'),
-            subtitle:
-                '${dateText(r.date)} · ${r.title} · ${tlf('分摊 {value}', {'value': money(r.amount / math.max(r.assetIds.length, 1), store.settings)})}',
+            subtitle: '${dateText(r.date)} · ${r.title} · ${tlf('分摊 {value}', {
+                  'value': money(
+                      r.amount / math.max(r.assetIds.length, 1), store.settings)
+                })}',
             icon: Icons.savings_rounded,
             color: const Color(0xFF22C55E)
           )),
@@ -866,7 +885,8 @@ void showHoldingTimeExplanation(
       : asset.status == AssetStatus.sold
           ? tl('卖出日期')
           : tl('退役日期');
-  final startLabel = asset.isPriceless ? tr('detail.recordDate') : tr('detail.purchaseDate');
+  final startLabel =
+      asset.isPriceless ? tr('detail.recordDate') : tr('detail.purchaseDate');
   showDialog(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -881,16 +901,17 @@ void showHoldingTimeExplanation(
             const SizedBox(height: 6),
             Text(tlf('原始天数：{days} 天', {'days': '${asset.serviceDays}'})),
             const SizedBox(height: 6),
-            Text(
-                tlf('当前显示：{duration}', {
-                  'duration':
-                      durationWithCalendarText(asset.serviceDays, store.settings.durationMode),
-                })),
+            Text(tlf('当前显示：{duration}', {
+              'duration': durationWithCalendarText(
+                  asset.serviceDays, store.settings.durationMode),
+            })),
             const SizedBox(height: 12),
             Text(
                 asset.isPriceless
-                    ? tl('计算方式：从记录日期到当前日期或退役日期，按包含首尾日期的方式统计。你可以在“设置 - 外观交互 - 时长显示”里切换天、周、月或年/月显示。')
-                    : tl('计算方式：从购买日期到当前日期、退役日期或卖出日期，按包含首尾日期的方式统计。你可以在“设置 - 外观交互 - 时长显示”里切换天、周、月或年/月显示。'),
+                    ? tl(
+                        '计算方式：从记录日期到当前日期或退役日期，按包含首尾日期的方式统计。你可以在“设置 - 外观交互 - 时长显示”里切换天、周、月或年/月显示。')
+                    : tl(
+                        '计算方式：从购买日期到当前日期、退役日期或卖出日期，按包含首尾日期的方式统计。你可以在“设置 - 外观交互 - 时长显示”里切换天、周、月或年/月显示。'),
                 style:
                     const TextStyle(color: kMuted, fontSize: 12, height: 1.45)),
           ]),
@@ -945,8 +966,7 @@ class DetailMini extends StatelessWidget {
         label.contains(tl('持有')) ||
         label.toLowerCase().contains('time') ||
         label.toLowerCase().contains('active') ||
-        label.toLowerCase().contains('holding'))
-      return Icons.timeline_rounded;
+        label.toLowerCase().contains('holding')) return Icons.timeline_rounded;
     return Icons.insights_rounded;
   }
 
@@ -958,8 +978,7 @@ class DetailMini extends StatelessWidget {
         label.contains(tl('持有')) ||
         label.toLowerCase().contains('time') ||
         label.toLowerCase().contains('active') ||
-        label.toLowerCase().contains('holding'))
-      return const Color(0xFF7CC6F2);
+        label.toLowerCase().contains('holding')) return const Color(0xFF7CC6F2);
     return kBrandStrong;
   }
 
@@ -971,8 +990,7 @@ class DetailMini extends StatelessWidget {
         label.contains(tl('持有')) ||
         label.toLowerCase().contains('time') ||
         label.toLowerCase().contains('active') ||
-        label.toLowerCase().contains('holding'))
-      return .48;
+        label.toLowerCase().contains('holding')) return .48;
     return .54;
   }
 
@@ -1077,14 +1095,18 @@ class DetailCell extends StatelessWidget {
 
   IconData get _icon {
     final lower = label.toLowerCase();
-    if (label.contains(tl('日期')) || label.contains(tl('达成')) ||
-        lower.contains('date') || lower.contains('target'))
-      return Icons.event_rounded;
-    if (label.contains(tl('价')) || label.contains(tl('成本')) ||
-        label.contains(tl('日耗')) || lower.contains('cost') ||
-        lower.contains('price') || lower.contains('value'))
-      return Icons.payments_rounded;
-    if (label.contains(tl('天')) || lower.contains('day')) return Icons.schedule_rounded;
+    if (label.contains(tl('日期')) ||
+        label.contains(tl('达成')) ||
+        lower.contains('date') ||
+        lower.contains('target')) return Icons.event_rounded;
+    if (label.contains(tl('价')) ||
+        label.contains(tl('成本')) ||
+        label.contains(tl('日耗')) ||
+        lower.contains('cost') ||
+        lower.contains('price') ||
+        lower.contains('value')) return Icons.payments_rounded;
+    if (label.contains(tl('天')) || lower.contains('day'))
+      return Icons.schedule_rounded;
     return Icons.radio_button_checked_rounded;
   }
 
@@ -1093,8 +1115,10 @@ class DetailCell extends StatelessWidget {
     final lower = label.toLowerCase();
     final accent = label.contains(tl('日耗')) || lower.contains('daily')
         ? const Color(0xFFFFB15C)
-        : label.contains(tl('日期')) || label.contains(tl('达成')) ||
-                lower.contains('date') || lower.contains('target')
+        : label.contains(tl('日期')) ||
+                label.contains(tl('达成')) ||
+                lower.contains('date') ||
+                lower.contains('target')
             ? const Color(0xFF7CC6F2)
             : kBrandStrong;
     return Container(
@@ -1182,7 +1206,6 @@ class TrendExplainRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final startDaily = asset.netCost;
     final nowDaily = asset.dailyCost;
-    final saved = math.max(0.0, startDaily - nowDaily);
     final targetDays = asset.targetDays;
     final targetText = targetDays == null
         ? tl('未设目标')
@@ -1196,11 +1219,13 @@ class TrendExplainRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(18)),
       child: Row(children: [
         Expanded(
-            child: Text(tlf('第 1 天 {value}/天',
+            child: Text(
+                tlf('第 1 天 {value}/天',
                     {'value': money(startDaily, context.store.settings)}),
                 style: const TextStyle(fontSize: 12, color: kMuted))),
         Expanded(
-            child: Text(tlf('现在 {value}/天',
+            child: Text(
+                tlf('现在 {value}/天',
                     {'value': money(nowDaily, context.store.settings)}),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12, color: kMuted))),
@@ -1220,11 +1245,13 @@ void showAssetTrendGuide(BuildContext context, Asset asset, AppStore store) {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         DetailCell(
             label: tl('第 1 天日耗'),
-            value: '${money(asset.netCost, store.settings)} ${tr('time.perDay')}'),
+            value:
+                '${money(asset.netCost, store.settings)} ${tr('time.perDay')}'),
         const SizedBox(height: 8),
         DetailCell(
             label: tl('当前日耗'),
-            value: '${money(asset.dailyCost, store.settings)} ${tr('time.perDay')}'),
+            value:
+                '${money(asset.dailyCost, store.settings)} ${tr('time.perDay')}'),
         const SizedBox(height: 8),
         DetailCell(
             label: tr('detail.holdingTime'),
@@ -1271,8 +1298,9 @@ class DailyCostTrendChart extends StatelessWidget {
         currentIndex: actualCount - 1,
         currentLabel: tl('当前'),
         targetValue: _targetDailyValue(),
-        targetLabel:
-            targetDays == null ? null : tlf('目标 {days}天', {'days': '$targetDays'}),
+        targetLabel: targetDays == null
+            ? null
+            : tlf('目标 {days}天', {'days': '$targetDays'}),
       ),
       size: Size.infinite,
     );
