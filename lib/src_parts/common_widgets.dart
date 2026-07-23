@@ -258,6 +258,32 @@ class ValoraGlassSceneBackground extends StatelessWidget {
   }
 }
 
+/// Shared iOS-style tuning for the scene-level liquid lenses.
+///
+/// A single persisted value changes both the optical blur and the milk-glass
+/// tint. Keeping the two in lockstep avoids the muddy, low-contrast look that
+/// a blur-only control would create.
+double liquidGlassBlurSigma(BuildContext context) => lerpDouble(
+      .70,
+      2.35,
+      context.store.settings.liquidGlassSoftness,
+    )!;
+
+Color liquidGlassTint(BuildContext context) {
+  final softness = context.store.settings.liquidGlassSoftness;
+  final opacity = context.isDark
+      ? lerpDouble(.028, .090, softness)!
+      : lerpDouble(.040, .130, softness)!;
+  return Colors.white.withOpacity(opacity);
+}
+
+double liquidGlassCapturePixelRatio(BuildContext context,
+    {bool duringInteraction = false}) {
+  final ratio =
+      lerpDouble(.955, 1.0, context.store.settings.liquidGlassSoftness)!;
+  return (ratio - (duringInteraction ? .025 : 0.0)).clamp(.92, 1.0).toDouble();
+}
+
 class ValoraLiquidGlassSurface extends StatelessWidget {
   final double? width;
   final double height;

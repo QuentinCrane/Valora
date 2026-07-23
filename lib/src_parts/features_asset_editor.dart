@@ -136,14 +136,16 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
             ambientIntensity: 1.08 + .22 * spring,
             borderSolidity: 0.0),
       ),
-      blur: const lge.LiquidGlassBlur(sigmaX: .003, sigmaY: .003),
+      blur: lge.LiquidGlassBlur(
+          sigmaX: liquidGlassBlurSigma(context),
+          sigmaY: liquidGlassBlurSigma(context)),
       distortion: .096 + .026 * spring,
       distortionWidth: 32 + 7 * spring,
       magnification: 1.044 + .030 * spring,
       chromaticAberration: .00052 + .00014 * spring,
       saturation: 1.055,
       refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-      color: Colors.white.withOpacity(dark ? .018 : .026),
+      color: liquidGlassTint(context),
       child: saveContent,
     );
   }
@@ -523,7 +525,8 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
         realTimeCapture: true,
         useSync: true,
         refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
-        pixelRatio: _savePressed ? .84 : .92,
+        pixelRatio: liquidGlassCapturePixelRatio(context,
+            duringInteraction: _savePressed),
         backgroundWidget:
             ValoraGlassSceneBackground(child: RepaintBoundary(child: pageBody)),
         children: [

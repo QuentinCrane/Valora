@@ -495,14 +495,16 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
           borderSolidity: 0.0,
         ),
       ),
-      blur: const lge.LiquidGlassBlur(sigmaX: .002, sigmaY: .002),
+      blur: lge.LiquidGlassBlur(
+          sigmaX: liquidGlassBlurSigma(context),
+          sigmaY: liquidGlassBlurSigma(context)),
       distortion: .112 + .030 * spring,
       distortionWidth: 44 + 10 * spring,
       magnification: 1.052 + .036 * spring,
       chromaticAberration: .00056 + .00014 * spring,
       saturation: 1.065,
       refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-      color: Colors.white.withOpacity(dark ? .012 : .018),
+      color: liquidGlassTint(context),
       child: dock,
     );
   }
@@ -537,14 +539,16 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
           borderSolidity: 0.0,
         ),
       ),
-      blur: const lge.LiquidGlassBlur(sigmaX: .003, sigmaY: .003),
+      blur: lge.LiquidGlassBlur(
+          sigmaX: liquidGlassBlurSigma(context),
+          sigmaY: liquidGlassBlurSigma(context)),
       distortion: .096 + .026 * spring,
       distortionWidth: 34 + 7 * spring,
       magnification: 1.044 + .030 * spring,
       chromaticAberration: .00052 + .00014 * spring,
       saturation: 1.055,
       refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-      color: Colors.white.withOpacity(dark ? .018 : .026),
+      color: liquidGlassTint(context),
       child: addButton,
     );
   }
@@ -627,7 +631,8 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
         realTimeCapture: true,
         useSync: true,
         refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
-        pixelRatio: (_dockMagicActive || _addMagicActive) ? .84 : .92,
+        pixelRatio: liquidGlassCapturePixelRatio(context,
+            duringInteraction: _dockMagicActive || _addMagicActive),
         backgroundWidget: ValoraGlassSceneBackground(
             child: RepaintBoundary(child: shellBackground)),
         children: [

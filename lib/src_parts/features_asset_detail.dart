@@ -324,14 +324,16 @@ class AssetDetailPage extends StatelessWidget {
               ambientIntensity: 1.08,
               borderSolidity: 0.0),
         ),
-        blur: const lge.LiquidGlassBlur(sigmaX: .004, sigmaY: .004),
+        blur: lge.LiquidGlassBlur(
+            sigmaX: liquidGlassBlurSigma(context),
+            sigmaY: liquidGlassBlurSigma(context)),
         distortion: .088,
         distortionWidth: 28,
         magnification: 1.040,
         chromaticAberration: .00050,
         saturation: 1.055,
         refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-        color: Colors.white.withOpacity(dark ? .014 : .022),
+        color: liquidGlassTint(context),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
@@ -348,7 +350,7 @@ class AssetDetailPage extends StatelessWidget {
         realTimeCapture: true,
         useSync: true,
         refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
-        pixelRatio: .92,
+        pixelRatio: liquidGlassCapturePixelRatio(context),
         backgroundWidget:
             ValoraGlassSceneBackground(child: RepaintBoundary(child: content)),
         children: [

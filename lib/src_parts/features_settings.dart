@@ -375,6 +375,17 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                     store.settings.copyWith(glassEffectMode: v)),
               ),
             ),
+            if (store.settings.glassEffectMode == GlassEffectMode.liquid)
+              SettingSliderRow(
+                icon: Icons.water_drop_outlined,
+                iconBg: const Color(0xFFCFEAFF),
+                label: tr('settings.glassSoftness'),
+                description: tr('settings.glassSoftness.desc'),
+                value: store.settings.liquidGlassSoftness,
+                valueLabel: glassSoftnessLabel(store.settings.liquidGlassSoftness),
+                onChanged: (value) => store.updateSettings(store.settings
+                    .copyWith(liquidGlassSoftness: value)),
+              ),
             SettingRow(
                 icon: Icons.view_carousel_rounded,
                 iconBg: const Color(0xFFC8EBFF),
@@ -1112,6 +1123,86 @@ class SettingSwitchRow extends StatelessWidget {
           }),
     );
   }
+}
+
+class SettingSliderRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final String label;
+  final String description;
+  final double value;
+  final String valueLabel;
+  final ValueChanged<double> onChanged;
+
+  const SettingSliderRow({
+    super.key,
+    required this.icon,
+    required this.iconBg,
+    required this.label,
+    required this.description,
+    required this.value,
+    required this.valueLabel,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = context.isDark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 9, 2, 7),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: iconBg.withOpacity(dark ? .18 : .35),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon,
+                size: 18,
+                color: dark ? Colors.white.withOpacity(.86) : iconBg),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: TextStyle(
+                          fontWeight: FontWeight.normal,
+                          fontSize: 15,
+                          letterSpacing: -.08,
+                          color: dark ? Colors.white.withOpacity(.92) : kText)),
+                  const SizedBox(height: 2),
+                  Text(description,
+                      style: const TextStyle(
+                          color: kMuted,
+                          fontSize: 12,
+                          height: 1.32,
+                          fontWeight: FontWeight.normal)),
+                ]),
+          ),
+          ValuePill(valueLabel),
+        ]),
+        Padding(
+          padding: const EdgeInsets.only(left: 42, right: 2, top: 2),
+          child: Slider(
+            value: value,
+            onChanged: (next) {
+              if ((next - value).abs() > .005) onChanged(next);
+            },
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+String glassSoftnessLabel(double value) {
+  if (value < .34) return tr('settings.glassSoftness.clear');
+  if (value < .68) return tr('settings.glassSoftness.soft');
+  return tr('settings.glassSoftness.frosted');
 }
 
 class ValuePill extends StatelessWidget {

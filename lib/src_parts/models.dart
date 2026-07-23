@@ -769,6 +769,7 @@ class AppSettings {
   final HomeViewMode defaultHomeViewMode;
   final StickerEngineMode stickerEngineMode;
   final GlassEffectMode glassEffectMode;
+  final double liquidGlassSoftness;
   final bool keepStickerCandidates;
   final double homeMetaFontScale;
   final bool onboardingCompleted;
@@ -789,6 +790,7 @@ class AppSettings {
     this.defaultHomeViewMode = HomeViewMode.grid,
     this.stickerEngineMode = StickerEngineMode.balanced,
     this.glassEffectMode = GlassEffectMode.liquid,
+    this.liquidGlassSoftness = .5,
     this.keepStickerCandidates = false,
     this.homeMetaFontScale = 1.0,
     this.onboardingCompleted = false,
@@ -810,6 +812,7 @@ class AppSettings {
           HomeViewMode? defaultHomeViewMode,
           StickerEngineMode? stickerEngineMode,
           GlassEffectMode? glassEffectMode,
+          double? liquidGlassSoftness,
           bool? keepStickerCandidates,
           double? homeMetaFontScale,
           bool? onboardingCompleted,
@@ -831,6 +834,7 @@ class AppSettings {
         defaultHomeViewMode: defaultHomeViewMode ?? this.defaultHomeViewMode,
         stickerEngineMode: stickerEngineMode ?? this.stickerEngineMode,
         glassEffectMode: glassEffectMode ?? this.glassEffectMode,
+        liquidGlassSoftness: liquidGlassSoftness ?? this.liquidGlassSoftness,
         keepStickerCandidates:
             keepStickerCandidates ?? this.keepStickerCandidates,
         homeMetaFontScale: homeMetaFontScale ?? this.homeMetaFontScale,
@@ -853,6 +857,7 @@ class AppSettings {
         'defaultHomeViewMode': defaultHomeViewMode.name,
         'stickerEngineMode': stickerEngineMode.name,
         'glassEffectMode': glassEffectMode.name,
+        'liquidGlassSoftness': liquidGlassSoftness,
         'keepStickerCandidates': keepStickerCandidates,
         'homeMetaFontScale': homeMetaFontScale,
         'onboardingCompleted': onboardingCompleted,
@@ -886,6 +891,10 @@ class AppSettings {
             StickerEngineModeX.fromValue(map['stickerEngineMode']?.toString()),
         glassEffectMode:
             GlassEffectModeX.fromValue(map['glassEffectMode']?.toString()),
+        liquidGlassSoftness:
+            asDouble(map['liquidGlassSoftness'], fallback: .5)
+                .clamp(0.0, 1.0)
+                .toDouble(),
         keepStickerCandidates: map['keepStickerCandidates'] == true,
         homeMetaFontScale: (asDouble(map['homeMetaFontScale'], fallback: 1.0))
             .clamp(0.82, 1.12)
