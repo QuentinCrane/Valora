@@ -1,227 +1,212 @@
-# Valora（值谱）
+<p align="center">
+  <img src="assets/images/app_icon.png" alt="Valora app icon" width="112" />
+</p>
 
-**让每一件物品的价值，都有迹可循。**
+<h1 align="center">Valora · 值谱</h1>
 
-<img src="assets/images/app_icon.png" alt="Valora app icon" width="96" />
+<p align="center"><strong>把每一次购买，变成一条看得见的价值轨迹</strong></p>
 
-Valora（中文名：值谱）是一款面向个人物品、数码产品和长期消费品的资产价值管理 App。它不是传统记账软件，而是把购买记录转化为日均成本、生命周期和价值洞察，帮助你从“我花了多少钱”进一步理解“这件东西到今天为止值不值”。
+<p align="center">本地优先的个人资产生命周期管理 App · Android / Flutter</p>
 
-> A clean personal asset tracker that turns purchases into daily cost, lifecycle, and value insights.
+<p align="center">
+  <a href="#开始使用">开始使用</a> ·
+  <a href="#核心能力">核心能力</a> ·
+  <a href="#数据与隐私">数据与隐私</a> ·
+  <a href="#文档导航">文档导航</a>
+</p>
 
-## 项目状态
+---
 
-- 当前版本：`0.80`
-- 英文名：Valora
-- 中文名：值谱
-- Flutter 包名：`valora_assets`
-- Android applicationId：`com.valora.assets`
-- GitHub 仓库：<https://github.com/QuentinCrane/Valora>
-- 当前重点：Android APK 构建与本地优先体验
-- 数据策略：本地优先，云端同步为可选能力
+> Valora 不是记账工具。它关心的不是“花了多少钱”，而是“这件东西今天是否仍然值得”
 
-> 开源前请确认你拥有本项目代码、图标、图片、模型、文案和第三方素材的公开授权。如果项目中存在个人数据、私有备份、签名证书或未授权资源，请先移除后再推送到 GitHub。
+一台 8,000 元的手机，使用四年后的日均成本可能很低；一件 500 元的配件，三天后闲置，反而值得被重新审视。Valora 将物品、价格、使用时间、目标、回收与收益放进同一条时间线，帮助你用更长期的视角理解消费
 
-> 当前目录就是建议发布到 GitHub 的 App 仓库根目录。外层 `archives/`、宣传站、本地压缩包和构建产物不进入源码仓库。APK 请通过 GitHub Releases 作为附件发布。
+## 界面预览
 
-## App 定位
+<p align="center">
+  <img src="docs/assets/screenshots/首页.jpg" alt="首页资产总览与日均成本" width="31%" />
+  <img src="docs/assets/screenshots/detail.png" alt="资产详情、流转与日均成本趋势" width="31%" />
+  <img src="docs/assets/screenshots/analysis.png" alt="分析页与资产健康度" width="31%" />
+</p>
 
-Valora关注的不是“这笔钱花掉了”，而是这件物品在之后的每一天里是否继续产生价值。
+<p align="center">
+  <img src="docs/assets/screenshots/add.png" alt="新建资产与目标设置" width="23%" />
+  <img src="docs/assets/screenshots/cover.png" alt="贴纸修复与调整" width="23%" />
+  <img src="docs/assets/screenshots/settings.png" alt="设置与数据入口" width="23%" />
+  <img src="docs/assets/screenshots/widgets.png" alt="Android 小组件" width="23%" />
+</p>
 
-它适合记录和复盘：
+<p align="center"><sub>截图使用示例资产数据，展示首页、详情、分析、录入、封面、设置与小组件</sub></p>
 
-- 手机、平板、电脑、相机、耳机、手表等数码产品。
-- 家电、家具、通勤装备、摄影器材等长期消费品。
-- 软件订阅、课程、工具、配件等有持续使用周期的支出。
-- 闲置、转卖、归档、换新前需要复盘价值的物品。
+## 一眼了解
 
-核心关键词：
+| 项目 | 说明 |
+| --- | --- |
+| 当前版本 | `0.80.1+81` |
+| 平台 | Android，Flutter 构建 |
+| 最低 Android 版本 | Android 7.0 / API 24 |
+| 数据策略 | 本地优先，云同步按需开启 |
+| 包名 | `valora_assets` |
+| Android applicationId | `com.valora.assets` |
+| 许可 | [Apache License 2.0](LICENSE) |
 
-**物品资产管理、日均成本、生命周期、价值趋势、消费复盘、可视化分析。**
+## 为长期使用的物品而设计
 
-## 核心特色
+Valora 适合记录那些会陪伴你一段时间、也值得被复盘的东西
 
-**不是记账，而是价值复盘**
+- 数码设备：手机、电脑、相机、耳机、手表
+- 长期消费品：家具、家电、通勤和摄影装备
+- 持续投入：订阅、课程、工具、配件
+- 待购与换新计划：心愿、目标、旧物转卖与归档
 
-普通记账关心“我花了多少钱”，Valora关心“这笔钱到今天为止值不值”。一个 8000 元手机用了 4 年，日均成本可能已经很低；一个 500 元配件用了 3 天就闲置，反而可能更不划算。
+它将“买入”之后的使用、目标、闲置、收益与回收关联起来，让一条购买记录逐渐成为一份个人资产档案
 
-**日均成本视角**
+## 核心能力
 
-Valora会根据购买价格和使用天数计算日均成本。随着使用时间增加，用户能直观看到“用得越久越值”的过程。
+| 能力 | 你能看到什么 | 它帮助你判断什么 |
+| --- | --- | --- |
+| 日均成本 | 价格、服役天数、日均成本与下降趋势 | 一件物品是否越用越值 |
+| 生命周期 | 服役、退役、卖出、归档状态与目标进度 | 是否达到预期使用周期 |
+| 资产分析 | 趋势、排行、分类占比、价值复盘 | 钱主要花在何处，哪些物品最划算 |
+| 价值回收 | 二手回收与使用收益 | 一件物品实际沉淀了多少价值 |
+| 封面与贴纸 | 图片封面、主体抠图、贴纸描边与修边 | 让资产库更像一本可阅读的图鉴 |
+| 备份与恢复 | JSON、CSV、Markdown 报告、SQLite 与完整资料包 | 换机或整理前能安全留档 |
+
+### 日均成本，而不是一次性价格
+
+日均成本会随着使用时间动态变化。Valora 以净投入与服役天数为基础展示成本，并在详情与分析页中持续呈现趋势；转卖回收和记录的使用收益也会进入价值复盘
 
 ```text
-日均成本 = 已消耗成本 / 持有天数
-```
-
-**生命周期管理**
-
-每件物品不只是一条消费记录，而是一个有状态的资产：新购入、高频使用、稳定使用、闲置、转卖、报废、归档。它帮助用户判断一件东西是否还在发挥价值。
-
-**目标日均 / 值得线**
-
-用户可以设置目标，比如手机希望用到日均 5 元以下、相机至少使用 3 年、耳机用满 1000 天。App 会根据当前使用时间计算距离目标还有多久、是否已经达标、是否因为提前闲置而不划算。
-
-**个人资产图鉴**
-
-Valora不是一张冷冰冰的表格。它支持物品封面、主体抠图、贴纸描边和图标化展示，让资产管理更像一本清爽的个人资产图鉴。
-
-**完整资料包备份**
-
-Valora不只导出 JSON，也可以导出包含数据库、资产数据、报告、CSV、封面和贴纸媒体文件的完整 ZIP 资料包。迁移设备或恢复数据时，可以尽量保留物品记录和视觉封面之间的关系。
-
-**使用收益参与价值回收**
-
-一些资产的价值不只来自二手转卖，也来自它们帮助你创造的收益。Valora支持记录使用收益，并把收益分摊到参与资产上，让价值回收口径变成：
-
-```text
+日均成本 = 净投入 ÷ 服役天数
 价值回收 = 二手卖出回收 + 使用收益
 ```
 
-## 第三方开源组件声明
+### 从记录到复盘
 
-Valora 的液态玻璃视觉效果使用了第三方 Flutter 组件 [`liquid_glass_easy`](https://pub.dev/packages/liquid_glass_easy)。该组件用于实现实时背景捕获、形状折射、动态镜片、模糊与 Optical Border 光学边界等能力。当前依赖版本为 `2.0.1`，许可为 MIT。
+1. 新增一件资产，填写价格、日期、分类、标签与封面
+2. 设定目标日均、预计使用周期或到期日期
+3. 在详情中观察服役天数、成本下降与目标进度
+4. 在分析页比较趋势、分类占比、高成本项目与最划算资产
+5. 在卖出、闲置或换新时记录回收与收益，完成一次消费复盘
 
-Valora 仅作为依赖使用该组件，并基于自身界面设计调整视觉参数。根据该组件的 MIT 许可要求，公开分发源码或 APK 时请保留仓库根目录的 `THIRD_PARTY_NOTICES.md`，其中包含 `liquid_glass_easy` 的版权声明、许可来源和完整 MIT 许可文本。
+## 应用体验
 
-## 展示内容
+### 资产库与心愿清单
 
-当前仓库已保留应用图标、产品定位、功能清单、页面结构、技术指南和构建说明，足够让访问者理解项目是做什么的、如何运行、如何参与。
+- 首页提供总资产、日均成本、状态分布、高成本提醒与最近资产
+- 资产支持搜索、排序、分类筛选、标签与归档
+- 心愿可独立管理，并在购买后转换为资产
+- 支持卡片、列表与贴纸式浏览，适配手机与较宽的 Android 屏幕
 
-正式公开前建议继续补充 3-5 张脱敏截图，优先展示：首页资产总览、资产详情生命周期、分析页趋势排行、封面/贴纸编辑，以及设置里的备份同步入口。
+### 详情、目标与分析
 
-截图可以放在 `docs/assets/screenshots/`，并在 README 中引用。不要提交包含个人资产、账号、WebDAV 地址或其他隐私内容的真实截图。
+- 资产详情集中展示购买信息、使用天数、当前成本、目标与价值变化
+- 分析页提供总投入、日均成本趋势、分类占比、生命周期分布、排行与价值复盘
+- 图表和排行榜可以进一步查看明细或进入对应资产
+- 快照可用于创建、查看、恢复、重命名与删除某一时刻的资产状态
 
-## 主要功能
+### 封面制作与视觉整理
 
-- 首页仪表盘：总资产、日均成本、服役/退役/卖出状态、资产总览胶囊、高成本提醒、最近物品和紧凑卡片概览。
-- 资产管理：记录名称、分类、标签、价格、购买日期、封面、状态、目标周期、备注、估算剩余价值、使用收益和归档状态。
-- 添加与编辑：支持新增资产/心愿、编辑信息、删除或归档物品，并提供中文自然语言日期输入和 Android Material 风格日期选择。
-- 资产详情：展示购买价格、购买日期、已使用天数、当前日均成本、目标日均、生命周期进度、价值变化和成本下降趋势。
-- 分析页面：提供日均成本趋势、目标预测曲线、总投入趋势、分类占比、高成本排行、最划算物品、生命周期分布和价值复盘，并支持点击钻取到明细或资产详情。
-- 封面制作系统：支持 AI 贴纸封面、裁切白框封面、手动勾勒贴纸、多候选结果、贴纸缩放定位、完整显示/铺满、边缘清理、手动橡皮、恢复笔和撤销修边。
-- 快照管理：支持创建、查看、恢复、重命名和删除资产快照，便于回看资产状态变化。
-- 分类与标签：提供分类图标池、颜色色板、智能推荐、自定义 Emoji、已有标签点选和新增标签自动加入当前表单。
-- 设置体系：整合总览、数据、外观交互和系统入口，集中管理分类、标签、备份、云端、触感、提示条、原生能力和分享恢复。
-- 应用内提示与触感：提示条避开底部按钮，支持主动关闭和横滑关闭；触感反馈、Android 原生震动和紧凑提示条可在设置中控制。
-- 数据备份：支持 JSON、CSV、Markdown 报告、SQLite 副本、媒体清单和完整资料包 ZIP 的导出、分享与恢复。
-- 可选云同步：支持 WebDAV、坚果云、Nextcloud 和自定义 WebDAV 地址。
-- Android 小组件：提供资产总览、心愿清单、日均成本、资产体检、快速记录、到期提醒和资产快照。
+- 支持图片封面、裁切白框封面与贴纸化展示
+- 支持主体勾勒、多候选结果、缩放定位、边缘清理、橡皮、恢复笔与撤销修边
+- 浅色界面以白色与冷灰为主，深色界面保留深蓝层次
+- Dock、添加与保存操作使用场景级液态玻璃；可在设置中切换经典毛玻璃，并通过“玻璃柔化”调整通透、模糊与乳化质感
 
-## 页面结构
+### 数据、同步与 Android 能力
 
-```text
-Valora（值谱）
-├── 首页
-│   ├── 数据总览
-│   ├── 日均成本
-│   ├── 资产概览
-│   ├── 高成本提醒
-│   └── 最近物品
-│
-├── 资产
-│   ├── 物品列表
-│   ├── 分类筛选
-│   ├── 搜索排序
-│   ├── 物品详情
-│   └── 归档 / 删除
-│
-├── 添加
-│   ├── 名称
-│   ├── 价格
-│   ├── 日期
-│   ├── 分类
-│   ├── 图片
-│   ├── 使用收益
-│   └── 目标周期 / 值得线
-│
-├── 分析
-│   ├── 日均成本趋势
-│   ├── 目标预测曲线
-│   ├── 分类占比
-│   ├── 生命周期分析
-│   ├── 高成本排行
-│   ├── 价值象限
-│   └── 价值复盘
-│
-├── 封面
-│   ├── AI 贴纸
-│   ├── 白框裁切
-│   ├── 手动勾勒
-│   └── 修边调整
-│
-├── 快照
-│   ├── 快照列表
-│   ├── 恢复快照
-│   ├── 重命名
-│   └── 删除
-│
-└── 设置
-    ├── 总览
-    ├── 数据
-    ├── 外观交互
-    └── 系统
-```
+- 默认将数据保存在设备本地的 SQLite 数据库中
+- 支持导入导出 JSON、CSV、Markdown 报告、数据库副本、媒体清单和完整 ZIP 资料包
+- 可选 WebDAV、坚果云、Nextcloud 与自定义 WebDAV 同步
+- 提供资产总览、心愿、日均成本、体检、快速记录、提醒和快照等 Android 小组件
+- 触感反馈、原生震动、紧凑提示条、主题、语言与玻璃效果均可在设置中调整
 
-## 视觉方向
+## 数据与隐私
 
-Valora的界面目标是清爽、现代、轻量、理性，并带一点高级感。
+Valora 采用本地优先设计。资产、心愿和绝大多数配置默认保存在应用私有目录中；相机、识别、扫描、封面处理与网络同步只会在你主动使用对应功能后触发
 
-- 主色调倾向：`#7CC6F2` + `#FFFFFF`
-- 风格参考：Apple 风格、浅蓝白色调、干净卡片、柔和阴影、圆角设计。
-- 深色模式：不是纯黑，而是保留深蓝调和玻璃质感。
-- 数据呈现：图表可点击、卡片紧凑、信息密度合理。
-- 响应式体验：手机端保持双列资产卡片，小平板/宽屏扩展为 3 列，大平板可扩展到 4 列或 5 列。
-- 系统交互：优先使用 Android 官方预测式返回机制和 Flutter 官方预测式返回转场，页面视觉效果尽量轻，不抢系统手势。
-- 动效体验：页面转场、返回动画、数字刷新、底部导航、提示条和震动反馈都应轻量克制，并受设置项控制。
+- 云同步不是必需项，只有启用并填写配置后才会访问网络
+- 导出文件由系统文件选择器保存到你指定的位置
+- 发布问题截图或备份前，请移除真实资产、账户名称、WebDAV 地址、路径和其他私人信息
 
-## 技术与构建
+完整说明见[技术与构建指南](docs/guides/TECHNICAL_GUIDE.md#数据与隐私说明)
 
-README 只保留产品和开源入口。更具体的技术栈、环境配置、构建命令、目录说明、权限解释和开源检查项请查看：
+## 开始使用
 
-- [文档索引](docs/README.md)
-- [技术与构建指南](docs/guides/TECHNICAL_GUIDE.md)
-- [用户使用教程](docs/guides/USER_GUIDE.md)
-- [Flutter Release APK 编译流程与问题记录](docs/guides/BUILD_PROCESS.md)
-- [第三方开源声明](THIRD_PARTY_NOTICES.md)
-- [开源发布检查清单](docs/guides/OPEN_SOURCE_RELEASE.md)
+### 环境要求
 
-快速构建 Debug APK：
+- Flutter stable，Dart `>=3.3.0 <4.0.0`
+- JDK 17
+- Android SDK 或 Android Studio
+- 一台 Android 真机或模拟器
+
+### 运行
 
 ```bash
-flutter clean
 flutter pub get
-dart format .
-flutter analyze
+flutter run
+```
+
+### 构建 APK
+
+```bash
+# Debug
 flutter build apk --debug
+
+# Release
+flutter build apk --release
 ```
 
 输出位置：
 
 ```text
 build/app/outputs/flutter-apk/app-debug.apk
+build/app/outputs/flutter-apk/app-release.apk
 ```
 
-## 开源发布建议
+release 配置用于本地测试。正式发布前，请创建自己的签名密钥，并通过本地 `key.properties` 或 CI Secret 管理；不要将证书、密码或 `android/local.properties` 提交到仓库
 
-首次推送 GitHub 前，建议检查：
+## 项目结构
 
-- 不提交 `android/local.properties`、`.env`、`key.properties`、`*.jks`、`*.keystore` 等本机路径或签名密钥。
-- 不提交 `build/`、`.dart_tool/`、`.gradle/`、APK/AAB、临时日志和个人备份 ZIP。
-- APK 安装包建议上传到 GitHub Releases，并命名为类似 `Valora-v0.80-android.apk` 的公开文件名。
-- Flutter App 建议提交 `pubspec.lock`，这样其他人能复现当前依赖解析结果。
-- 保留或替换当前 `LICENSE` 文件。本仓库默认采用 Apache License 2.0，并提供 `NOTICE` 项目归属说明。
-- 保留 `THIRD_PARTY_NOTICES.md`，其中包含 `liquid_glass_easy` 的版权声明和完整 MIT 许可文本；Release notes 中继续声明该组件的使用与归属。
-- 如果后续添加截图，先确认截图不包含个人资产、账号、WebDAV 地址或其他隐私信息。
-- 如果使用 GitHub，建议启用 `.github/workflows/flutter.yml` 中的格式化、静态分析和 Debug APK 构建检查。
+```text
+lib/
+├── main.dart                  # Flutter 入口与模块组织
+└── src_parts/                 # 页面、模型、状态、公共组件与原生桥接
 
-## 贡献
+android/app/src/main/java/com/valora/assets/
+├── MainActivity.java          # Android 原生能力与 MethodChannel
+└── *WidgetProvider.java       # Android 小组件
 
-欢迎通过 Issue 或 Pull Request 改进项目。更完整的流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。提交 PR 前请尽量保证：
+assets/images/                 # 应用资源
+docs/                          # 使用、构建、产品与发布文档
+```
 
-- 代码已格式化：`dart format .`
-- 静态分析通过：`flutter analyze`
-- 至少能构建 Debug APK：`flutter build apk --debug`
-- 涉及数据迁移、备份恢复、原生桥接或权限变更时，在 PR 描述中写清测试方式和影响范围。
+## 文档导航
+
+| 需要了解 | 文档 |
+| --- | --- |
+| 如何使用应用 | [用户使用教程](docs/guides/USER_GUIDE.md) |
+| 环境、构建、目录和权限 | [技术与构建指南](docs/guides/TECHNICAL_GUIDE.md) |
+| Release 构建常见问题 | [Flutter Release APK 编译流程](docs/guides/BUILD_PROCESS.md) |
+| 开源发布前检查 | [开源发布检查清单](docs/guides/OPEN_SOURCE_RELEASE.md) |
+| 当前版本更新内容 | [v0.80 Release Notes](docs/v80_github_release_notes.md) |
+| 全部文档 | [docs/README.md](docs/README.md) |
+
+## 第三方声明
+
+液态玻璃效果使用 [`liquid_glass_easy`](https://pub.dev/packages/liquid_glass_easy) `2.0.1`。该依赖采用 MIT License；其完整版权声明和许可文本保留在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+
+## 参与贡献
+
+欢迎提交 Issue 或 Pull Request。提交前请尽量完成以下检查：
+
+```bash
+dart format .
+flutter analyze
+flutter build apk --debug
+```
+
+贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 许可证
 
-本项目使用 [Apache License 2.0](LICENSE)。项目归属和补充声明见 [NOTICE](NOTICE)。如果你正式发布前希望改成 MIT、GPL-3.0 或其他协议，请同步替换 `LICENSE`、`NOTICE` 和本段说明。
+本项目使用 [Apache License 2.0](LICENSE)，项目归属和补充说明见 [NOTICE](NOTICE)
