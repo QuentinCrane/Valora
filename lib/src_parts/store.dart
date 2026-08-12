@@ -1575,6 +1575,7 @@ class AppStore extends ChangeNotifier {
   SortMode sortMode = SortMode.dailyCost;
   HomeViewMode viewMode = HomeViewMode.grid;
   bool wishShowArchived = false;
+  int _homeRevision = 0;
 
   String? _analyticsSnapshotKey;
   AnalyticsSnapshot? _analyticsSnapshot;
@@ -1588,6 +1589,12 @@ class AppStore extends ChangeNotifier {
   CloudSyncConflict? get cloudConflict => _cloudConflict;
   bool get canUndo => _undoPayload != null && !_undoInFlight;
   String? get undoLabel => _undoLabel;
+  int get homeRevision => _homeRevision;
+
+  void _notifyHomeChanged() {
+    _homeRevision++;
+    notifyListeners();
+  }
 
   Future<bool> _hydrateCloudCredentials() async {
     final localCloud = settings.cloudSync;
@@ -2119,7 +2126,7 @@ class AppStore extends ChangeNotifier {
         localSummary: _summaryForJson(json),
         detectedAt: DateTime.now(),
       );
-      if (!silent) notifyListeners();
+      if (!silent) _notifyHomeChanged();
       return result;
     }
     if (result.ok) {
@@ -2133,7 +2140,7 @@ class AppStore extends ChangeNotifier {
       await _enqueueSnapshot(snapshot, kind: PersistenceSaveKind.settings);
       _cloudConflict = null;
       _invalidateAnalytics();
-      if (!silent) notifyListeners();
+      if (!silent) _notifyHomeChanged();
     }
     return result;
   }
@@ -2195,7 +2202,7 @@ class AppStore extends ChangeNotifier {
       _clearUndo();
       _cloudConflict = null;
       _invalidateAnalytics();
-      if (!silent) notifyListeners();
+      if (!silent) _notifyHomeChanged();
     } catch (error) {
       try {
         importMap(Map<String, dynamic>.from(jsonDecode(localJson) as Map));
@@ -2761,23 +2768,27 @@ class AppStore extends ChangeNotifier {
   }
 
   void setQuery(String value) {
+    if (query == value) return;
     query = value;
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   void setStatusFilter(String value) {
+    if (statusFilter == value) return;
     statusFilter = value;
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   void setCategoryFilter(String value) {
+    if (categoryFilter == value) return;
     categoryFilter = value;
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   void setSortMode(SortMode value) {
+    if (sortMode == value) return;
     sortMode = value;
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   void setViewMode(HomeViewMode value) {
@@ -2788,7 +2799,7 @@ class AppStore extends ChangeNotifier {
   void setAdvancedFilters({bool? taggedOnlyValue, bool? targetedOnlyValue}) {
     taggedOnly = taggedOnlyValue ?? taggedOnly;
     targetedOnly = targetedOnlyValue ?? targetedOnly;
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   void resetFilters() {
@@ -2797,7 +2808,7 @@ class AppStore extends ChangeNotifier {
     categoryFilter = 'all';
     taggedOnly = false;
     targetedOnly = false;
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   void setWishArchivedFilter(bool value) {
@@ -2810,7 +2821,7 @@ class AppStore extends ChangeNotifier {
     configureRuntimeSettings(settings);
     await save(kind: PersistenceSaveKind.settings);
     _invalidateAnalytics();
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   void _validateDomain(DomainValidationResult result) {
@@ -2910,7 +2921,7 @@ class AppStore extends ChangeNotifier {
       rethrow;
     }
     _invalidateAnalytics();
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   Future<void> _commitWishWithTags(Wish wish, List<Tag> newTags) async {
@@ -2967,7 +2978,7 @@ class AppStore extends ChangeNotifier {
     }
     await save();
     _invalidateAnalytics();
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   DestructiveImpact assetDeleteImpact(String id) {
@@ -3132,7 +3143,7 @@ class AppStore extends ChangeNotifier {
       _undoPayload = null;
       _undoLabel = null;
       _invalidateAnalytics();
-      notifyListeners();
+      _notifyHomeChanged();
       return true;
     } catch (_) {
       try {
@@ -3168,7 +3179,7 @@ class AppStore extends ChangeNotifier {
     }
     await save();
     _invalidateAnalytics();
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   Future<void> upsertWish(Wish wish) async {
@@ -3256,7 +3267,7 @@ class AppStore extends ChangeNotifier {
       rethrow;
     }
     _invalidateAnalytics();
-    notifyListeners();
+    _notifyHomeChanged();
     return assetId;
   }
 
@@ -3271,7 +3282,7 @@ class AppStore extends ChangeNotifier {
     categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     await save();
     _invalidateAnalytics();
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   Future<void> deleteCategory(String id) async {
@@ -3314,7 +3325,7 @@ class AppStore extends ChangeNotifier {
     }
     await save();
     _invalidateAnalytics();
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   Future<void> upsertTag(Tag item) async {
@@ -3665,7 +3676,7 @@ class AppStore extends ChangeNotifier {
     categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     await save();
     _invalidateAnalytics();
-    notifyListeners();
+    _notifyHomeChanged();
   }
 
   Map<String, dynamic> prepareRestoreJson(String raw) {
@@ -3714,7 +3725,7 @@ class AppStore extends ChangeNotifier {
       await _enqueueSnapshot(jsonEncode(exportMap()));
       _clearUndo();
       _invalidateAnalytics();
-      notifyListeners();
+      _notifyHomeChanged();
       return true;
     } catch (_) {
       try {
@@ -3742,6 +3753,6 @@ class AppStore extends ChangeNotifier {
   Future<void> clearAllAndSeed() async {
     initializeEmptyData();
     await save();
-    notifyListeners();
+    _notifyHomeChanged();
   }
 }

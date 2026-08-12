@@ -107,17 +107,23 @@ class _ValoraAppState extends State<ValoraApp> {
             : store.storageLoadResult;
         return AppScope(
           store: store,
-          child: AnimatedBuilder(
-            animation: store,
-            builder: (context, _) {
+          child: StoreSelector<AppSettings>(
+            store: store,
+            selector: (store) => store.settings,
+            equals: identical,
+            builder: (context, settings) {
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
                 onGenerateTitle: (context) => appDisplayName(context),
-                locale: store.settings.language.locale,
+                locale: settings.language.locale,
                 localeResolutionCallback: resolveAppLocale,
                 theme: buildAppTheme(Brightness.light),
                 darkTheme: buildAppTheme(Brightness.dark),
-                themeMode: store.resolvedThemeMode,
+                themeMode: switch (settings.theme) {
+                  ThemeSetting.dark => ThemeMode.dark,
+                  ThemeSetting.system => ThemeMode.system,
+                  ThemeSetting.light => ThemeMode.light,
+                },
                 localizationsDelegates: const [
                   AppLocalizationsDelegate(),
                   GlobalMaterialLocalizations.delegate,
@@ -412,11 +418,76 @@ class AppScope extends InheritedNotifier<AppStore> {
     assert(scope != null, 'AppScope not found');
     return scope!.notifier!;
   }
+
+  static AppStore read(BuildContext context) {
+    final scope = context.getInheritedWidgetOfExactType<AppScope>();
+    assert(scope != null, 'AppScope not found');
+    return scope!.notifier!;
+  }
 }
 
 extension StoreContext on BuildContext {
   AppStore get store => AppScope.of(this);
+  AppStore get readStore => AppScope.read(this);
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
+}
+
+class StoreSelector<T> extends StatefulWidget {
+  final AppStore store;
+  final T Function(AppStore store) selector;
+  final Widget Function(BuildContext context, T value) builder;
+  final bool Function(T previous, T next) equals;
+
+  StoreSelector({
+    super.key,
+    required this.store,
+    required this.selector,
+    required this.builder,
+    bool Function(T previous, T next)? equals,
+  }) : equals = equals ?? _defaultStoreSelectorEquals;
+
+  @override
+  State<StoreSelector<T>> createState() => _StoreSelectorState<T>();
+}
+
+bool _defaultStoreSelectorEquals<T>(T previous, T next) => previous == next;
+
+class _StoreSelectorState<T> extends State<StoreSelector<T>> {
+  late T _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.selector(widget.store);
+    widget.store.addListener(_handleStoreChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant StoreSelector<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.store != widget.store) {
+      oldWidget.store.removeListener(_handleStoreChanged);
+      widget.store.addListener(_handleStoreChanged);
+    }
+    final next = widget.selector(widget.store);
+    if (!widget.equals(_value, next)) _value = next;
+  }
+
+  void _handleStoreChanged() {
+    if (!mounted) return;
+    final next = widget.selector(widget.store);
+    if (widget.equals(_value, next)) return;
+    setState(() => _value = next);
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_handleStoreChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _value);
 }
 
 class BootPage extends StatelessWidget {

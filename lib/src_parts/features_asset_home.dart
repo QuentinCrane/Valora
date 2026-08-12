@@ -81,7 +81,15 @@ class AssetHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.store;
+    final store = context.readStore;
+    return StoreSelector<int>(
+      store: store,
+      selector: (store) => store.homeRevision,
+      builder: (context, _) => _buildHome(context, store),
+    );
+  }
+
+  Widget _buildHome(BuildContext context, AppStore store) {
     final filtered = store.filteredAssets;
     return PageFrame(
       padding: const EdgeInsets.fromLTRB(10, 12, 10, 116),
@@ -106,7 +114,7 @@ class AssetHomePage extends StatelessWidget {
                   onAction: () => Navigator.of(context).push(softRoute(
                       const ComposePage(initialTab: ComposeTab.asset)))))
         else if (store.viewMode == HomeViewMode.grid)
-          ResponsiveAssetGrid(assets: filtered)
+          ResponsiveAssetGrid(assets: filtered, store: store)
         else if (store.viewMode == HomeViewMode.list)
           ...List.generate(
               filtered.length,
@@ -115,8 +123,9 @@ class AssetHomePage extends StatelessWidget {
                   child: i == 0
                       ? TutorialTargetAnchor(
                           id: 'home.assetCard',
-                          child: AssetListTileCard(asset: filtered[i]))
-                      : AssetListTileCard(asset: filtered[i])))
+                          child: AssetListTileCard(
+                              asset: filtered[i], store: store))
+                      : AssetListTileCard(asset: filtered[i], store: store)))
         else
           Wrap(
               spacing: 10,
@@ -126,8 +135,9 @@ class AssetHomePage extends StatelessWidget {
                   (i) => i == 0
                       ? TutorialTargetAnchor(
                           id: 'home.assetCard',
-                          child: AssetStickerChip(asset: filtered[i]))
-                      : AssetStickerChip(asset: filtered[i]))),
+                          child: AssetStickerChip(
+                              asset: filtered[i], store: store))
+                      : AssetStickerChip(asset: filtered[i], store: store))),
       ],
     );
   }
@@ -135,7 +145,9 @@ class AssetHomePage extends StatelessWidget {
 
 class ResponsiveAssetGrid extends StatelessWidget {
   final List<Asset> assets;
-  const ResponsiveAssetGrid({super.key, required this.assets});
+  final AppStore store;
+  const ResponsiveAssetGrid(
+      {super.key, required this.assets, required this.store});
 
   int _columnCount(double width) {
     if (width >= 1180) return 5;
@@ -163,8 +175,8 @@ class ResponsiveAssetGrid extends StatelessWidget {
                 child: i == 0
                     ? TutorialTargetAnchor(
                         id: 'home.assetCard',
-                        child: AssetGridCard(asset: assets[i]))
-                    : AssetGridCard(asset: assets[i]))),
+                        child: AssetGridCard(asset: assets[i], store: store))
+                    : AssetGridCard(asset: assets[i], store: store))),
       );
     });
   }
@@ -948,7 +960,7 @@ class WalletLeakCard extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(children: [
-                  AssetIcon(asset: item.asset, size: 42),
+                  AssetIcon(asset: item.asset, store: store, size: 42),
                   const SizedBox(width: 10),
                   Expanded(
                       child: Column(
@@ -1126,7 +1138,7 @@ class PricelessHomeCard extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(children: [
-                  AssetIcon(asset: asset, size: 42),
+                  AssetIcon(asset: asset, store: store, size: 42),
                   const SizedBox(width: 10),
                   Expanded(
                       child: Column(
@@ -1194,7 +1206,7 @@ class DueSoonCard extends StatelessWidget {
             math.max(asset.expiresAt!.difference(DateTime.now()).inDays, 0);
         return ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: AssetIcon(asset: asset, size: 42),
+          leading: AssetIcon(asset: asset, store: store, size: 42),
           title: Text(asset.name,
               style: const TextStyle(fontWeight: FontWeight.normal)),
           subtitle: Text(
@@ -1210,11 +1222,11 @@ class DueSoonCard extends StatelessWidget {
 
 class AssetGridCard extends StatelessWidget {
   final Asset asset;
-  const AssetGridCard({super.key, required this.asset});
+  final AppStore store;
+  const AssetGridCard({super.key, required this.asset, required this.store});
 
   @override
   Widget build(BuildContext context) {
-    final store = context.store;
     return InkWell(
       borderRadius: BorderRadius.circular(24),
       onTap: () {
@@ -1274,11 +1286,12 @@ class AssetGridCard extends StatelessWidget {
 
 class AssetListTileCard extends StatelessWidget {
   final Asset asset;
-  const AssetListTileCard({super.key, required this.asset});
+  final AppStore store;
+  const AssetListTileCard(
+      {super.key, required this.asset, required this.store});
 
   @override
   Widget build(BuildContext context) {
-    final store = context.store;
     return InkWell(
       borderRadius: BorderRadius.circular(22),
       onTap: () {
@@ -1291,7 +1304,7 @@ class AssetListTileCard extends StatelessWidget {
         child: SizedBox(
           height: 70,
           child: Row(children: [
-            AssetIcon(asset: asset, size: 52),
+            AssetIcon(asset: asset, store: store, size: 52),
             const SizedBox(width: 12),
             Expanded(
                 child: Column(
@@ -1339,11 +1352,11 @@ class AssetListTileCard extends StatelessWidget {
 
 class AssetStickerChip extends StatelessWidget {
   final Asset asset;
-  const AssetStickerChip({super.key, required this.asset});
+  final AppStore store;
+  const AssetStickerChip({super.key, required this.asset, required this.store});
 
   @override
   Widget build(BuildContext context) {
-    final store = context.store;
     final dark = context.isDark;
     final width = (MediaQuery.sizeOf(context).width - 42) / 2;
     final hash = asset.id.hashCode.abs();
@@ -1465,13 +1478,15 @@ BoxShadow softShadow(BuildContext context) => BoxShadow(
 
 class AssetIcon extends StatelessWidget {
   final Asset asset;
+  final AppStore? store;
   final double size;
-  const AssetIcon({super.key, required this.asset, this.size = 54});
+  const AssetIcon({super.key, required this.asset, this.store, this.size = 54});
 
   @override
   Widget build(BuildContext context) {
     final c = parseColor(
-        context.store.categoryById(asset.categoryId)?.color ?? '#7cc6f2');
+        (store ?? context.store).categoryById(asset.categoryId)?.color ??
+            '#7cc6f2');
     final isImage = isValoraImageIcon(asset.iconValue);
     final isSticker = isImage && isValoraStickerImage(asset.iconValue);
     // 图片封面/裁切贴纸按“方形圆角”稳定显示，避免保存或导入后又被首页圆形容器二次裁掉。
@@ -1694,35 +1709,71 @@ class EmptyStateCard extends StatelessWidget {
 }
 
 void showSearchSheet(BuildContext context) {
-  final store = context.store;
-  final controller = TextEditingController(text: store.query);
+  final store = context.readStore;
   appSheet(context,
       title: tr('home.searchTitle'),
       subtitle: tr('home.searchSubtitle'),
-      child: Column(children: [
-        TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search_rounded),
-                hintText: tr('home.searchHint')),
-            onChanged: store.setQuery),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-              child: OutlinedButton(
-                  onPressed: () {
-                    controller.clear();
-                    store.setQuery('');
-                  },
-                  child: Text(tr('home.clearSearch')))),
-          const SizedBox(width: 10),
-          Expanded(
-              child: FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(tr('common.done')))),
-        ]),
-      ]));
+      child: _SearchSheetContent(store: store));
+}
+
+class _SearchSheetContent extends StatefulWidget {
+  final AppStore store;
+
+  const _SearchSheetContent({required this.store});
+
+  @override
+  State<_SearchSheetContent> createState() => _SearchSheetContentState();
+}
+
+class _SearchSheetContentState extends State<_SearchSheetContent> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.store.query);
+  }
+
+  void _commit() => widget.store.setQuery(_controller.text);
+
+  void _commitAndClose() {
+    _commit();
+    Navigator.of(context).pop();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search_rounded),
+            hintText: tr('home.searchHint')),
+        onSubmitted: (_) => _commitAndClose(),
+      ),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(
+            child: OutlinedButton(
+                onPressed: () {
+                  _controller.clear();
+                  widget.store.setQuery('');
+                },
+                child: Text(tr('home.clearSearch')))),
+        const SizedBox(width: 10),
+        Expanded(
+            child: FilledButton(
+                onPressed: _commitAndClose, child: Text(tr('common.done')))),
+      ]),
+    ]);
+  }
 }
 
 void showFilterSheet(BuildContext context) {

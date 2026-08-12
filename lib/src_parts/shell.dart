@@ -28,17 +28,11 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     _dockGlassController = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 460),
-        reverseDuration: const Duration(milliseconds: 460))
-      ..addListener(() {
-        if (mounted) setState(() {});
-      });
+        reverseDuration: const Duration(milliseconds: 460));
     _addGlassController = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 360),
-        reverseDuration: const Duration(milliseconds: 360))
-      ..addListener(() {
-        if (mounted) setState(() {});
-      });
+        reverseDuration: const Duration(milliseconds: 360));
     _onboardingOverlayRequest.addListener(_handleOnboardingRequest);
     NativeBridge.listenIncomingIntents(_handleIntentInfo);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -52,7 +46,7 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
   }
 
   Future<void> _maybeAutoStartOnboarding() async {
-    final store = context.store;
+    final store = context.readStore;
     if (store.settings.onboardingCompleted ||
         _autoShowingOnboarding ||
         _onboardingPromptShown ||
@@ -260,7 +254,7 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // 预先把分析页所需的聚合数据缓存好，避免从设置页切到分析页时首帧卡顿。
-      context.store.analyticsSnapshot;
+      context.readStore.analyticsSnapshot;
     });
   }
 
@@ -395,7 +389,7 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
 
   Future<void> _settleShellOnboardingTarget() async {
     if (!mounted || _onboardingRequest == null) return;
-    final steps = _shellOnboardingSteps(context.store);
+    final steps = _shellOnboardingSteps(context.readStore);
     if (_onboardingIndex >= steps.length) return;
     final step = steps[_onboardingIndex];
     if (index != step.tabIndex) {
@@ -418,7 +412,7 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
   Future<void> _advanceOnboarding(int next) async {
     final request = _onboardingRequest;
     if (request == null) return;
-    final steps = _shellOnboardingSteps(context.store);
+    final steps = _shellOnboardingSteps(context.readStore);
     if (next < 0) return;
     if (next >= steps.length) {
       await _closeOnboarding(completed: true);
@@ -433,7 +427,7 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     final request = _onboardingRequest;
     if (request == null) return;
     if (request.markSeen && completed) {
-      final store = context.store;
+      final store = context.readStore;
       await store
           .updateSettings(store.settings.copyWith(onboardingCompleted: true));
     }
@@ -553,8 +547,40 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildAnimatedLiquidGlassView({
+    required BuildContext context,
+    required Widget shellBackground,
+    required Widget dock,
+    required Widget addButton,
+    required EdgeInsets safe,
+    required bool dark,
+    required double dockWidth,
+    required double dockHeight,
+    required double addSize,
+  }) {
+    return AnimatedBuilder(
+      animation: Listenable.merge(
+          <Listenable>[_dockGlassController, _addGlassController]),
+      builder: (context, _) => lge.LiquidGlassView(
+        realTimeCapture: true,
+        useSync: true,
+        refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
+        pixelRatio: liquidGlassCapturePixelRatio(context,
+            duringInteraction: _dockMagicActive || _addMagicActive),
+        backgroundWidget: ValoraGlassSceneBackground(
+            child: RepaintBoundary(child: shellBackground)),
+        children: [
+          _buildDockLiquidGlass(
+              context, dock, safe, dark, dockWidth, dockHeight),
+          _buildAddLiquidGlass(context, addButton, safe, dark, addSize),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final store = context.readStore;
     final pages = const [
       AssetHomePage(),
       WishHomePage(),
@@ -609,7 +635,7 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     );
 
     final useLiquidGlass =
-        context.store.settings.glassEffectMode == GlassEffectMode.liquid;
+        store.settings.glassEffectMode == GlassEffectMode.liquid;
     final dock = LiquidDock(
       index: index,
       onChanged: _goToTab,
@@ -627,19 +653,16 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
 
     Widget shellLayer;
     if (useLiquidGlass) {
-      shellLayer = lge.LiquidGlassView(
-        realTimeCapture: true,
-        useSync: true,
-        refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
-        pixelRatio: liquidGlassCapturePixelRatio(context,
-            duringInteraction: _dockMagicActive || _addMagicActive),
-        backgroundWidget: ValoraGlassSceneBackground(
-            child: RepaintBoundary(child: shellBackground)),
-        children: [
-          _buildDockLiquidGlass(
-              context, dock, safe, dark, dockWidth, dockHeight),
-          _buildAddLiquidGlass(context, addButton, safe, dark, addSize),
-        ],
+      shellLayer = _buildAnimatedLiquidGlassView(
+        context: context,
+        shellBackground: shellBackground,
+        dock: dock,
+        addButton: addButton,
+        safe: safe,
+        dark: dark,
+        dockWidth: dockWidth,
+        dockHeight: dockHeight,
+        addSize: addSize,
       );
     } else {
       shellLayer = Stack(children: [
@@ -684,7 +707,7 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
           shellLayer,
           if (_onboardingRequest != null)
             Builder(builder: (context) {
-              final tutorialSteps = _shellOnboardingSteps(context.store);
+              final tutorialSteps = _shellOnboardingSteps(store);
               final safeIndex = _onboardingIndex
                   .clamp(0, math.max(0, tutorialSteps.length - 1))
                   .toInt();
@@ -701,14 +724,21 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
                 ),
               );
             }),
-          if (context.store.persistenceState.isSaving ||
-              context.store.persistenceState.isFailed)
-            Positioned(
-              left: 14,
-              right: 14,
-              bottom: safe.bottom + 100,
-              child: const PersistenceStatusBanner(),
-            ),
+          StoreSelector<PersistenceSaveState>(
+            store: store,
+            selector: (store) => store.persistenceState,
+            builder: (context, state) {
+              if (!state.isSaving && !state.isFailed) {
+                return const SizedBox.shrink();
+              }
+              return Positioned(
+                left: 14,
+                right: 14,
+                bottom: safe.bottom + 100,
+                child: PersistenceStatusBanner(store: store, state: state),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -723,12 +753,17 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
 }
 
 class PersistenceStatusBanner extends StatelessWidget {
-  const PersistenceStatusBanner({super.key});
+  final AppStore store;
+  final PersistenceSaveState state;
+
+  const PersistenceStatusBanner({
+    super.key,
+    required this.store,
+    required this.state,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final store = context.store;
-    final state = store.persistenceState;
     final failed = state.isFailed;
     final scheme = Theme.of(context).colorScheme;
     return Material(
