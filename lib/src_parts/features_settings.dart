@@ -2014,6 +2014,10 @@ class _CategoryManagerState extends State<CategoryManager> {
     super.dispose();
   }
 
+  void refreshAfterDestructiveAction() {
+    if (mounted) setState(() {});
+  }
+
   void applyNameSuggestion(String value) {
     if (!manualIcon) selectedIcon = _suggestCategoryIcon(value);
     if (!manualColor) selectedColor = _suggestColor(value);
@@ -2257,14 +2261,30 @@ class _CategoryManagerState extends State<CategoryManager> {
                   icon: Icons.delete_outline_rounded,
                   size: 36,
                   tooltip: tl('删除分类'),
-                  onTap: () async {
-                    await store.deleteCategory(c.id);
-                    if (mounted) setState(() {});
-                  }),
+                  onTap: () => confirmDeleteCategory(context, c)),
             ]),
           )),
     ]);
   }
+}
+
+Future<void> confirmDeleteCategory(
+    BuildContext context, Category category) async {
+  final store = context.store;
+  final impact = store.categoryDeleteImpact(category.id);
+  final confirmed = await showDestructiveActionSheet(
+    context,
+    title: tl('删除分类'),
+    message: tlf('确认删除「{name}」吗？', {'name': store.categoryName(category.id)}),
+    impactSummary: destructiveImpactText(impact),
+    actionLabel: tr('common.delete'),
+  );
+  if (confirmed != true || !context.mounted) return;
+  final deleted = await store.deleteCategoryWithUndo(category.id);
+  if (!context.mounted || !deleted) return;
+  final state = context.findAncestorStateOfType<_CategoryManagerState>();
+  state?.refreshAfterDestructiveAction();
+  showUndoSnack(context, tr('delete.categoryUndo'));
 }
 
 void showTagManager(BuildContext context) {
@@ -2289,6 +2309,10 @@ class _TagManagerState extends State<TagManager> {
   void dispose() {
     name.dispose();
     super.dispose();
+  }
+
+  void refreshAfterDestructiveAction() {
+    if (mounted) setState(() {});
   }
 
   void applyPreset(String label) {
@@ -2443,14 +2467,29 @@ class _TagManagerState extends State<TagManager> {
                   icon: Icons.delete_outline_rounded,
                   size: 36,
                   tooltip: tl('删除标签'),
-                  onTap: () async {
-                    await store.deleteTag(t.id);
-                    if (mounted) setState(() {});
-                  }),
+                  onTap: () => confirmDeleteTag(context, t)),
             ]),
           )),
     ]);
   }
+}
+
+Future<void> confirmDeleteTag(BuildContext context, Tag tag) async {
+  final store = context.store;
+  final impact = store.tagDeleteImpact(tag.id);
+  final confirmed = await showDestructiveActionSheet(
+    context,
+    title: tl('删除标签'),
+    message: tlf('确认删除「{name}」吗？', {'name': store.tagName(tag.id)}),
+    impactSummary: destructiveImpactText(impact),
+    actionLabel: tr('common.delete'),
+  );
+  if (confirmed != true || !context.mounted) return;
+  final deleted = await store.deleteTagWithUndo(tag.id);
+  if (!context.mounted || !deleted) return;
+  final state = context.findAncestorStateOfType<_TagManagerState>();
+  state?.refreshAfterDestructiveAction();
+  showUndoSnack(context, tr('delete.tagUndo'));
 }
 
 void showBackupManager(BuildContext context) {
@@ -2501,27 +2540,21 @@ class _BackupManagerState extends State<BackupManager> {
             ));
   }
 
-  void confirmDeleteSnapshot(SnapshotRecord record) {
-    showDialog(
-        context: context,
-        builder: (d) => AlertDialog(
-              title: Text(tl('删除快照')),
-              content: Text(tlf(
-                  '确定删除「{label}」吗？这个操作不会影响当前资产数据。', {'label': record.label})),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(d),
-                    child: Text(tr('common.cancel'))),
-                FilledButton(
-                    onPressed: () async {
-                      await context.store.deleteSnapshot(record.id);
-                      if (!context.mounted) return;
-                      Navigator.pop(d);
-                      setState(() {});
-                    },
-                    child: Text(tr('common.delete'))),
-              ],
-            ));
+  Future<void> confirmDeleteSnapshot(SnapshotRecord record) async {
+    final store = context.store;
+    final confirmed = await showDestructiveActionSheet(
+      context,
+      title: tl('删除快照'),
+      message: tlf('确定删除「{label}」吗？这个操作不会影响当前资产数据。', {'label': record.label}),
+      impactSummary:
+          destructiveImpactText(store.snapshotDeleteImpact(record.id)),
+      actionLabel: tr('common.delete'),
+    );
+    if (confirmed != true || !mounted) return;
+    final deleted = await store.deleteSnapshotWithUndo(record.id);
+    if (!mounted || !deleted) return;
+    setState(() {});
+    showUndoSnack(context, tr('delete.snapshotUndo'));
   }
 
   Future<void> restoreSnapshot(SnapshotRecord record) async {
@@ -2530,6 +2563,71 @@ class _BackupManagerState extends State<BackupManager> {
     showNativeSnack(context, ok ? tl('已恢复快照') : tl('快照损坏'));
     if (ok) Navigator.pop(context);
   }
+
+  Future<void> previewSnapshot(SnapshotRecord record) async {
+    final store = context.store;
+    final preview = store.snapshotPreview(record);
+    final restore = await showModalBottomSheet<bool>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => Semantics(
+        container: true,
+        scopesRoute: true,
+        label: tr('destructive.snapshotPreview'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(tr('destructive.snapshotPreview'),
+                style: const TextStyle(
+                    fontSize: 19, fontWeight: FontWeight.normal)),
+            const SizedBox(height: 6),
+            Text(record.label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: kMuted)),
+            const SizedBox(height: 16),
+            if (!preview.isValid)
+              Text(tr('destructive.snapshotInvalid'),
+                  style: const TextStyle(color: kMuted))
+            else
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _previewPill(tr('compose.asset'), preview.assets),
+                  _previewPill(tr('compose.wish'), preview.wishes),
+                  _previewPill(tr('compose.category'), preview.categories),
+                  _previewPill(tr('compose.tags'), preview.tags),
+                  _previewPill(
+                      tr('home.valueRecovery'), preview.recoveryRecords),
+                ],
+              ),
+            const SizedBox(height: 18),
+            Row(children: [
+              Expanded(
+                  child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetContext, false),
+                      child: Text(tr('common.cancel')))),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: FilledButton(
+                      onPressed: preview.isValid
+                          ? () => Navigator.pop(sheetContext, true)
+                          : null,
+                      child: Text(tl('恢复快照')))),
+            ]),
+          ]),
+        ),
+      ),
+    );
+    if (restore == true && mounted) await restoreSnapshot(record);
+  }
+
+  Widget _previewPill(String label, int count) => Chip(
+        label: Text('$label $count'),
+        visualDensity: VisualDensity.compact,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -2618,10 +2716,7 @@ class _BackupManagerState extends State<BackupManager> {
       const SizedBox(height: 8),
       OutlinedButton(
           onPressed: () async {
-            final ok = await store.restoreFromJson(importCtl.text);
-            if (!context.mounted) return;
-            showNativeSnack(context, ok ? tl('恢复成功') : tl('JSON 格式不正确'));
-            if (ok) Navigator.pop(context);
+            await restoreJsonFromText(context, importCtl.text);
           },
           child: Text(tl('覆盖恢复'))),
       const SizedBox(height: 16),
@@ -2647,10 +2742,10 @@ class _BackupManagerState extends State<BackupManager> {
                 style: const TextStyle(fontWeight: FontWeight.normal)),
             subtitle: Text(
                 '${dateText(s.createdAt)} · ${s.createdAt.hour.toString().padLeft(2, '0')}:${s.createdAt.minute.toString().padLeft(2, '0')}'),
-            onTap: () => restoreSnapshot(s),
+            onTap: () => previewSnapshot(s),
             trailing: PopupMenuButton<String>(
               onSelected: (value) {
-                if (value == 'restore') restoreSnapshot(s);
+                if (value == 'restore') previewSnapshot(s);
                 if (value == 'rename') renameSnapshot(s);
                 if (value == 'delete') confirmDeleteSnapshot(s);
               },
@@ -2666,24 +2761,20 @@ class _BackupManagerState extends State<BackupManager> {
   }
 }
 
-void confirmReset(BuildContext context) {
-  showDialog(
-      context: context,
-      builder: (d) => AlertDialog(
-              title: Text(tr('settings.clearLocalData')),
-              content: Text(tl('会删除当前资产、心愿、分类、标签和快照，保留一个完全空白的 App。')),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(d),
-                    child: Text(tr('common.cancel'))),
-                FilledButton(
-                    onPressed: () async {
-                      mediumHaptic();
-                      await context.store.clearAllAndSeed();
-                      if (context.mounted) Navigator.pop(d);
-                    },
-                    child: Text(tr('common.clear')))
-              ]));
+Future<void> confirmReset(BuildContext context) async {
+  final store = context.store;
+  final confirmed = await showDestructiveActionSheet(
+    context,
+    title: tr('settings.clearLocalData'),
+    message: tl('会删除当前资产、心愿、分类、标签和快照，保留一个完全空白的 App。'),
+    impactSummary: destructiveImpactText(store.resetImpact()),
+    actionLabel: tr('common.clear'),
+  );
+  if (confirmed != true || !context.mounted) return;
+  mediumHaptic();
+  final cleared = await store.clearAllAndSeedWithUndo();
+  if (!context.mounted || !cleared) return;
+  showUndoSnack(context, tr('delete.resetUndo'));
 }
 
 class TutorialTargetAnchor extends StatefulWidget {

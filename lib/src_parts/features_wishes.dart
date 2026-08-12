@@ -1406,7 +1406,7 @@ class WishCard extends StatelessWidget {
             }
             if (v == 'archive')
               await store.upsertWish(wish.copyWith(archived: !wish.archived));
-            if (v == 'delete') await store.deleteWish(wish.id);
+            if (v == 'delete') await confirmDeleteWish(context, wish);
           },
           itemBuilder: (_) => [
             PopupMenuItem(
@@ -1421,6 +1421,21 @@ class WishCard extends StatelessWidget {
       ])),
     );
   }
+}
+
+Future<void> confirmDeleteWish(BuildContext context, Wish wish) async {
+  final store = context.store;
+  final confirmed = await showDestructiveActionSheet(
+    context,
+    title: tl('删除心愿'),
+    message: tlf('确认删除「{name}」吗？', {'name': wish.name}),
+    impactSummary: destructiveImpactText(store.wishDeleteImpact(wish.id)),
+    actionLabel: tr('common.delete'),
+  );
+  if (confirmed != true || !context.mounted) return;
+  final deleted = await store.deleteWishWithUndo(wish.id);
+  if (!context.mounted || !deleted) return;
+  showUndoSnack(context, tr('delete.wishUndo'));
 }
 
 class WishEditorPage extends StatefulWidget {

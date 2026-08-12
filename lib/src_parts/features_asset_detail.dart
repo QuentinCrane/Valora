@@ -929,25 +929,20 @@ void showHoldingTimeExplanation(
 }
 
 void confirmDeleteAsset(BuildContext context, Asset asset) {
-  showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-            title: Text(tl('删除资产')),
-            content: Text(tlf('确认删除「{name}」吗？', {'name': asset.name})),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: Text(tr('common.cancel'))),
-              FilledButton(
-                  onPressed: () async {
-                    await context.store.deleteAsset(asset.id);
-                    if (!context.mounted) return;
-                    Navigator.pop(dialogContext);
-                    Navigator.pop(context);
-                  },
-                  child: Text(tr('common.delete'))),
-            ],
-          ));
+  showDestructiveActionSheet(
+    context,
+    title: tl('删除资产'),
+    message: tlf('确认删除「{name}」吗？', {'name': asset.name}),
+    impactSummary:
+        destructiveImpactText(context.store.assetDeleteImpact(asset.id)),
+    actionLabel: tr('common.delete'),
+  ).then((confirmed) async {
+    if (confirmed != true || !context.mounted) return;
+    final deleted = await context.store.deleteAssetWithUndo(asset.id);
+    if (!context.mounted || !deleted) return;
+    showUndoSnack(context, tr('delete.assetUndo'));
+    Navigator.pop(context);
+  });
 }
 
 extension FirstOrNullExtension<E> on Iterable<E> {

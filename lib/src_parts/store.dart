@@ -52,6 +52,53 @@ class LifecycleEventItem {
       this.sortKey = ''});
 }
 
+class DestructiveImpact {
+  final int targetCount;
+  final int affectedAssets;
+  final int affectedWishes;
+  final int affectedCategories;
+  final int affectedTags;
+  final int affectedRecoveryRecords;
+  final int affectedSnapshots;
+
+  const DestructiveImpact({
+    this.targetCount = 0,
+    this.affectedAssets = 0,
+    this.affectedWishes = 0,
+    this.affectedCategories = 0,
+    this.affectedTags = 0,
+    this.affectedRecoveryRecords = 0,
+    this.affectedSnapshots = 0,
+  });
+
+  bool get isEmpty =>
+      targetCount == 0 &&
+      affectedAssets == 0 &&
+      affectedWishes == 0 &&
+      affectedCategories == 0 &&
+      affectedTags == 0 &&
+      affectedRecoveryRecords == 0 &&
+      affectedSnapshots == 0;
+}
+
+class SnapshotPreview {
+  final bool isValid;
+  final int assets;
+  final int wishes;
+  final int categories;
+  final int tags;
+  final int recoveryRecords;
+
+  const SnapshotPreview({
+    required this.isValid,
+    this.assets = 0,
+    this.wishes = 0,
+    this.categories = 0,
+    this.tags = 0,
+    this.recoveryRecords = 0,
+  });
+}
+
 class AnalyticsSnapshot {
   final double totalAssetValue;
   final double averageDailyCost;
@@ -1480,6 +1527,11 @@ class AppStore extends ChangeNotifier {
   String? _lastValidatedSnapshot;
   PersistenceSaveState _persistenceState = const PersistenceSaveState.idle();
   CloudSyncConflict? _cloudConflict;
+  String? _undoPayload;
+  String? _undoLabel;
+  bool _undoInFlight = false;
+  bool _destructiveMutationInFlight = false;
+  bool _restoreInFlight = false;
 
   AppStore() {
     _saveCoordinator = SaveCoordinator(
@@ -1518,6 +1570,8 @@ class AppStore extends ChangeNotifier {
   int get persistenceRevision => _saveCoordinator.revision;
   int get persistedRevision => _saveCoordinator.persistedRevision;
   CloudSyncConflict? get cloudConflict => _cloudConflict;
+  bool get canUndo => _undoPayload != null && !_undoInFlight;
+  String? get undoLabel => _undoLabel;
 
   Future<bool> _hydrateCloudCredentials() async {
     final localCloud = settings.cloudSync;
@@ -1869,6 +1923,7 @@ class AppStore extends ChangeNotifier {
       {PersistenceSaveKind kind = PersistenceSaveKind.crud}) async {
     final isLatestPersisted =
         await _enqueueSnapshot(jsonEncode(exportMap()), kind: kind);
+    if (isLatestPersisted) _clearUndo();
     if (isLatestPersisted &&
         settings.cloudSync.autoUploadOnSave &&
         settings.cloudSync.enabled) {
@@ -1970,8 +2025,25 @@ class AppStore extends ChangeNotifier {
       return conflictResult;
     }
 
+    Map<String, dynamic> prepared;
     try {
-      final prepared = prepareRestoreJson(result.payload!);
+      prepared = prepareRestoreJson(result.payload!);
+    } catch (error) {
+      return CloudSyncResult(
+        ok: false,
+        message: '${tr('store.downloadFailed')}：$error',
+        statusCode: result.statusCode,
+        etag: result.etag,
+        contentHash: result.contentHash,
+        remoteLastModifiedAt: result.remoteLastModifiedAt,
+        remoteSummary: result.remoteSummary,
+      );
+    }
+
+    try {
+      if (!silent) {
+        await createSnapshot(tlf('恢复前快照 {date}', {'date': dateStamp()}));
+      }
       importMap(prepared);
       settings = settings.copyWith(
         cloudSync: _settingsWithRemoteResult(
@@ -1980,6 +2052,7 @@ class AppStore extends ChangeNotifier {
         ).copyWith(lastDownloadAt: DateTime.now()),
       );
       await _enqueueSnapshot(jsonEncode(exportMap()));
+      _clearUndo();
       _cloudConflict = null;
       _invalidateAnalytics();
       if (!silent) notifyListeners();
@@ -2756,6 +2829,181 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  DestructiveImpact assetDeleteImpact(String id) {
+    if (!assets.any((asset) => asset.id == id)) {
+      return const DestructiveImpact();
+    }
+    return DestructiveImpact(
+      targetCount: 1,
+      affectedAssets: 1,
+      affectedWishes:
+          wishes.where((wish) => wish.convertedAssetId == id).length,
+      affectedRecoveryRecords: recoveryRecords
+          .where((record) => record.assetIds.contains(id))
+          .length,
+    );
+  }
+
+  DestructiveImpact wishDeleteImpact(String id) =>
+      wishes.any((wish) => wish.id == id)
+          ? const DestructiveImpact(targetCount: 1, affectedWishes: 1)
+          : const DestructiveImpact();
+
+  DestructiveImpact categoryDeleteImpact(String id) {
+    if (!categories.any((category) => category.id == id)) {
+      return const DestructiveImpact();
+    }
+    return DestructiveImpact(
+      targetCount: 1,
+      affectedCategories: 1,
+      affectedAssets: assets.where((asset) => asset.categoryId == id).length,
+      affectedWishes: wishes.where((wish) => wish.categoryId == id).length,
+    );
+  }
+
+  DestructiveImpact tagDeleteImpact(String id) {
+    if (!tags.any((tag) => tag.id == id)) return const DestructiveImpact();
+    return DestructiveImpact(
+      targetCount: 1,
+      affectedTags: 1,
+      affectedAssets: assets.where((asset) => asset.tagIds.contains(id)).length,
+      affectedWishes: wishes.where((wish) => wish.tagIds.contains(id)).length,
+    );
+  }
+
+  DestructiveImpact snapshotDeleteImpact(String id) =>
+      snapshots.any((snapshot) => snapshot.id == id)
+          ? const DestructiveImpact(targetCount: 1, affectedSnapshots: 1)
+          : const DestructiveImpact();
+
+  DestructiveImpact resetImpact() => DestructiveImpact(
+        targetCount: 1,
+        affectedAssets: assets.length,
+        affectedWishes: wishes.length,
+        affectedCategories: categories.length,
+        affectedTags: tags.length,
+        affectedRecoveryRecords: recoveryRecords.length,
+        affectedSnapshots: snapshots.length,
+      );
+
+  SnapshotPreview snapshotPreview(SnapshotRecord record) {
+    try {
+      final prepared = prepareRestoreJson(record.payload);
+      int count(String key) {
+        final value = prepared[key];
+        return value is List ? value.length : 0;
+      }
+
+      return SnapshotPreview(
+        isValid: true,
+        assets: count('assets'),
+        wishes: count('wishes'),
+        categories: count('categories'),
+        tags: count('tags'),
+        recoveryRecords: count('recoveryRecords'),
+      );
+    } catch (_) {
+      return const SnapshotPreview(isValid: false);
+    }
+  }
+
+  void _rememberUndo(String label, String payload) {
+    _undoPayload = payload;
+    _undoLabel = label;
+  }
+
+  void _clearUndo() {
+    _undoPayload = null;
+    _undoLabel = null;
+  }
+
+  Future<bool> _runDestructiveWithUndo({
+    required bool exists,
+    required String label,
+    required Future<void> Function() action,
+  }) async {
+    if (!exists || _destructiveMutationInFlight) return false;
+    _destructiveMutationInFlight = true;
+    try {
+      final before = exportJson();
+      await action();
+      _rememberUndo(label, before);
+      return true;
+    } finally {
+      _destructiveMutationInFlight = false;
+    }
+  }
+
+  Future<bool> deleteAssetWithUndo(String id) => _runDestructiveWithUndo(
+        exists: assets.any((asset) => asset.id == id),
+        label: tr('delete.assetUndo'),
+        action: () => deleteAsset(id),
+      );
+
+  Future<bool> deleteWishWithUndo(String id) => _runDestructiveWithUndo(
+        exists: wishes.any((wish) => wish.id == id),
+        label: tr('delete.wishUndo'),
+        action: () => deleteWish(id),
+      );
+
+  Future<bool> deleteCategoryWithUndo(String id) => _runDestructiveWithUndo(
+        exists: categories.any((category) => category.id == id),
+        label: tr('delete.categoryUndo'),
+        action: () => deleteCategory(id),
+      );
+
+  Future<bool> deleteTagWithUndo(String id) => _runDestructiveWithUndo(
+        exists: tags.any((tag) => tag.id == id),
+        label: tr('delete.tagUndo'),
+        action: () => deleteTag(id),
+      );
+
+  Future<bool> deleteSnapshotWithUndo(String id) => _runDestructiveWithUndo(
+        exists: snapshots.any((snapshot) => snapshot.id == id),
+        label: tr('delete.snapshotUndo'),
+        action: () => deleteSnapshot(id),
+      );
+
+  Future<bool> clearAllAndSeedWithUndo() async {
+    if (_destructiveMutationInFlight) return false;
+    _destructiveMutationInFlight = true;
+    try {
+      await createSnapshot(tlf('清空前快照 {date}', {'date': dateStamp()}));
+      final before = exportJson();
+      await clearAllAndSeed();
+      _rememberUndo(tr('delete.resetUndo'), before);
+      return true;
+    } finally {
+      _destructiveMutationInFlight = false;
+    }
+  }
+
+  Future<bool> undoLastAction() async {
+    final payload = _undoPayload;
+    if (payload == null || _undoInFlight) return false;
+    _undoInFlight = true;
+    final previous = exportMap();
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is! Map) return false;
+      importMap(Map<String, dynamic>.from(decoded));
+      await _enqueueSnapshot(jsonEncode(exportMap()));
+      _undoPayload = null;
+      _undoLabel = null;
+      _invalidateAnalytics();
+      notifyListeners();
+      return true;
+    } catch (_) {
+      try {
+        importMap(previous);
+        await _enqueueSnapshot(jsonEncode(previous));
+      } catch (_) {}
+      return false;
+    } finally {
+      _undoInFlight = false;
+    }
+  }
+
   Future<void> deleteAsset(String id) async {
     assets.removeWhere((a) => a.id == id);
     for (var i = 0; i < wishes.length; i++) {
@@ -3265,29 +3513,65 @@ class AppStore extends ChangeNotifier {
     return migratePersistedMap(Map<String, dynamic>.from(decoded));
   }
 
-  Future<bool> restoreFromJson(String raw) async {
-    final previous = exportMap();
-    var imported = false;
+  Future<bool> restoreFromJson(
+    String raw, {
+    bool createPreRestoreSnapshot = false,
+    String? preRestoreLabel,
+  }) async {
+    if (_restoreInFlight) return false;
+    Map<String, dynamic> prepared;
+    Map<String, dynamic> decoded;
     try {
-      importMap(prepareRestoreJson(raw));
-      imported = true;
+      final value = jsonDecode(raw);
+      if (value is! Map) return false;
+      decoded = Map<String, dynamic>.from(value);
+      prepared = prepareRestoreJson(raw);
+    } catch (_) {
+      return false;
+    }
+
+    _restoreInFlight = true;
+    Map<String, dynamic>? previous;
+    try {
+      if (createPreRestoreSnapshot) {
+        await createSnapshot(
+            preRestoreLabel ?? tlf('恢复前快照 {date}', {'date': dateStamp()}));
+      }
+      previous = exportMap();
+      // Snapshot payloads intentionally omit nested snapshots. Keep the
+      // current snapshot history, including the automatic pre-restore one,
+      // instead of silently deleting the history during a data restore.
+      if (!decoded.containsKey('snapshots')) {
+        prepared['snapshots'] = previous['snapshots'];
+      }
+      importMap(prepared);
       await _enqueueSnapshot(jsonEncode(exportMap()));
+      _clearUndo();
       _invalidateAnalytics();
       notifyListeners();
       return true;
     } catch (_) {
-      if (imported) {
-        try {
-          importMap(previous);
-          await _enqueueSnapshot(jsonEncode(previous));
-        } catch (_) {}
-      }
+      try {
+        final rollback = previous;
+        if (rollback != null) {
+          importMap(rollback);
+          await _enqueueSnapshot(jsonEncode(rollback));
+        } else if (_lastValidatedSnapshot != null) {
+          importMap(prepareRestoreJson(_lastValidatedSnapshot!));
+          await _enqueueSnapshot(jsonEncode(exportMap()));
+        }
+      } catch (_) {}
       return false;
+    } finally {
+      _restoreInFlight = false;
     }
   }
 
-  Future<bool> restoreSnapshot(SnapshotRecord record) =>
-      restoreFromJson(record.payload);
+  Future<bool> restoreSnapshot(SnapshotRecord record) => restoreFromJson(
+        record.payload,
+        createPreRestoreSnapshot: true,
+        preRestoreLabel: tlf('恢复前快照 {date}', {'date': dateStamp()}),
+      );
 
   Future<void> clearAllAndSeed() async {
     initializeEmptyData();

@@ -308,6 +308,170 @@ void showNativeSnack(BuildContext context, String text) {
   );
 }
 
+String destructiveImpactText(DestructiveImpact impact) {
+  final lines = <String>[];
+  void add(String key, int count) {
+    if (count > 0) {
+      lines.add(tlf(tr(key), {'count': '$count'}));
+    }
+  }
+
+  add('destructive.target', impact.targetCount);
+  add('destructive.assets', impact.affectedAssets);
+  add('destructive.wishes', impact.affectedWishes);
+  add('destructive.categories', impact.affectedCategories);
+  add('destructive.tags', impact.affectedTags);
+  add('destructive.recoveryRecords', impact.affectedRecoveryRecords);
+  add('destructive.snapshots', impact.affectedSnapshots);
+  return lines.join(' · ');
+}
+
+Future<bool?> showDestructiveActionSheet(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String actionLabel,
+  String? impactSummary,
+}) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierLabel: tr('common.cancel'),
+    builder: (sheetContext) {
+      var submitting = false;
+      return StatefulBuilder(
+        builder: (context, setLocalState) => Semantics(
+          container: true,
+          scopesRoute: true,
+          explicitChildNodes: true,
+          label: title,
+          child: Container(
+            padding: EdgeInsets.fromLTRB(
+                18, 12, 18, 18 + MediaQuery.viewInsetsOf(context).bottom),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(30)),
+              border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(.35)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                    child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                            color: kMuted.withOpacity(.45),
+                            borderRadius: BorderRadius.circular(99)))),
+                const SizedBox(height: 18),
+                Row(children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFFF6B5E).withOpacity(.15),
+                        borderRadius: BorderRadius.circular(15)),
+                    child: const Icon(Icons.warning_amber_rounded,
+                        color: Color(0xFFD84A3A)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Text(title,
+                          style: const TextStyle(
+                              fontSize: 19, fontWeight: FontWeight.normal))),
+                ]),
+                const SizedBox(height: 12),
+                Text(message, style: const TextStyle(height: 1.45)),
+                if (impactSummary != null &&
+                    impactSummary.trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(tr('destructive.impact'),
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.normal)),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFFF6B5E).withOpacity(.08),
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Text(impactSummary,
+                        style: const TextStyle(color: kMuted, height: 1.4)),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Text(tr('destructive.cancelNoChange'),
+                    style: const TextStyle(color: kMuted, fontSize: 12)),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: submitting
+                          ? null
+                          : () => Navigator.pop(sheetContext, false),
+                      child: Text(tr('common.cancel')),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFD84A3A)),
+                      onPressed: submitting
+                          ? null
+                          : () {
+                              setLocalState(() => submitting = true);
+                              Navigator.pop(sheetContext, true);
+                            },
+                      child: Text(actionLabel),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+void showUndoSnack(BuildContext context, String text) {
+  final messenger = ScaffoldMessenger.of(context);
+  final store = context.store;
+  messenger.clearSnackBars();
+  final bottom = MediaQuery.paddingOf(context).bottom +
+      (valoraCompactSnackbars ? 92.0 : 24.0);
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
+      duration: const Duration(seconds: 5),
+      behavior: SnackBarBehavior.floating,
+      margin: EdgeInsets.fromLTRB(16, 0, 16, bottom),
+      dismissDirection: DismissDirection.horizontal,
+      action: SnackBarAction(
+        label: tr('common.undo'),
+        textColor: const Color(0xFF7CC6F2),
+        onPressed: () async {
+          final restored = await store.undoLastAction();
+          if (!context.mounted) return;
+          if (restored) {
+            successHaptic();
+            showNativeSnack(context, tr('common.undone'));
+          } else {
+            warningHaptic();
+            showNativeSnack(context, tr('common.undoUnavailable'));
+          }
+        },
+      ),
+    ),
+  );
+}
+
 Map<String, dynamic> nativeJsonMap(String? raw) {
   if (raw == null || raw.trim().isEmpty) return <String, dynamic>{};
   try {
@@ -2852,7 +3016,11 @@ Future<void> restoreJsonFromText(BuildContext context, String? text) async {
     return;
   }
   final store = context.store;
-  final ok = await store.restoreFromJson(text);
+  final ok = await store.restoreFromJson(
+    text,
+    createPreRestoreSnapshot: true,
+    preRestoreLabel: tlf('恢复前快照 {date}', {'date': dateStamp()}),
+  );
   if (!context.mounted) return;
   if (ok) {
     successHaptic();
