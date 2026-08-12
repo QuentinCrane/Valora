@@ -169,6 +169,13 @@ public class MainActivity extends FlutterActivity {
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                           int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 7901) ReminderScheduler.sync(this);
+    }
+
+    @Override
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
         super.configureFlutterEngine(flutterEngine);
         storeDb = new LocalStoreDb(this);
@@ -351,6 +358,12 @@ public class MainActivity extends FlutterActivity {
                 case "cancelNotifications":
                     cancelNotification();
                     result.success(true);
+                    break;
+                case "syncReminders":
+                    result.success(ReminderScheduler.sync(this));
+                    break;
+                case "getReminderStatus":
+                    result.success(ReminderScheduler.status(this));
                     break;
                 case "createShortcuts":
                     result.success(createDynamicShortcuts());

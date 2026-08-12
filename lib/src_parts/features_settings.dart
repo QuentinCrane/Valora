@@ -524,6 +524,10 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 value: store.settings.reminderEnabled,
                 onChanged: (v) => store.updateSettings(
                     store.settings.copyWith(reminderEnabled: v))),
+            ReminderStatusRow(
+              refreshKey:
+                  '${store.settings.reminderEnabled}:${store.persistenceRevision}',
+            ),
           ]),
           const SizedBox(height: 12),
           SettingsSection(title: tl('云端快速操作'), children: [
@@ -1215,6 +1219,81 @@ class SettingSwitchRow extends StatelessWidget {
             tapHaptic();
             onChanged(v);
           }),
+    );
+  }
+}
+
+class ReminderStatusRow extends StatefulWidget {
+  final String refreshKey;
+
+  const ReminderStatusRow({super.key, required this.refreshKey});
+
+  @override
+  State<ReminderStatusRow> createState() => _ReminderStatusRowState();
+}
+
+class _ReminderStatusRowState extends State<ReminderStatusRow> {
+  late Future<NativeBridgeResult<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = NativeBridge.getReminderStatusResult();
+  }
+
+  @override
+  void didUpdateWidget(covariant ReminderStatusRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshKey != widget.refreshKey) {
+      _future = NativeBridge.getReminderStatusResult();
+    }
+  }
+
+  String _description(NativeBridgeResult<Map<String, dynamic>> result) {
+    if (result.isFailure) return tr('notification.statusFailed');
+    final payload = result.value ?? const <String, dynamic>{};
+    switch (payload['result']?.toString()) {
+      case 'scheduled':
+        return tlf('notification.statusScheduled', {
+          'n': '${payload['scheduledCount'] ?? 0}',
+        });
+      case 'permission_denied':
+        return tr('notification.statusPermissionDenied');
+      case 'disabled':
+        return tr('notification.statusDisabled');
+      case 'pending':
+        return tr('notification.statusPending');
+      case 'no_reminders':
+        return tlf('notification.statusScheduled', {'n': '0'});
+      default:
+        return tr('notification.statusFailed');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<NativeBridgeResult<Map<String, dynamic>>>(
+      future: _future,
+      builder: (context, snapshot) {
+        final result = snapshot.data;
+        return SettingRow(
+          icon: Icons.event_available_rounded,
+          iconBg: const Color(0xFFC8EBFF),
+          label: tr('notification.title'),
+          description: result == null
+              ? tr('notification.statusPending')
+              : _description(result),
+          trailing: result == null
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : ValuePill(
+                  '${result.value?['scheduledCount'] ?? 0}',
+                ),
+        );
+      },
     );
   }
 }

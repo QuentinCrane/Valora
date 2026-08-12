@@ -527,6 +527,7 @@ void _ensurePersistedCollections(Map<String, dynamic> data) {
     'assets',
     'wishes',
     'recoveryRecords',
+    'reminders',
     'snapshots',
   ];
   for (final key in collectionKeys) {
@@ -613,6 +614,12 @@ void _canonicalizePersistedDates(Map<String, dynamic> data) {
     'recoveryRecords',
     dateTimeFields: const ['createdAt', 'updatedAt'],
     dateOnlyFields: const ['date'],
+  );
+  _normalizeRecordDates(
+    data,
+    'reminders',
+    dateTimeFields: const ['triggerAt', 'lastScheduledAt'],
+    dateOnlyFields: const ['triggerDate'],
   );
   _normalizeSnapshotDates(data);
 
@@ -736,12 +743,14 @@ void _validatePersistedData(Map<String, dynamic> data) {
   final assets = _persistedRecords(data, 'assets');
   final wishes = _persistedRecords(data, 'wishes');
   final recoveryRecords = _persistedRecords(data, 'recoveryRecords');
+  final reminders = _persistedRecords(data, 'reminders');
   final snapshots = _persistedRecords(data, 'snapshots');
   final categoryIds = _validatePrimaryKeys(categories, 'categories');
   final tagIds = _validatePrimaryKeys(tags, 'tags');
   final assetIds = _validatePrimaryKeys(assets, 'assets');
   _validatePrimaryKeys(wishes, 'wishes');
   _validatePrimaryKeys(recoveryRecords, 'recoveryRecords');
+  _validatePrimaryKeys(reminders, 'reminders');
   _validatePrimaryKeys(snapshots, 'snapshots');
 
   for (var index = 0; index < categories.length; index++) {
@@ -797,6 +806,11 @@ void _validatePersistedData(Map<String, dynamic> data) {
         dateOnlyFields: const ['date']);
     _validateReferences(
         record, 'assetIds', assetIds, 'recoveryRecords[$index]');
+  }
+  for (var index = 0; index < reminders.length; index++) {
+    _validateDateFields(reminders[index], 'reminders[$index]',
+        dateTimeFields: const ['triggerAt', 'lastScheduledAt'],
+        dateOnlyFields: const ['triggerDate']);
   }
   for (var index = 0; index < snapshots.length; index++) {
     _validateDateFields(snapshots[index], 'snapshots[$index]',
@@ -1532,6 +1546,7 @@ class AppStore extends ChangeNotifier {
   bool _undoInFlight = false;
   bool _destructiveMutationInFlight = false;
   bool _restoreInFlight = false;
+  bool _reminderSyncInFlight = false;
 
   AppStore() {
     _saveCoordinator = SaveCoordinator(
@@ -1549,6 +1564,7 @@ class AppStore extends ChangeNotifier {
   final List<Asset> assets = [];
   final List<Wish> wishes = [];
   final List<ValueRecoveryRecord> recoveryRecords = [];
+  final List<ReminderRecord> reminders = [];
   final List<SnapshotRecord> snapshots = [];
 
   String query = '';
@@ -1733,6 +1749,7 @@ class AppStore extends ChangeNotifier {
       return result;
     }
 
+    var reminderSyncHandled = false;
     try {
       final raw = result.payload ?? '';
       if (result.status == StorageLoadStatus.empty) {
@@ -1747,11 +1764,13 @@ class AppStore extends ChangeNotifier {
         }
         initializeEmptyData();
         await save();
+        reminderSyncHandled = true;
       } else {
         importMap(Map<String, dynamic>.from(jsonDecode(raw)));
         final migratedLegacyCredentials = await _hydrateCloudCredentials();
         if (migratedLegacyCredentials) {
           await save();
+          reminderSyncHandled = true;
         } else if (result.lastValidatedPayload != raw) {
           await _storage.markValidated(raw);
         }
@@ -1782,6 +1801,7 @@ class AppStore extends ChangeNotifier {
     }
     viewMode = settings.defaultHomeViewMode;
     configureRuntimeSettings(settings);
+    if (!reminderSyncHandled) await _synchronizeReminderSchedule();
     if (settings.cloudSync.syncOnLaunch && settings.cloudSync.enabled) {
       Future<void>(() async {
         await downloadCloudBackup(silent: true);
@@ -1823,6 +1843,9 @@ class AppStore extends ChangeNotifier {
     final nextRecoveryRecords = ((normalized['recoveryRecords'] as List?) ?? [])
         .map((e) => ValueRecoveryRecord.fromMap(Map<String, dynamic>.from(e)))
         .toList();
+    final nextReminders = ((normalized['reminders'] as List?) ?? [])
+        .map((e) => ReminderRecord.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
     final nextSnapshots = ((normalized['snapshots'] as List?) ?? [])
         .map((e) => SnapshotRecord.fromMap(Map<String, dynamic>.from(e)))
         .toList();
@@ -1846,27 +1869,142 @@ class AppStore extends ChangeNotifier {
     recoveryRecords
       ..clear()
       ..addAll(nextRecoveryRecords);
+    reminders
+      ..clear()
+      ..addAll(nextReminders);
     snapshots
       ..clear()
       ..addAll(nextSnapshots);
     _invalidateAnalytics();
   }
 
-  Map<String, dynamic> exportMap({bool includeSnapshots = true}) => {
-        'storageSchemaVersion': kCurrentStorageSchemaVersion,
-        'exportSchemaVersion': kCurrentExportSchemaVersion,
-        'appVersion': kValoraAppVersion,
-        'version': kCurrentExportSchemaVersion,
-        'generatedBy': 'valora-flutter',
-        'settings': settings.toMap(),
-        'categories': categories.map((e) => e.toMap()).toList(),
-        'tags': tags.map((e) => e.toMap()).toList(),
-        'assets': assets.map((e) => e.toMap()).toList(),
-        'wishes': wishes.map((e) => e.toMap()).toList(),
-        'recoveryRecords': recoveryRecords.map((e) => e.toMap()).toList(),
-        if (includeSnapshots)
-          'snapshots': snapshots.map((e) => e.toMap()).toList(),
-      };
+  void _refreshReminderRecords() {
+    final previous = <String, ReminderRecord>{
+      for (final reminder in reminders) reminder.id: reminder,
+    };
+    final next = <ReminderRecord>[];
+    final now = DateTime.now();
+
+    void addReminder({
+      required Asset asset,
+      required String type,
+      required DateTime triggerDate,
+      required DateTime triggerAt,
+      required String body,
+    }) {
+      final id = 'asset:${asset.id}:$type';
+      final old = previous[id];
+      next.add(ReminderRecord(
+        id: id,
+        sourceId: asset.id,
+        type: type,
+        triggerDate: dateOnly(triggerDate),
+        triggerAt: triggerAt,
+        title: tr('notification.title'),
+        body: body,
+        enabled: settings.reminderEnabled && triggerAt.isAfter(now),
+        lastScheduleResult: old?.lastScheduleResult ?? 'pending',
+        lastScheduledAt: old?.lastScheduledAt,
+      ));
+    }
+
+    for (final asset in assets) {
+      if (asset.status == AssetStatus.sold) continue;
+      final expiry = asset.expiresAt;
+      final remindDays = asset.remindBeforeDays;
+      if (expiry != null && remindDays != null && remindDays >= 0) {
+        final triggerAt = dateOnly(expiry)
+            .subtract(Duration(days: remindDays))
+            .add(const Duration(hours: 9));
+        addReminder(
+          asset: asset,
+          type: 'expiry',
+          triggerDate: dateOnly(expiry).subtract(Duration(days: remindDays)),
+          triggerAt: triggerAt,
+          body: tlf('notification.assetExpiry', {
+            'name': asset.name,
+            'date': dateText(expiry),
+          }),
+        );
+      }
+      if (asset.targetMode == TargetMode.date && asset.targetDate != null) {
+        final targetDate = asset.targetDate!;
+        addReminder(
+          asset: asset,
+          type: 'target_date',
+          triggerDate: dateOnly(targetDate),
+          triggerAt: dateOnly(targetDate).add(const Duration(hours: 9)),
+          body: tlf('notification.assetTarget', {
+            'name': asset.name,
+            'date': dateText(targetDate),
+          }),
+        );
+      }
+    }
+
+    next.sort((a, b) {
+      final byDate = a.triggerAt.compareTo(b.triggerAt);
+      return byDate != 0 ? byDate : a.id.compareTo(b.id);
+    });
+    reminders
+      ..clear()
+      ..addAll(next);
+  }
+
+  Future<void> _synchronizeReminderSchedule({bool persistResult = true}) async {
+    if (_reminderSyncInFlight) return;
+    _reminderSyncInFlight = true;
+    try {
+      _refreshReminderRecords();
+      final result = await NativeBridge.syncRemindersResult();
+      if (result.error?.code == NativeBridgeErrorCode.notImplemented) return;
+
+      final before = jsonEncode(reminders.map((e) => e.toMap()).toList());
+      final now = DateTime.now();
+      final scheduleResult = result.isSuccess
+          ? (result.value?['result']?.toString() ?? 'scheduled')
+          : (result.error?.code.wireName ?? 'unknown');
+      final updated = reminders
+          .map((reminder) => reminder.copyWith(
+                lastScheduleResult: scheduleResult,
+                lastScheduledAt: now,
+              ))
+          .toList();
+      reminders
+        ..clear()
+        ..addAll(updated);
+      final after = jsonEncode(reminders.map((e) => e.toMap()).toList());
+      if (persistResult && before != after && !isStorageReadOnly) {
+        await _enqueueSnapshot(
+          jsonEncode(exportMap()),
+          kind: PersistenceSaveKind.settings,
+          syncReminders: false,
+        );
+      }
+    } finally {
+      _reminderSyncInFlight = false;
+    }
+  }
+
+  Map<String, dynamic> exportMap({bool includeSnapshots = true}) {
+    _refreshReminderRecords();
+    return {
+      'storageSchemaVersion': kCurrentStorageSchemaVersion,
+      'exportSchemaVersion': kCurrentExportSchemaVersion,
+      'appVersion': kValoraAppVersion,
+      'version': kCurrentExportSchemaVersion,
+      'generatedBy': 'valora-flutter',
+      'settings': settings.toMap(),
+      'categories': categories.map((e) => e.toMap()).toList(),
+      'tags': tags.map((e) => e.toMap()).toList(),
+      'assets': assets.map((e) => e.toMap()).toList(),
+      'wishes': wishes.map((e) => e.toMap()).toList(),
+      'recoveryRecords': recoveryRecords.map((e) => e.toMap()).toList(),
+      'reminders': reminders.map((e) => e.toMap()).toList(),
+      if (includeSnapshots)
+        'snapshots': snapshots.map((e) => e.toMap()).toList(),
+    };
+  }
 
   String exportJson({bool includeSnapshots = true}) =>
       const JsonEncoder.withIndent('  ')
@@ -1889,6 +2027,7 @@ class AppStore extends ChangeNotifier {
   Future<bool> _enqueueSnapshot(
     String snapshot, {
     PersistenceSaveKind kind = PersistenceSaveKind.crud,
+    bool syncReminders = true,
   }) async {
     if (isStorageReadOnly) {
       throw StateError(tr('store.recovery.readOnly'));
@@ -1915,6 +2054,7 @@ class AppStore extends ChangeNotifier {
         leakCount: walletLeaks(limit: 99).length,
         snapshotCount: snapshots.length,
       );
+      if (syncReminders) await _synchronizeReminderSchedule();
     }
     return isLatestPersisted;
   }
@@ -2083,6 +2223,7 @@ class AppStore extends ChangeNotifier {
     assets.clear();
     wishes.clear();
     recoveryRecords.clear();
+    reminders.clear();
     snapshots.clear();
     settings = const AppSettings();
     viewMode = settings.defaultHomeViewMode;

@@ -198,6 +198,20 @@ class NativeBridge {
     return NativeBridgeResult.success(decoded);
   }
 
+  static NativeBridgeResult<Map<String, dynamic>> _decodeMapResult(
+      NativeBridgeResult<Object> result) {
+    if (!result.isSuccess) {
+      return NativeBridgeResult.failure(result.error ??
+          const NativeBridgeError(NativeBridgeErrorCode.invalidFormat));
+    }
+    final value = result.value;
+    if (value is! Map) {
+      return const NativeBridgeResult.failure(
+          NativeBridgeError(NativeBridgeErrorCode.invalidFormat));
+    }
+    return NativeBridgeResult.success(Map<String, dynamic>.from(value));
+  }
+
   static Future<void> configureSystemUi() async {
     await _fireAndForget('configureSystemUi');
   }
@@ -454,6 +468,14 @@ class NativeBridge {
 
   static Future<bool> cancelNotifications() async =>
       (await cancelNotificationsResult()).value ?? false;
+
+  static Future<NativeBridgeResult<Map<String, dynamic>>>
+      syncRemindersResult() async =>
+          _decodeMapResult(await _callResult<Object>('syncReminders'));
+
+  static Future<NativeBridgeResult<Map<String, dynamic>>>
+      getReminderStatusResult() async =>
+          _decodeMapResult(await _callResult<Object>('getReminderStatus'));
 
   static Future<NativeBridgeResult<bool>> createShortcutsResult() =>
       _callResult<bool>('createShortcuts');

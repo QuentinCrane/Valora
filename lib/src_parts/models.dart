@@ -327,9 +327,8 @@ class Asset {
     final cursor = dateOnly(asOf);
     final parentDate = dateOnly(purchaseDate);
     return addons.fold(0.0, (sum, addon) {
-      final include = forDailyCost
-          ? addon.includeInDailyCost
-          : addon.includeInTotal;
+      final include =
+          forDailyCost ? addon.includeInDailyCost : addon.includeInTotal;
       if (!include) return sum;
       final addonDate =
           dateOnly(addon.effectivePurchaseDate(parentDate) ?? parentDate);
@@ -561,6 +560,88 @@ class Asset {
           parsePersistedDateTime(map['createdAt'], fallback: DateTime.now()),
       updatedAt:
           parsePersistedDateTime(map['updatedAt'], fallback: DateTime.now()),
+    );
+  }
+}
+
+class ReminderRecord {
+  final String id;
+  final String sourceId;
+  final String type;
+  final DateTime triggerDate;
+  final DateTime triggerAt;
+  final String title;
+  final String body;
+  final bool enabled;
+  final String lastScheduleResult;
+  final DateTime? lastScheduledAt;
+
+  const ReminderRecord({
+    required this.id,
+    required this.sourceId,
+    required this.type,
+    required this.triggerDate,
+    required this.triggerAt,
+    required this.title,
+    required this.body,
+    required this.enabled,
+    this.lastScheduleResult = 'pending',
+    this.lastScheduledAt,
+  });
+
+  ReminderRecord copyWith({
+    DateTime? triggerDate,
+    DateTime? triggerAt,
+    String? title,
+    String? body,
+    bool? enabled,
+    String? lastScheduleResult,
+    DateTime? lastScheduledAt,
+  }) =>
+      ReminderRecord(
+        id: id,
+        sourceId: sourceId,
+        type: type,
+        triggerDate: triggerDate ?? this.triggerDate,
+        triggerAt: triggerAt ?? this.triggerAt,
+        title: title ?? this.title,
+        body: body ?? this.body,
+        enabled: enabled ?? this.enabled,
+        lastScheduleResult: lastScheduleResult ?? this.lastScheduleResult,
+        lastScheduledAt: lastScheduledAt ?? this.lastScheduledAt,
+      );
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'sourceId': sourceId,
+        'type': type,
+        'triggerDate': dateStorageText(triggerDate),
+        'triggerAt': dateTimeStorageText(triggerAt),
+        'title': title,
+        'body': body,
+        'enabled': enabled,
+        'lastScheduleResult': lastScheduleResult,
+        'lastScheduledAt': lastScheduledAt == null
+            ? null
+            : dateTimeStorageText(lastScheduledAt!),
+      };
+
+  factory ReminderRecord.fromMap(Map<String, dynamic> map) {
+    final triggerAt =
+        parsePersistedDateTime(map['triggerAt'], fallback: DateTime.now());
+    final triggerDate =
+        parseOptionalPersistedDate(map['triggerDate']) ?? dateOnly(triggerAt);
+    return ReminderRecord(
+      id: map['id']?.toString() ?? newId('reminder'),
+      sourceId: map['sourceId']?.toString() ?? '',
+      type: map['type']?.toString() ?? 'asset_expiry',
+      triggerDate: triggerDate,
+      triggerAt: triggerAt,
+      title: map['title']?.toString() ?? tr('notification.title'),
+      body: map['body']?.toString() ?? '',
+      enabled: map['enabled'] != false,
+      lastScheduleResult: map['lastScheduleResult']?.toString() ?? 'pending',
+      lastScheduledAt: parseOptionalPersistedDateTime(map['lastScheduledAt']),
     );
   }
 }
