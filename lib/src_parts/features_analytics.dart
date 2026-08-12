@@ -168,7 +168,7 @@ class AnalyticsHomePage extends StatelessWidget {
                               .map((e) => Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
                                   child: Text(
-                                      '${e.key}  ${money(e.value, store.settings)}',
+                                      '${store.categoryDistributionLabel(e.key)}  ${money(e.value, store.settings)}',
                                       style: const TextStyle(
                                           fontWeight: FontWeight.normal))))
                               .toList()))
@@ -187,7 +187,9 @@ class AnalyticsHomePage extends StatelessWidget {
                   runSpacing: 8,
                   children: tags.entries
                       .map((e) => TinyTag(
-                          label: '${e.key} · ${e.value}', color: kBrandStrong))
+                          label:
+                              '${store.tagDistributionLabel(e.key)} · ${e.value}',
+                          color: kBrandStrong))
                       .toList())),
       const SizedBox(height: 12),
       InkWell(
@@ -344,7 +346,9 @@ void showCategoryDistributionDetail(BuildContext context, AppStore store) {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(children: [
-                        Expanded(child: Text(e.key)),
+                        Expanded(
+                            child:
+                                Text(store.categoryDistributionLabel(e.key))),
                         Text(
                             '${money(e.value, store.settings)} · ${(total <= 0 ? 0 : e.value / total * 100).toStringAsFixed(1)}%')
                       ]),
@@ -375,7 +379,7 @@ void showTagDistributionDetail(BuildContext context, AppStore store) {
         else
           ...entries.map((e) => ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(e.key),
+              title: Text(store.tagDistributionLabel(e.key)),
               trailing: Text('${e.value} ${tr('analytics.countUnit')}'))),
       ]));
 }

@@ -1,5 +1,7 @@
 part of '../main.dart';
 
+const String kUncategorizedAnalyticsKey = '__valora_uncategorized__';
+
 class AssetInsight {
   final IconData icon;
   final String title;
@@ -39,13 +41,15 @@ class LifecycleEventItem {
   final String subtitle;
   final IconData icon;
   final Color color;
+  final String sortKey;
 
   const LifecycleEventItem(
       {required this.date,
       required this.title,
       required this.subtitle,
       required this.icon,
-      required this.color});
+      required this.color,
+      this.sortKey = ''});
 }
 
 class AnalyticsSnapshot {
@@ -2105,8 +2109,8 @@ class AppStore extends ChangeNotifier {
       if (asset.status == AssetStatus.sold) continue;
       if (!settings.includeRetiredInTotal &&
           asset.status == AssetStatus.retired) continue;
-      final name = categoryName(asset.categoryId);
-      result[name] = (result[name] ?? 0) + asset.assetValue;
+      final id = asset.categoryId ?? kUncategorizedAnalyticsKey;
+      result[id] = (result[id] ?? 0) + asset.assetValue;
     }
     return result;
   }
@@ -2115,25 +2119,30 @@ class AppStore extends ChangeNotifier {
     final result = <String, int>{};
     for (final asset in assets) {
       for (final id in asset.tagIds) {
-        final name = tagName(id);
-        result[name] = (result[name] ?? 0) + 1;
+        result[id] = (result[id] ?? 0) + 1;
       }
     }
     return result;
   }
 
+  String categoryDistributionLabel(String key) =>
+      key == kUncategorizedAnalyticsKey
+          ? tr('store.uncategorized')
+          : categoryName(key);
+
+  String tagDistributionLabel(String key) => tagName(key);
+
   double getTotalPurchaseCost() => assets
       .where((a) => !a.isPriceless)
-      .fold(0.0, (sum, asset) => sum + asset.price + asset.addonTotal);
+      .fold(0.0, (sum, asset) => sum + asset.acquisitionCost);
 
   double getActiveAssetValue() => assets
       .where((a) => a.status == AssetStatus.serving)
       .fold(0.0, (sum, a) => sum + a.assetValue);
 
-  double getSoldLossOrGain() =>
-      assets.where((a) => a.status == AssetStatus.sold && !a.isPriceless).fold(
-          0.0,
-          (sum, a) => sum + ((a.soldPrice ?? 0) - a.price - a.dailyAddonTotal));
+  double getSoldLossOrGain() => assets
+      .where((a) => a.status == AssetStatus.sold && !a.isPriceless)
+      .fold(0.0, (sum, a) => sum + ((a.soldPrice ?? 0) - a.acquisitionCost));
 
   double getNetAssetPosition() =>
       getTotalAssetValue() +
@@ -2251,25 +2260,8 @@ class AppStore extends ChangeNotifier {
       for (final asset in dailyAssets) {
         final purchaseDate = dateOnly(asset.purchaseDate);
         if (purchaseDate.isAfter(cursor)) continue;
-        var serviceEnd = cursor;
-        if (asset.status == AssetStatus.retired &&
-            asset.retiredAt != null &&
-            !dateOnly(asset.retiredAt!).isAfter(cursor)) {
-          serviceEnd = dateOnly(asset.retiredAt!);
-        }
-        if (asset.status == AssetStatus.sold &&
-            asset.soldAt != null &&
-            !dateOnly(asset.soldAt!).isAfter(cursor)) {
-          serviceEnd = dateOnly(asset.soldAt!);
-        }
-        final days = diffDaysInclusive(purchaseDate, serviceEnd);
-        final recovered = asset.status == AssetStatus.sold &&
-                asset.soldAt != null &&
-                !dateOnly(asset.soldAt!).isAfter(cursor)
-            ? (asset.soldPrice ?? 0)
-            : 0.0;
-        final netCost = asset.price + asset.dailyAddonTotal - recovered;
-        activeDailyCosts.add(netCost / math.max(days, 1));
+        final recovered = getAssetRecoveryIncomeAt(asset.id, cursor);
+        activeDailyCosts.add(asset.dailyCostAt(cursor, recovered: recovered));
       }
       if (activeDailyCosts.isEmpty) continue;
       final average = activeDailyCosts.fold(0.0, (sum, value) => sum + value) /
@@ -2291,6 +2283,7 @@ class AppStore extends ChangeNotifier {
             '${categoryIcon(asset.categoryId)} ${categoryName(asset.categoryId)} · ${assetBasePriceText(asset, settings)}',
         icon: Icons.add_shopping_cart_rounded,
         color: kBrandStrong,
+        sortKey: 'asset:${asset.id}:purchase',
       ));
       if (asset.status == AssetStatus.retired && asset.retiredAt != null) {
         rows.add(LifecycleEventItem(
@@ -2301,6 +2294,7 @@ class AppStore extends ChangeNotifier {
               : '${tr('store.eventTotalServed')} ${durationText(asset.serviceDays, settings.durationMode)}${tr('store.eventFinalDaily')} ${money(asset.dailyCost, settings)} ${tr('store.perDay')}',
           icon: Icons.archive_rounded,
           color: const Color(0xFFFFB020),
+          sortKey: 'asset:${asset.id}:retired',
         ));
       }
       if (asset.status == AssetStatus.sold && asset.soldAt != null) {
@@ -2308,9 +2302,10 @@ class AppStore extends ChangeNotifier {
           date: asset.soldAt!,
           title: '${tr('store.eventSold')} ${asset.name}',
           subtitle:
-              '${tr('store.eventRecovered')} ${money(asset.soldPrice ?? 0, settings)}${tr('store.eventNetCost')} ${money(asset.netCost, settings)}',
+              '${tr('store.eventRecovered')} ${money(asset.soldPrice ?? 0, settings)}${tr('store.eventNetCost')} ${money(getAssetNetConsumptionAfterRecovery(asset), settings)}',
           icon: Icons.swap_horiz_rounded,
           color: const Color(0xFF4ADE80),
+          sortKey: 'asset:${asset.id}:sold',
         ));
       }
     }
@@ -2332,9 +2327,13 @@ class AppStore extends ChangeNotifier {
             '${names.isEmpty ? tr('store.noAssetSelected') : names} · ${tr('store.eventRecoveredAmount')} ${money(item.amount, settings)}',
         icon: Icons.savings_rounded,
         color: const Color(0xFF22C55E),
+        sortKey: 'recovery:${item.id}',
       ));
     }
-    rows.sort((a, b) => b.date.compareTo(a.date));
+    rows.sort((a, b) {
+      final byDate = b.date.compareTo(a.date);
+      return byDate == 0 ? a.sortKey.compareTo(b.sortKey) : byDate;
+    });
     return rows.take(limit).toList();
   }
 
@@ -2449,8 +2448,13 @@ class AppStore extends ChangeNotifier {
       });
 
   double getAssetRecoveryIncome(String assetId) {
+    return getAssetRecoveryIncomeAt(assetId, DateTime.now());
+  }
+
+  double getAssetRecoveryIncomeAt(String assetId, DateTime asOf) {
     double result = 0;
     for (final item in recoveryRecords) {
+      if (dateOnly(item.date).isAfter(dateOnly(asOf))) continue;
       final eligibleIds = _recoverableIdsForRecord(item);
       if (!eligibleIds.contains(assetId)) continue;
       result += math.max(item.amount, 0) / math.max(eligibleIds.length, 1);
@@ -2465,21 +2469,14 @@ class AppStore extends ChangeNotifier {
     return soldRecovered + getAssetRecoveryIncome(asset.id);
   }
 
-  double getAssetNetConsumptionAfterRecovery(Asset asset) => asset.isPriceless
-      ? 0
-      : math.max(
-          asset.price +
-              asset.dailyAddonTotal -
-              getAssetTotalRecoveredValue(asset),
-          0);
+  double getAssetNetConsumptionAfterRecovery(Asset asset) =>
+      asset.isPriceless ? 0 : asset.netCost - getAssetRecoveryIncome(asset.id);
 
   double getLifecycleRecoveredValue() =>
       getSoldRecoveredValue() + getRecoveryIncomeTotal();
 
-  double getLifecycleNetConsumption() => math.max(
-      assets.fold(0.0, (sum, a) => sum + math.max(a.netCost, 0)) -
-          getRecoveryIncomeTotal(),
-      0);
+  double getLifecycleNetConsumption() => assets.fold(
+      0.0, (sum, asset) => sum + getAssetNetConsumptionAfterRecovery(asset));
 
   List<Asset> pricelessAssets({int limit = 5}) {
     final rows = assets
@@ -2491,7 +2488,12 @@ class AppStore extends ChangeNotifier {
 
   List<ValueRecoveryRecord> recoveryRecordsForAsset(String assetId) =>
       recoveryRecords.where((e) => e.assetIds.contains(assetId)).toList()
-        ..sort((a, b) => b.date.compareTo(a.date));
+        ..sort((a, b) {
+          final byDate = b.date.compareTo(a.date);
+          if (byDate != 0) return byDate;
+          final byUpdated = b.updatedAt.compareTo(a.updatedAt);
+          return byUpdated == 0 ? a.id.compareTo(b.id) : byUpdated;
+        });
 
   Future<void> addRecoveryRecord(ValueRecoveryRecord record) async {
     final referenced = record.assetIds

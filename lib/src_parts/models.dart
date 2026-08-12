@@ -295,31 +295,80 @@ class Asset {
     required this.updatedAt,
   });
 
-  DateTime get serviceEndDate {
-    if (status == AssetStatus.sold && soldAt != null) return soldAt!;
-    if (status == AssetStatus.retired && retiredAt != null) return retiredAt!;
-    return DateTime.now();
+  DateTime serviceEndDateAt(DateTime asOf) {
+    final cursor = dateOnly(asOf);
+    final lifecycleDate = status == AssetStatus.sold
+        ? soldAt
+        : status == AssetStatus.retired
+            ? retiredAt
+            : null;
+    if (lifecycleDate == null) return cursor;
+    final end = dateOnly(lifecycleDate);
+    return end.isBefore(cursor) ? end : cursor;
   }
 
-  int get serviceDays => diffDaysInclusive(purchaseDate, serviceEndDate);
+  DateTime get serviceEndDate => serviceEndDateAt(DateTime.now());
+
+  int serviceDaysAt(DateTime asOf) {
+    final cursor = dateOnly(asOf);
+    if (dateOnly(purchaseDate).isAfter(cursor)) return 0;
+    return diffDaysInclusive(purchaseDate, serviceEndDateAt(cursor));
+  }
+
+  int get serviceDays => serviceDaysAt(DateTime.now());
   bool get isPriceless => valueMode == AssetValueMode.priceless;
   double get addonTotal => addons.fold(
       0.0, (sum, item) => sum + (item.includeInTotal ? item.price : 0));
   double get dailyAddonTotal => addons.fold(
       0.0, (sum, item) => sum + (item.includeInDailyCost ? item.price : 0));
-  double get totalDisplayValue => isPriceless ? 0 : price + addonTotal;
-  double get netCost => isPriceless
-      ? 0
-      : price +
-          dailyAddonTotal -
-          (status == AssetStatus.sold ? (soldPrice ?? 0) : 0);
-  double get dailyCost =>
-      includeInDailyCost ? netCost / math.max(serviceDays, 1) : 0;
+  double get acquisitionCost => isPriceless ? 0 : price + addonTotal;
+
+  double addonCostAt(DateTime asOf, {required bool forDailyCost}) {
+    final cursor = dateOnly(asOf);
+    final parentDate = dateOnly(purchaseDate);
+    return addons.fold(0.0, (sum, addon) {
+      final include = forDailyCost
+          ? addon.includeInDailyCost
+          : addon.includeInTotal;
+      if (!include) return sum;
+      final addonDate =
+          dateOnly(addon.effectivePurchaseDate(parentDate) ?? parentDate);
+      return addonDate.isAfter(cursor) ? sum : sum + addon.price;
+    });
+  }
+
+  double soldRecoveryAt(DateTime asOf) {
+    if (status != AssetStatus.sold || soldAt == null) return 0;
+    return dateOnly(soldAt!).isAfter(dateOnly(asOf)) ? 0 : (soldPrice ?? 0);
+  }
+
+  double acquisitionCostAt(DateTime asOf, {required bool forDailyCost}) {
+    if (isPriceless || dateOnly(purchaseDate).isAfter(dateOnly(asOf))) return 0;
+    return price + addonCostAt(asOf, forDailyCost: forDailyCost);
+  }
+
+  double netCostAt(DateTime asOf) =>
+      acquisitionCostAt(asOf, forDailyCost: false) - soldRecoveryAt(asOf);
+
+  double get totalDisplayValue => acquisitionCost;
+  double get netCost => netCostAt(DateTime.now());
+
+  double dailyCostAt(DateTime asOf, {double recovered = 0}) {
+    if (isPriceless || !includeInDailyCost) return 0;
+    final days = serviceDaysAt(asOf);
+    if (days <= 0) return 0;
+    final cost = acquisitionCostAt(asOf, forDailyCost: true) -
+        soldRecoveryAt(asOf) -
+        recovered;
+    return cost / days;
+  }
+
+  double get dailyCost => dailyCostAt(DateTime.now());
   double get assetValue {
     if (isPriceless) return 0;
     if (!includeInTotal) return 0;
     if (status == AssetStatus.sold) return 0;
-    return price + addonTotal;
+    return acquisitionCost;
   }
 
   double get targetRatio {

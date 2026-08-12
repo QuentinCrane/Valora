@@ -210,7 +210,10 @@ class AssetDetailPage extends StatelessWidget {
                                         DetailCell(
                                             label: tr('detail.netCost'),
                                             value: money(
-                                                asset.netCost, store.settings)),
+                                                store
+                                                    .getAssetNetConsumptionAfterRecovery(
+                                                        asset),
+                                                store.settings)),
                                       ]),
                             if (!asset.isPriceless &&
                                 asset.addons.isNotEmpty) ...[
@@ -599,7 +602,7 @@ class AssetValueReplayCard extends StatelessWidget {
     final earningRecovered = store.getAssetRecoveryIncome(asset.id);
     final recovered = soldRecovered + earningRecovered;
     final consumed = store.getAssetNetConsumptionAfterRecovery(asset);
-    final maxValue = math.max(asset.price + asset.dailyAddonTotal, 1.0);
+    final maxValue = math.max(asset.acquisitionCost, 1.0);
     final recoveredRatio = (recovered / maxValue).clamp(0, 1).toDouble();
     final consumedRatio = (consumed / maxValue).clamp(0, 1).toDouble();
     final records = store.recoveryRecordsForAsset(asset.id);
@@ -640,8 +643,7 @@ class AssetValueReplayCard extends StatelessWidget {
           GridWrap(children: [
             DetailCell(
                 label: tl('总投入'),
-                value:
-                    money(asset.price + asset.dailyAddonTotal, store.settings)),
+                value: money(asset.acquisitionCost, store.settings)),
             DetailCell(
                 label: tl('二手回收'), value: money(soldRecovered, store.settings)),
             DetailCell(
@@ -663,7 +665,7 @@ class AssetValueReplayCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 12.5))),
                     Text(
-                        money(r.amount / math.max(r.assetIds.length, 1),
+                        money(store.getAssetRecoveryIncomeAt(asset.id, r.date),
                             store.settings),
                         style: const TextStyle(
                             fontWeight: FontWeight.normal, fontSize: 12.5)),
@@ -984,18 +986,6 @@ class DetailMini extends StatelessWidget {
     return kBrandStrong;
   }
 
-  double get _progressValue {
-    if (label.contains(tl('日均')) || label.toLowerCase().contains('daily'))
-      return .64;
-    if (label.contains(tl('时长')) ||
-        label.contains(tr('AssetStatus.serving')) ||
-        label.contains(tl('持有')) ||
-        label.toLowerCase().contains('time') ||
-        label.toLowerCase().contains('active') ||
-        label.toLowerCase().contains('holding')) return .48;
-    return .54;
-  }
-
   @override
   Widget build(BuildContext context) {
     final dark = context.isDark;
@@ -1047,18 +1037,6 @@ class DetailMini extends StatelessWidget {
                     fontSize: 15.5,
                     height: 1.0,
                     letterSpacing: -.15)),
-            const SizedBox(height: 7),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: _progressValue,
-                minHeight: 5,
-                backgroundColor: dark
-                    ? Colors.white.withOpacity(.10)
-                    : const Color(0xFFE8EEF3),
-                color: _color,
-              ),
-            ),
           ]),
         ),
       ]),
@@ -1206,8 +1184,16 @@ class TrendExplainRow extends StatelessWidget {
   const TrendExplainRow({super.key, required this.asset});
   @override
   Widget build(BuildContext context) {
-    final startDaily = asset.netCost;
-    final nowDaily = asset.dailyCost;
+    final store = context.store;
+    final startDaily = asset.dailyCostAt(
+      asset.purchaseDate,
+      recovered: store.getAssetRecoveryIncomeAt(asset.id, asset.purchaseDate),
+    );
+    final now = DateTime.now();
+    final nowDaily = asset.dailyCostAt(
+      now,
+      recovered: store.getAssetRecoveryIncomeAt(asset.id, now),
+    );
     final targetDays = asset.targetDays;
     final targetText = targetDays == null
         ? tl('未设目标')
@@ -1247,13 +1233,19 @@ void showAssetTrendGuide(BuildContext context, Asset asset, AppStore store) {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         DetailCell(
             label: tl('第 1 天日耗'),
-            value:
-                '${money(asset.netCost, store.settings)} ${tr('time.perDay')}'),
+            value: '${money(asset.dailyCostAt(
+                  asset.purchaseDate,
+                  recovered: store.getAssetRecoveryIncomeAt(
+                      asset.id, asset.purchaseDate),
+                ), store.settings)} ${tr('time.perDay')}'),
         const SizedBox(height: 8),
         DetailCell(
             label: tl('当前日耗'),
-            value:
-                '${money(asset.dailyCost, store.settings)} ${tr('time.perDay')}'),
+            value: '${money(asset.dailyCostAt(
+                  DateTime.now(),
+                  recovered:
+                      store.getAssetRecoveryIncomeAt(asset.id, DateTime.now()),
+                ), store.settings)} ${tr('time.perDay')}'),
         const SizedBox(height: 8),
         DetailCell(
             label: tr('detail.holdingTime'),
@@ -1280,16 +1272,25 @@ class DailyCostTrendChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nowDays = math.max(asset.serviceDays, 1);
+    final store = context.store;
+    final now = dateOnly(DateTime.now());
+    final nowDays = math.max(asset.serviceDaysAt(now), 1);
     final targetDays = asset.targetDays;
-    final endDays = math.max(nowDays, targetDays ?? nowDays);
+    final lifecycleEnded = asset.status != AssetStatus.serving &&
+        asset.serviceEndDateAt(now).isBefore(now);
+    final endDays =
+        lifecycleEnded ? nowDays : math.max(nowDays, targetDays ?? nowDays);
     final sampleCount = targetDays != null && targetDays > nowDays ? 34 : 24;
     final values = <double>[];
     int actualCount = 0;
     for (var i = 0; i < sampleCount; i++) {
       final ratio = sampleCount == 1 ? 1.0 : i / (sampleCount - 1);
       final day = math.max(1, (1 + (endDays - 1) * ratio).round());
-      values.add(asset.netCost / day);
+      final cursor = dateOnly(asset.purchaseDate).add(Duration(days: day - 1));
+      values.add(asset.dailyCostAt(
+        cursor,
+        recovered: store.getAssetRecoveryIncomeAt(asset.id, cursor),
+      ));
       if (day <= nowDays) actualCount = i + 1;
     }
     actualCount = actualCount.clamp(1, values.length).toInt();
