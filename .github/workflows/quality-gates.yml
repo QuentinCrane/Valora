@@ -1,0 +1,48 @@
+name: Quality Gates
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Format, test, analyze, and debug build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.8"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check Dart formatting
+        run: dart run tooling/format_check.dart
+
+      - name: Run unit and widget tests
+        run: flutter test --no-pub
+
+      - name: Run static analysis
+        run: flutter analyze --no-pub --fatal-warnings --no-fatal-infos
+
+      - name: Build debug APK
+        run: flutter build apk --debug --no-pub

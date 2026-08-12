@@ -1,0 +1,6 @@
+# Existing formatting debt tracked by B01; remove entries as dedicated blocks fix them.
+lib/src_parts/common_widgets.dart
+lib/src_parts/features_settings.dart
+lib/src_parts/features_wishes.dart
+lib/src_parts/l10n.dart
+lib/src_parts/models.dart
