@@ -145,6 +145,548 @@ class StorageLoadResult {
       lastValidatedPayload != null && lastValidatedPayload!.trim().isNotEmpty;
 }
 
+const int kCurrentStorageSchemaVersion = 1;
+const int kCurrentExportSchemaVersion = 3;
+const String kValoraAppVersion = '0.80.1+81';
+
+class PersistedDataException implements Exception {
+  final String code;
+  final String message;
+
+  const PersistedDataException(this.code, this.message);
+
+  @override
+  String toString() => '$code: $message';
+}
+
+Map<String, dynamic> migratePersistedMap(Map<String, dynamic> input) {
+  final data = _deepCopyPersistedMap(input);
+  final storageVersion = _readSchemaVersion(
+    data['storageSchemaVersion'],
+    fallback: 1,
+    field: 'storageSchemaVersion',
+  );
+  final legacyVersion = data['version'] == null
+      ? null
+      : _readSchemaVersion(
+          data['version'],
+          fallback: 1,
+          field: 'version',
+        );
+  final exportVersion = _readSchemaVersion(
+    data['exportSchemaVersion'] ?? legacyVersion,
+    fallback: 1,
+    field: 'exportSchemaVersion',
+  );
+
+  if (storageVersion > kCurrentStorageSchemaVersion ||
+      (legacyVersion ?? exportVersion) > kCurrentExportSchemaVersion ||
+      exportVersion > kCurrentExportSchemaVersion) {
+    throw const PersistedDataException(
+      'data_future_schema',
+      'Persisted data was written by a newer Valora schema',
+    );
+  }
+  if (storageVersion < 1 || exportVersion < 1) {
+    throw const PersistedDataException(
+      'data_invalid_schema',
+      'Persisted data schema versions must be positive integers',
+    );
+  }
+
+  _ensurePersistedCollections(data);
+  _ensurePersistedSettings(data);
+  _canonicalizePersistedDates(data);
+
+  data['storageSchemaVersion'] = kCurrentStorageSchemaVersion;
+  data['exportSchemaVersion'] = kCurrentExportSchemaVersion;
+  // Keep the old field as a compatibility alias for older importers.
+  data['version'] = kCurrentExportSchemaVersion;
+  data['appVersion'] = kValoraAppVersion;
+  data['generatedBy'] = data['generatedBy']?.toString() ?? 'valora-flutter';
+
+  _validatePersistedData(data);
+  return data;
+}
+
+int _readSchemaVersion(
+  Object? raw, {
+  required int fallback,
+  required String field,
+}) {
+  if (raw == null) return fallback;
+  final value = raw is num
+      ? (raw == raw.toInt() ? raw.toInt() : null)
+      : int.tryParse(raw.toString().trim());
+  if (value == null || value < 1) {
+    throw PersistedDataException(
+      'data_invalid_schema',
+      '$field must be a positive integer',
+    );
+  }
+  return value;
+}
+
+Map<String, dynamic> _deepCopyPersistedMap(Map<dynamic, dynamic> source) {
+  final result = <String, dynamic>{};
+  for (final entry in source.entries) {
+    if (entry.key is! String) {
+      throw const PersistedDataException(
+        'data_invalid_object',
+        'Persisted object keys must be strings',
+      );
+    }
+    result[entry.key as String] = _deepCopyPersistedValue(entry.value);
+  }
+  return result;
+}
+
+dynamic _deepCopyPersistedValue(dynamic value) {
+  if (value is Map) return _deepCopyPersistedMap(value);
+  if (value is List) {
+    return value.map(_deepCopyPersistedValue).toList();
+  }
+  return value;
+}
+
+void _ensurePersistedCollections(Map<String, dynamic> data) {
+  const collectionKeys = [
+    'categories',
+    'tags',
+    'assets',
+    'wishes',
+    'recoveryRecords',
+    'snapshots',
+  ];
+  for (final key in collectionKeys) {
+    final value = data[key];
+    if (value == null) {
+      data[key] = <dynamic>[];
+    } else if (value is! List) {
+      throw PersistedDataException(
+        'data_invalid_collection',
+        '$key must be an array',
+      );
+    }
+  }
+}
+
+void _ensurePersistedSettings(Map<String, dynamic> data) {
+  final settings = data['settings'];
+  if (settings == null) {
+    const settingKeys = [
+      'currencyUnit',
+      'currency',
+      'decimalPlaces',
+      'useThousandsSeparator',
+      'durationMode',
+      'theme',
+      'darkMode',
+      'language',
+      'includeRetiredInTotal',
+      'reminderEnabled',
+      'hapticsEnabled',
+      'nativeHapticsEnabled',
+      'compactSnackbars',
+      'defaultHomeViewMode',
+      'stickerEngineMode',
+      'glassEffectMode',
+      'liquidGlassSoftness',
+      'keepStickerCandidates',
+      'homeMetaFontScale',
+      'onboardingCompleted',
+      'cloudSync',
+    ];
+    data['settings'] = <String, dynamic>{
+      for (final key in settingKeys)
+        if (data.containsKey(key)) key: _deepCopyPersistedValue(data[key]),
+    };
+  } else if (settings is! Map) {
+    throw const PersistedDataException(
+      'data_invalid_settings',
+      'settings must be an object',
+    );
+  }
+}
+
+void _canonicalizePersistedDates(Map<String, dynamic> data) {
+  _normalizeRecordDates(data, 'categories', dateTimeFields: const [
+    'createdAt',
+    'updatedAt',
+  ]);
+  _normalizeRecordDates(data, 'tags', dateTimeFields: const [
+    'createdAt',
+    'updatedAt',
+  ]);
+  _normalizeRecordDates(
+    data,
+    'assets',
+    dateTimeFields: const ['createdAt', 'updatedAt'],
+    dateOnlyFields: const [
+      'purchaseDate',
+      'purchaseDateYmd',
+      'retiredAt',
+      'soldAt',
+      'targetDate',
+      'expiresAt',
+    ],
+  );
+  _normalizeRecordDates(
+    data,
+    'wishes',
+    dateTimeFields: const ['createdAt', 'updatedAt'],
+    dateOnlyFields: const ['convertedAt'],
+  );
+  _normalizeRecordDates(
+    data,
+    'recoveryRecords',
+    dateTimeFields: const ['createdAt', 'updatedAt'],
+    dateOnlyFields: const ['date'],
+  );
+  _normalizeSnapshotDates(data);
+
+  final settings = Map<String, dynamic>.from(data['settings'] as Map);
+  data['settings'] = settings;
+  final cloud = settings['cloudSync'];
+  if (cloud is Map) {
+    final cloudMap = Map<String, dynamic>.from(cloud);
+    _normalizeDateTimeField(cloudMap, 'lastUploadAt', 'cloudSync');
+    _normalizeDateTimeField(cloudMap, 'lastDownloadAt', 'cloudSync');
+    settings['cloudSync'] = cloudMap;
+  }
+}
+
+void _normalizeRecordDates(
+  Map<String, dynamic> data,
+  String collection, {
+  List<String> dateTimeFields = const [],
+  List<String> dateOnlyFields = const [],
+}) {
+  final records = data[collection] as List;
+  for (var index = 0; index < records.length; index++) {
+    final value = records[index];
+    if (value is! Map) {
+      throw PersistedDataException(
+        'data_invalid_record',
+        '$collection[$index] must be an object',
+      );
+    }
+    final record = Map<String, dynamic>.from(value);
+    for (final field in dateTimeFields) {
+      _normalizeDateTimeField(record, field, '$collection[$index]');
+    }
+    for (final field in dateOnlyFields) {
+      _normalizeDateOnlyField(record, field, '$collection[$index]');
+    }
+    final addons = record['addons'];
+    if (addons is List) {
+      for (var addonIndex = 0; addonIndex < addons.length; addonIndex++) {
+        final addon = addons[addonIndex];
+        if (addon is! Map) {
+          throw PersistedDataException(
+            'data_invalid_record',
+            '$collection[$index].addons[$addonIndex] must be an object',
+          );
+        }
+        final addonMap = Map<String, dynamic>.from(addon);
+        _normalizeDateOnlyField(addonMap, 'purchaseDate',
+            '$collection[$index].addons[$addonIndex]');
+        addons[addonIndex] = addonMap;
+      }
+    }
+    records[index] = record;
+  }
+}
+
+void _normalizeSnapshotDates(Map<String, dynamic> data) {
+  final records = data['snapshots'] as List;
+  for (var index = 0; index < records.length; index++) {
+    final value = records[index];
+    if (value is! Map) {
+      throw PersistedDataException(
+        'data_invalid_record',
+        'snapshots[$index] must be an object',
+      );
+    }
+    final record = Map<String, dynamic>.from(value);
+    final raw = record['createdAtIso'] ??
+        record['createdAt'] ??
+        record['createdAtEpochMillis'];
+    if (raw != null) {
+      final parsed = parseOptionalPersistedDateTime(raw);
+      if (parsed == null) {
+        throw PersistedDataException(
+          'data_invalid_timestamp',
+          'snapshots[$index].createdAt is invalid',
+        );
+      }
+      final canonical = dateTimeStorageText(parsed);
+      record['createdAt'] = canonical;
+      record['createdAtIso'] = canonical;
+    }
+    records[index] = record;
+  }
+}
+
+void _normalizeDateTimeField(
+    Map<String, dynamic> record, String field, String owner) {
+  if (!record.containsKey(field) || record[field] == null) return;
+  final parsed = parseOptionalPersistedDateTime(record[field]);
+  if (parsed == null) {
+    throw PersistedDataException(
+      'data_invalid_timestamp',
+      '$owner.$field is not a valid ISO-8601 timestamp',
+    );
+  }
+  record[field] = dateTimeStorageText(parsed);
+}
+
+void _normalizeDateOnlyField(
+    Map<String, dynamic> record, String field, String owner) {
+  if (!record.containsKey(field) || record[field] == null) return;
+  final parsed = parseOptionalPersistedDate(record[field]);
+  if (parsed == null) {
+    if (record[field].toString().trim().isEmpty) {
+      record[field] = null;
+      return;
+    }
+    throw PersistedDataException(
+      'data_invalid_date',
+      '$owner.$field is not a valid date-only value',
+    );
+  }
+  record[field] = dateStorageText(parsed);
+}
+
+void _validatePersistedData(Map<String, dynamic> data) {
+  final categories = _persistedRecords(data, 'categories');
+  final tags = _persistedRecords(data, 'tags');
+  final assets = _persistedRecords(data, 'assets');
+  final wishes = _persistedRecords(data, 'wishes');
+  final recoveryRecords = _persistedRecords(data, 'recoveryRecords');
+  final snapshots = _persistedRecords(data, 'snapshots');
+  final categoryIds = _validatePrimaryKeys(categories, 'categories');
+  final tagIds = _validatePrimaryKeys(tags, 'tags');
+  final assetIds = _validatePrimaryKeys(assets, 'assets');
+  _validatePrimaryKeys(wishes, 'wishes');
+  _validatePrimaryKeys(recoveryRecords, 'recoveryRecords');
+  _validatePrimaryKeys(snapshots, 'snapshots');
+
+  for (var index = 0; index < categories.length; index++) {
+    _validateDateFields(categories[index], 'categories[$index]',
+        dateTimeFields: const ['createdAt', 'updatedAt']);
+  }
+  for (var index = 0; index < tags.length; index++) {
+    _validateDateFields(tags[index], 'tags[$index]',
+        dateTimeFields: const ['createdAt', 'updatedAt']);
+  }
+  for (var index = 0; index < assets.length; index++) {
+    final asset = assets[index];
+    _validateEnum(asset, 'valueMode', AssetValueMode.values, 'assets[$index]');
+    _validateEnum(asset, 'status', AssetStatus.values, 'assets[$index]');
+    _validateEnum(asset, 'targetMode', TargetMode.values, 'assets[$index]');
+    _validateDateFields(
+      asset,
+      'assets[$index]',
+      dateTimeFields: const ['createdAt', 'updatedAt'],
+      dateOnlyFields: const [
+        'purchaseDate',
+        'purchaseDateYmd',
+        'retiredAt',
+        'soldAt',
+        'targetDate',
+        'expiresAt',
+      ],
+    );
+    _validateOptionalReference(
+        asset, 'categoryId', categoryIds, 'assets[$index]');
+    _validateReferences(asset, 'tagIds', tagIds, 'assets[$index]');
+    _validateAddons(asset, 'assets[$index]');
+  }
+  for (var index = 0; index < wishes.length; index++) {
+    final wish = wishes[index];
+    _validateDateFields(
+      wish,
+      'wishes[$index]',
+      dateTimeFields: const ['createdAt', 'updatedAt'],
+      dateOnlyFields: const ['convertedAt'],
+    );
+    _validateOptionalReference(
+        wish, 'categoryId', categoryIds, 'wishes[$index]');
+    _validateReferences(wish, 'tagIds', tagIds, 'wishes[$index]');
+    _validateOptionalReference(
+        wish, 'convertedAssetId', assetIds, 'wishes[$index]');
+    _validateAddons(wish, 'wishes[$index]');
+  }
+  for (var index = 0; index < recoveryRecords.length; index++) {
+    final record = recoveryRecords[index];
+    _validateDateFields(record, 'recoveryRecords[$index]',
+        dateTimeFields: const ['createdAt', 'updatedAt'],
+        dateOnlyFields: const ['date']);
+    _validateReferences(
+        record, 'assetIds', assetIds, 'recoveryRecords[$index]');
+  }
+  for (var index = 0; index < snapshots.length; index++) {
+    _validateDateFields(snapshots[index], 'snapshots[$index]',
+        dateTimeFields: const ['createdAt', 'createdAtIso']);
+    final payload = snapshots[index]['payload'];
+    if (payload != null && payload is! String) {
+      throw PersistedDataException(
+        'data_invalid_snapshot',
+        'snapshots[$index].payload must be a string',
+      );
+    }
+  }
+
+  final settings = Map<String, dynamic>.from(data['settings'] as Map);
+  _validateEnum(settings, 'durationMode', DurationMode.values, 'settings');
+  _validateEnum(settings, 'theme', ThemeSetting.values, 'settings');
+  _validateEnum(settings, 'language', AppLanguageSetting.values, 'settings');
+  _validateEnum(
+      settings, 'defaultHomeViewMode', HomeViewMode.values, 'settings');
+  _validateEnum(
+      settings, 'stickerEngineMode', StickerEngineMode.values, 'settings');
+  _validateEnum(
+      settings, 'glassEffectMode', GlassEffectMode.values, 'settings');
+  final cloud = settings['cloudSync'];
+  if (cloud != null) {
+    if (cloud is! Map) {
+      throw const PersistedDataException(
+        'data_invalid_settings',
+        'settings.cloudSync must be an object',
+      );
+    }
+    final cloudMap = Map<String, dynamic>.from(cloud);
+    _validateEnum(
+        cloudMap, 'provider', CloudSyncProvider.values, 'settings.cloudSync');
+    _validateDateFields(cloudMap, 'settings.cloudSync',
+        dateTimeFields: const ['lastUploadAt', 'lastDownloadAt']);
+  }
+}
+
+List<Map<String, dynamic>> _persistedRecords(
+    Map<String, dynamic> data, String collection) {
+  final records = data[collection];
+  if (records is! List) {
+    throw PersistedDataException(
+        'data_invalid_collection', '$collection must be an array');
+  }
+  return records.map((value) {
+    if (value is! Map) {
+      throw PersistedDataException(
+          'data_invalid_record', '$collection contains a non-object value');
+    }
+    return Map<String, dynamic>.from(value);
+  }).toList();
+}
+
+Set<String> _validatePrimaryKeys(
+    List<Map<String, dynamic>> records, String collection) {
+  final ids = <String>{};
+  for (var index = 0; index < records.length; index++) {
+    final id = records[index]['id'];
+    if (id is! String || id.trim().isEmpty) {
+      throw PersistedDataException(
+          'data_invalid_primary_key', '$collection[$index].id is required');
+    }
+    if (!ids.add(id)) {
+      throw PersistedDataException('data_duplicate_primary_key',
+          '$collection contains duplicate id $id');
+    }
+  }
+  return ids;
+}
+
+void _validateEnum<T extends Enum>(
+    Map<String, dynamic> record, String field, List<T> values, String owner) {
+  final raw = record[field];
+  if (raw == null) return;
+  final value = raw.toString();
+  if (!values.any((item) => item.name == value)) {
+    throw PersistedDataException(
+        'data_invalid_enum', '$owner.$field has unknown value $value');
+  }
+}
+
+void _validateOptionalReference(
+    Map<String, dynamic> record, String field, Set<String> ids, String owner) {
+  final raw = record[field];
+  if (raw == null) return;
+  if (raw is! String || raw.trim().isEmpty || !ids.contains(raw)) {
+    throw PersistedDataException(
+        'data_invalid_reference', '$owner.$field points to a missing record');
+  }
+}
+
+void _validateReferences(
+    Map<String, dynamic> record, String field, Set<String> ids, String owner) {
+  final raw = record[field];
+  if (raw == null) return;
+  if (raw is! List) {
+    throw PersistedDataException(
+        'data_invalid_reference', '$owner.$field must be an array');
+  }
+  for (final value in raw) {
+    if (value is! String || value.trim().isEmpty || !ids.contains(value)) {
+      throw PersistedDataException(
+          'data_invalid_reference', '$owner.$field points to a missing record');
+    }
+  }
+}
+
+void _validateAddons(Map<String, dynamic> record, String owner) {
+  final raw = record['addons'];
+  if (raw == null) return;
+  if (raw is! List) {
+    throw PersistedDataException(
+        'data_invalid_record', '$owner.addons must be an array');
+  }
+  final ids = <String>{};
+  for (var index = 0; index < raw.length; index++) {
+    final addon = raw[index];
+    if (addon is! Map) {
+      throw PersistedDataException(
+          'data_invalid_record', '$owner.addons[$index] must be an object');
+    }
+    final addonMap = Map<String, dynamic>.from(addon);
+    final id = addonMap['id'];
+    if (id is! String || id.trim().isEmpty || !ids.add(id)) {
+      throw PersistedDataException(
+          'data_invalid_primary_key', '$owner.addons[$index].id is invalid');
+    }
+    _validateDateFields(addonMap, '$owner.addons[$index]',
+        dateOnlyFields: const ['purchaseDate']);
+  }
+}
+
+void _validateDateFields(
+  Map<String, dynamic> record,
+  String owner, {
+  List<String> dateTimeFields = const [],
+  List<String> dateOnlyFields = const [],
+}) {
+  for (final field in dateTimeFields) {
+    final raw = record[field];
+    if (raw == null) continue;
+    if (raw is! String ||
+        !raw.endsWith('Z') ||
+        DateTime.tryParse(raw) == null) {
+      throw PersistedDataException(
+          'data_invalid_timestamp', '$owner.$field is not canonical ISO-8601');
+    }
+  }
+  for (final field in dateOnlyFields) {
+    final raw = record[field];
+    if (raw == null) continue;
+    if (raw is! String ||
+        !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(raw) ||
+        parseFlexibleDate(raw) == null) {
+      throw PersistedDataException(
+          'data_invalid_date', '$owner.$field is not a date-only value');
+    }
+  }
+}
+
 class LocalSqliteStorage {
   static const MethodChannel _channel = MethodChannel('valora/local_store');
   const LocalSqliteStorage();
@@ -560,6 +1102,15 @@ class AppStore extends ChangeNotifier {
           lastValidatedPayload: raw,
         );
       }
+    } on PersistedDataException catch (error) {
+      _storageLoadResult = StorageLoadResult.recoverableFailure(
+        errorCode: error.code,
+        errorMessage: error.message,
+        lastValidatedPayload: _lastValidatedSnapshot,
+      );
+      _invalidateAnalytics();
+      notifyListeners();
+      return _storageLoadResult;
     } catch (error) {
       _storageLoadResult = StorageLoadResult.recoverableFailure(
         errorCode: 'storage_payload_invalid',
@@ -583,24 +1134,25 @@ class AppStore extends ChangeNotifier {
   }
 
   void importMap(Map<String, dynamic> data) {
+    final normalized = migratePersistedMap(data);
     final nextSettings = AppSettings.fromMap(
-        Map<String, dynamic>.from(data['settings'] ?? data));
-    final nextCategories = ((data['categories'] as List?) ?? [])
+        Map<String, dynamic>.from(normalized['settings'] ?? normalized));
+    final nextCategories = ((normalized['categories'] as List?) ?? [])
         .map((e) => Category.fromMap(Map<String, dynamic>.from(e)))
         .toList();
-    final nextTags = ((data['tags'] as List?) ?? [])
+    final nextTags = ((normalized['tags'] as List?) ?? [])
         .map((e) => Tag.fromMap(Map<String, dynamic>.from(e)))
         .toList();
-    final nextAssets = ((data['assets'] as List?) ?? [])
+    final nextAssets = ((normalized['assets'] as List?) ?? [])
         .map((e) => Asset.fromMap(Map<String, dynamic>.from(e)))
         .toList();
-    final nextWishes = ((data['wishes'] as List?) ?? [])
+    final nextWishes = ((normalized['wishes'] as List?) ?? [])
         .map((e) => Wish.fromMap(Map<String, dynamic>.from(e)))
         .toList();
-    final nextRecoveryRecords = ((data['recoveryRecords'] as List?) ?? [])
+    final nextRecoveryRecords = ((normalized['recoveryRecords'] as List?) ?? [])
         .map((e) => ValueRecoveryRecord.fromMap(Map<String, dynamic>.from(e)))
         .toList();
-    final nextSnapshots = ((data['snapshots'] as List?) ?? [])
+    final nextSnapshots = ((normalized['snapshots'] as List?) ?? [])
         .map((e) => SnapshotRecord.fromMap(Map<String, dynamic>.from(e)))
         .toList();
     nextCategories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
@@ -630,8 +1182,11 @@ class AppStore extends ChangeNotifier {
   }
 
   Map<String, dynamic> exportMap({bool includeSnapshots = true}) => {
-        'version': 2,
-        'generatedBy': 'valora-flutter-migration',
+        'storageSchemaVersion': kCurrentStorageSchemaVersion,
+        'exportSchemaVersion': kCurrentExportSchemaVersion,
+        'appVersion': kValoraAppVersion,
+        'version': kCurrentExportSchemaVersion,
+        'generatedBy': 'valora-flutter',
         'settings': settings.toMap(),
         'categories': categories.map((e) => e.toMap()).toList(),
         'tags': tags.map((e) => e.toMap()).toList(),
@@ -1632,7 +2187,7 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> applyRecommendedCategorySystem() async {
-    final now = DateTime.now().toIso8601String();
+    final now = dateTimeStorageText(DateTime.now());
     final presets = <Map<String, String>>[
       {
         'id': 'cat_digital',

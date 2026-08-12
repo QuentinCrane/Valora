@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "settings": {
+    "currencyUnit": "¥",
+    "durationMode": "days",
+    "theme": "light",
+    "language": "system",
+    "defaultHomeViewMode": "grid",
+    "stickerEngineMode": "balanced",
+    "glassEffectMode": "liquid",
+    "cloudSync": {
+      "provider": "off"
+    }
+  },
+  "categories": [
+    {
+      "id": "cat_tech",
+      "name": "Tech",
+      "icon": "💻",
+      "color": "#60A5FA",
+      "sortOrder": 0,
+      "createdAt": "2026-08-01T08:00:00",
+      "updatedAt": "2026-08-01T08:00:00"
+    }
+  ],
+  "tags": [
+    {
+      "id": "tag_favorite",
+      "name": "Favorite",
+      "color": "#F59E0B",
+      "sortOrder": 0,
+      "createdAt": "2026-08-01T08:00:00",
+      "updatedAt": "2026-08-01T08:00:00"
+    }
+  ],
+  "assets": [
+    {
+      "id": "asset_morning",
+      "name": "Morning laptop",
+      "iconValue": "💻",
+      "valueMode": "priced",
+      "price": 1000,
+      "purchaseDate": "2026-08-01",
+      "categoryId": "cat_tech",
+      "tagIds": ["tag_favorite"],
+      "addons": [],
+      "note": "",
+      "status": "serving",
+      "includeInTotal": true,
+      "includeInDailyCost": true,
+      "targetMode": "none",
+      "createdAt": "2026-08-01T08:00:00",
+      "updatedAt": "2026-08-01T08:00:00"
+    },
+    {
+      "id": "asset_evening",
+      "name": "Evening monitor",
+      "iconValue": "🖥️",
+      "valueMode": "priced",
+      "price": 800,
+      "purchaseDate": "2026-08-01",
+      "categoryId": "cat_tech",
+      "tagIds": ["tag_favorite"],
+      "addons": [],
+      "note": "",
+      "status": "serving",
+      "includeInTotal": true,
+      "includeInDailyCost": true,
+      "targetMode": "none",
+      "createdAt": "2026-08-01T18:00:00",
+      "updatedAt": "2026-08-01T18:00:00"
+    }
+  ],
+  "wishes": [],
+  "recoveryRecords": [],
+  "snapshots": []
+}

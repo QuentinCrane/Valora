@@ -1777,7 +1777,7 @@ void showSmartCategoryCreateSheet(BuildContext context,
               onPressed: () async {
                 final label =
                     ctl.text.trim().isEmpty ? tl('新分类') : ctl.text.trim();
-                final now = DateTime.now().toIso8601String();
+                final now = dateTimeStorageText(DateTime.now());
                 final id = newId('cat');
                 await store.upsertCategory(Category(
                   id: id,
@@ -1876,7 +1876,7 @@ void showSmartTagCreateSheet(BuildContext context,
               onPressed: () async {
                 final label =
                     ctl.text.trim().isEmpty ? tl('新标签') : ctl.text.trim();
-                final now = DateTime.now().toIso8601String();
+                final now = dateTimeStorageText(DateTime.now());
                 final id = newId('tag');
                 await store.upsertTag(Tag(
                     id: id,
@@ -1938,7 +1938,7 @@ class _CategoryManagerState extends State<CategoryManager> {
 
   Future<void> addCategory() async {
     final store = context.store;
-    final now = DateTime.now().toIso8601String();
+    final now = dateTimeStorageText(DateTime.now());
     final label = name.text.trim().isEmpty ? tl('新分类') : name.text.trim();
     await store.upsertCategory(Category(
       id: newId('cat'),
@@ -2209,7 +2209,7 @@ class _TagManagerState extends State<TagManager> {
   Future<void> addTag() async {
     final store = context.store;
     final label = name.text.trim().isEmpty ? tl('新标签') : name.text.trim();
-    final now = DateTime.now().toIso8601String();
+    final now = dateTimeStorageText(DateTime.now());
     await store.upsertTag(Tag(
         id: newId('tag'),
         name: label,

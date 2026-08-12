@@ -900,8 +900,8 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
             name: name,
             color: '#7cc6f2',
             sortOrder: store.tags.length,
-            createdAt: now.toIso8601String(),
-            updatedAt: now.toIso8601String());
+            createdAt: dateTimeStorageText(now),
+            updatedAt: dateTimeStorageText(now));
         await store.upsertTag(tag);
         tagIds.add(tag.id);
       }

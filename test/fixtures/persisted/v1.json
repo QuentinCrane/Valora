@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "settings": {
+    "currencyUnit": "¥",
+    "durationMode": "days",
+    "theme": "light",
+    "language": "system",
+    "defaultHomeViewMode": "grid",
+    "stickerEngineMode": "balanced",
+    "glassEffectMode": "liquid",
+    "cloudSync": {
+      "provider": "off"
+    }
+  },
+  "categories": [],
+  "tags": [],
+  "assets": [],
+  "wishes": [],
+  "recoveryRecords": [],
+  "snapshots": []
+}

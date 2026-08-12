@@ -123,8 +123,8 @@ class ValueRecoveryRecord {
         'amount': amount,
         'date': dateStorageText(date),
         'note': note,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
+        'createdAt': dateTimeStorageText(createdAt),
+        'updatedAt': dateTimeStorageText(updatedAt),
       };
 
   factory ValueRecoveryRecord.fromMap(Map<String, dynamic> map) =>
@@ -141,9 +141,9 @@ class ValueRecoveryRecord {
                 parseOptionalPersistedDate(map['createdAt']) ?? DateTime.now()),
         note: map['note']?.toString() ?? '',
         createdAt:
-            parsePersistedDate(map['createdAt'], fallback: DateTime.now()),
+            parsePersistedDateTime(map['createdAt'], fallback: DateTime.now()),
         updatedAt:
-            parsePersistedDate(map['updatedAt'], fallback: DateTime.now()),
+            parsePersistedDateTime(map['updatedAt'], fallback: DateTime.now()),
       );
 }
 
@@ -174,7 +174,7 @@ class Category {
         color: color ?? this.color,
         sortOrder: sortOrder ?? this.sortOrder,
         createdAt: createdAt,
-        updatedAt: DateTime.now().toIso8601String(),
+        updatedAt: dateTimeStorageText(DateTime.now()),
       );
 
   Map<String, dynamic> toMap() => {
@@ -193,10 +193,8 @@ class Category {
         icon: map['icon']?.toString() ?? '📦',
         color: map['color']?.toString() ?? '#7cc6f2',
         sortOrder: asInt(map['sortOrder']),
-        createdAt:
-            map['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
-        updatedAt:
-            map['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
+        createdAt: persistedDateTimeTextOrNow(map['createdAt']),
+        updatedAt: persistedDateTimeTextOrNow(map['updatedAt']),
       );
 }
 
@@ -222,7 +220,7 @@ class Tag {
         color: color ?? this.color,
         sortOrder: sortOrder ?? this.sortOrder,
         createdAt: createdAt,
-        updatedAt: DateTime.now().toIso8601String(),
+        updatedAt: dateTimeStorageText(DateTime.now()),
       );
 
   Map<String, dynamic> toMap() => {
@@ -239,10 +237,8 @@ class Tag {
         name: map['name']?.toString() ?? tr('model.tag'),
         color: map['color']?.toString() ?? '#7cc6f2',
         sortOrder: asInt(map['sortOrder']),
-        createdAt:
-            map['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
-        updatedAt:
-            map['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
+        createdAt: persistedDateTimeTextOrNow(map['createdAt']),
+        updatedAt: persistedDateTimeTextOrNow(map['updatedAt']),
       );
 }
 
@@ -453,8 +449,8 @@ class Asset {
         'targetCustomDays': targetCustomDays,
         'expiresAt': expiresAt == null ? null : dateStorageText(expiresAt!),
         'remindBeforeDays': remindBeforeDays,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
+        'createdAt': dateTimeStorageText(createdAt),
+        'updatedAt': dateTimeStorageText(updatedAt),
       };
 
   factory Asset.fromMap(Map<String, dynamic> map) {
@@ -512,8 +508,10 @@ class Asset {
       remindBeforeDays: map['remindBeforeDays'] == null
           ? null
           : asInt(map['remindBeforeDays']),
-      createdAt: parsePersistedDate(map['createdAt'], fallback: DateTime.now()),
-      updatedAt: parsePersistedDate(map['updatedAt'], fallback: DateTime.now()),
+      createdAt:
+          parsePersistedDateTime(map['createdAt'], fallback: DateTime.now()),
+      updatedAt:
+          parsePersistedDateTime(map['updatedAt'], fallback: DateTime.now()),
     );
   }
 }
@@ -591,11 +589,12 @@ class Wish {
         'categoryId': categoryId,
         'tagIds': tagIds,
         'archived': archived,
-        'convertedAt': convertedAt?.toIso8601String(),
+        'convertedAt':
+            convertedAt == null ? null : dateStorageText(convertedAt!),
         'convertedAssetId': convertedAssetId,
         'addons': addons.map((e) => e.toMap()).toList(),
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
+        'createdAt': dateTimeStorageText(createdAt),
+        'updatedAt': dateTimeStorageText(updatedAt),
       };
 
   factory Wish.fromMap(Map<String, dynamic> map) => Wish(
@@ -615,9 +614,9 @@ class Wish {
             .map((e) => AddonItem.fromMap(Map<String, dynamic>.from(e)))
             .toList(),
         createdAt:
-            parsePersistedDate(map['createdAt'], fallback: DateTime.now()),
+            parsePersistedDateTime(map['createdAt'], fallback: DateTime.now()),
         updatedAt:
-            parsePersistedDate(map['updatedAt'], fallback: DateTime.now()),
+            parsePersistedDateTime(map['updatedAt'], fallback: DateTime.now()),
       );
 }
 
@@ -727,8 +726,11 @@ class CloudSyncSettings {
         'remotePath': remotePath,
         'autoUploadOnSave': autoUploadOnSave,
         'syncOnLaunch': syncOnLaunch,
-        'lastUploadAt': lastUploadAt?.toIso8601String(),
-        'lastDownloadAt': lastDownloadAt?.toIso8601String(),
+        'lastUploadAt':
+            lastUploadAt == null ? null : dateTimeStorageText(lastUploadAt!),
+        'lastDownloadAt': lastDownloadAt == null
+            ? null
+            : dateTimeStorageText(lastDownloadAt!),
       };
 
   factory CloudSyncSettings.fromMap(Map<String, dynamic>? map) {
@@ -748,8 +750,8 @@ class CloudSyncSettings {
           : 'zhipu/zhipu_backup.json',
       autoUploadOnSave: map['autoUploadOnSave'] == true,
       syncOnLaunch: map['syncOnLaunch'] == true,
-      lastUploadAt: parseOptionalPersistedDate(map['lastUploadAt']),
-      lastDownloadAt: parseOptionalPersistedDate(map['lastDownloadAt']),
+      lastUploadAt: parseOptionalPersistedDateTime(map['lastUploadAt']),
+      lastDownloadAt: parseOptionalPersistedDateTime(map['lastDownloadAt']),
     );
   }
 }
@@ -922,8 +924,8 @@ class SnapshotRecord {
         'id': id,
         'label': label,
         'payload': payload,
-        'createdAt': createdAt.toIso8601String(),
-        'createdAtIso': createdAt.toIso8601String(),
+        'createdAt': dateTimeStorageText(createdAt),
+        'createdAtIso': dateTimeStorageText(createdAt),
         'createdAtEpochMillis': createdAt.millisecondsSinceEpoch,
       };
 

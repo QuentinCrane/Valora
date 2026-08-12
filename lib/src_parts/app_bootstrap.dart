@@ -743,6 +743,10 @@ DateTime today() => DateTime.now();
 String dateText(DateTime value) =>
     '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 String dateStorageText(DateTime value) => dateText(dateOnly(value));
+String dateTimeStorageText(DateTime value) => value.toUtc().toIso8601String();
+
+String persistedDateTimeTextOrNow(dynamic raw) =>
+    dateTimeStorageText(parseOptionalPersistedDateTime(raw) ?? DateTime.now());
 
 const List<String> _englishMonthNames = [
   'January',
