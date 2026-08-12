@@ -31,6 +31,7 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
   late bool includeInDailyCost;
   final List<AddonItem> addons = [];
   bool _savePressed = false;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -838,118 +839,109 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
   }
 
   Future<void> saveAsset() async {
-    if (!(formKey.currentState?.validate() ?? false)) return;
-    final parsedPurchaseDate = parseUserDateOrNull(purchaseDate.text);
-    if (parsedPurchaseDate == null) {
-      showNativeSnack(
-          context,
-          valueMode == AssetValueMode.priceless
-              ? tr('editor.invalidRecordDate')
-              : tr('editor.invalidPurchaseDate'));
-      return;
-    }
-    final parsedRetiredAt = parseOptionalUserDate(retiredAt.text);
-    final parsedSoldAt = parseOptionalUserDate(soldAt.text);
-    final parsedTargetDate = parseOptionalUserDate(targetDate.text);
-    final parsedExpiresAt = parseOptionalUserDate(expiresAt.text);
-    final now = DateTime.now();
-    final store = context.store;
-    final savedStatus =
-        valueMode == AssetValueMode.priceless && status == AssetStatus.sold
-            ? AssetStatus.serving
-            : status;
-    final statusDate = savedStatus == AssetStatus.retired
-        ? (parsedRetiredAt ?? dateOnly(now))
-        : savedStatus == AssetStatus.sold
-            ? (parsedSoldAt ?? dateOnly(now))
-            : null;
-    if (statusDate != null && statusDate.isBefore(parsedPurchaseDate)) {
-      showNativeSnack(context, tr('editor.dateBeforePurchase'));
-      return;
-    }
-    if (valueMode != AssetValueMode.priceless &&
-        targetMode == TargetMode.daily &&
-        (targetDaily.text.trim().isEmpty || asDouble(targetDaily.text) <= 0)) {
-      showNativeSnack(context, tr('compose.targetDailyCostRequired'));
-      return;
-    }
-    if (targetMode == TargetMode.date && parsedTargetDate == null) {
-      showNativeSnack(context, tr('compose.targetDateRequired'));
-      return;
-    }
-    if (parsedTargetDate != null &&
-        parsedTargetDate.isBefore(parsedPurchaseDate)) {
-      showNativeSnack(context, tr('editor.dateBeforePurchase'));
-      return;
-    }
-    if (targetMode == TargetMode.custom &&
-        (targetDays.text.trim().isEmpty || asInt(targetDays.text) <= 0)) {
-      showNativeSnack(context, tr('compose.targetCustomDaysRequired'));
-      return;
-    }
-    final enteredTags = splitTags(tagsText.text);
-    final tagIds = <String>[];
-    for (final name in enteredTags) {
-      final existed =
-          store.tags.where((t) => t.name == name || t.id == name).firstOrNull;
-      if (existed != null) {
-        tagIds.add(existed.id);
-      } else {
-        final tag = Tag(
-            id: newId('tag'),
-            name: name,
-            color: '#7cc6f2',
-            sortOrder: store.tags.length,
-            createdAt: dateTimeStorageText(now),
-            updatedAt: dateTimeStorageText(now));
-        await store.upsertTag(tag);
-        tagIds.add(tag.id);
+    if (_saving) return;
+    _saving = true;
+    try {
+      if (!(formKey.currentState?.validate() ?? false)) return;
+      final parsedPurchaseDate = parseUserDateOrNull(purchaseDate.text);
+      if (parsedPurchaseDate == null) {
+        showNativeSnack(
+            context,
+            valueMode == AssetValueMode.priceless
+                ? tr('editor.invalidRecordDate')
+                : tr('editor.invalidPurchaseDate'));
+        return;
       }
+      final parsedRetiredAt = parseOptionalUserDate(retiredAt.text);
+      final parsedSoldAt = parseOptionalUserDate(soldAt.text);
+      final parsedTargetDate = parseOptionalUserDate(targetDate.text);
+      final parsedExpiresAt = parseOptionalUserDate(expiresAt.text);
+      final now = DateTime.now();
+      final store = context.store;
+      final savedStatus =
+          valueMode == AssetValueMode.priceless && status == AssetStatus.sold
+              ? AssetStatus.serving
+              : status;
+      final statusDate = savedStatus == AssetStatus.retired
+          ? (parsedRetiredAt ?? dateOnly(now))
+          : savedStatus == AssetStatus.sold
+              ? (parsedSoldAt ?? dateOnly(now))
+              : null;
+      if (statusDate != null && statusDate.isBefore(parsedPurchaseDate)) {
+        showNativeSnack(context, tr('editor.dateBeforePurchase'));
+        return;
+      }
+      if (valueMode != AssetValueMode.priceless &&
+          targetMode == TargetMode.daily &&
+          (targetDaily.text.trim().isEmpty ||
+              asDouble(targetDaily.text) <= 0)) {
+        showNativeSnack(context, tr('compose.targetDailyCostRequired'));
+        return;
+      }
+      if (targetMode == TargetMode.date && parsedTargetDate == null) {
+        showNativeSnack(context, tr('compose.targetDateRequired'));
+        return;
+      }
+      if (parsedTargetDate != null &&
+          parsedTargetDate.isBefore(parsedPurchaseDate)) {
+        showNativeSnack(context, tr('editor.dateBeforePurchase'));
+        return;
+      }
+      if (targetMode == TargetMode.custom &&
+          (targetDays.text.trim().isEmpty || asInt(targetDays.text) <= 0)) {
+        showNativeSnack(context, tr('compose.targetCustomDaysRequired'));
+        return;
+      }
+      final enteredTags = splitTags(tagsText.text);
+      final item = Asset(
+        id: widget.initial?.id ?? newId('asset'),
+        name: name.text.trim().isEmpty
+            ? tr('editor.unnamedAsset')
+            : name.text.trim(),
+        iconValue: icon.text.trim().isEmpty ? '📦' : icon.text.trim(),
+        valueMode: valueMode,
+        price: valueMode == AssetValueMode.priceless ? 0 : asDouble(price.text),
+        purchaseDate: parsedPurchaseDate,
+        categoryId: categoryId,
+        tagIds: const [],
+        addons: valueMode == AssetValueMode.priceless ? [] : List.of(addons),
+        note: note.text.trim(),
+        status: savedStatus,
+        includeInTotal:
+            valueMode == AssetValueMode.priceless ? false : includeInTotal,
+        includeInDailyCost:
+            valueMode == AssetValueMode.priceless ? false : includeInDailyCost,
+        retiredAt: savedStatus == AssetStatus.retired ? statusDate : null,
+        soldAt: savedStatus == AssetStatus.sold ? statusDate : null,
+        soldPrice:
+            savedStatus == AssetStatus.sold && soldPrice.text.trim().isNotEmpty
+                ? asDouble(soldPrice.text)
+                : null,
+        targetMode: valueMode == AssetValueMode.priceless &&
+                targetMode == TargetMode.daily
+            ? TargetMode.none
+            : targetMode,
+        targetDailyCost: valueMode == AssetValueMode.priceless ||
+                targetDaily.text.trim().isEmpty
+            ? null
+            : asDouble(targetDaily.text),
+        targetDate: targetDate.text.trim().isEmpty ? null : parsedTargetDate,
+        targetCustomDays:
+            targetDays.text.trim().isEmpty ? null : asInt(targetDays.text),
+        expiresAt: expiresAt.text.trim().isEmpty ? null : parsedExpiresAt,
+        remindBeforeDays:
+            remindDays.text.trim().isEmpty ? null : asInt(remindDays.text),
+        createdAt: widget.initial?.createdAt ?? now,
+        updatedAt: now,
+      );
+      await store.upsertAssetWithTagNames(item, enteredTags);
+      if (!mounted) return;
+      Navigator.pop(context);
+    } on DomainValidationException catch (error) {
+      if (mounted) showNativeSnack(context, tr(error.firstIssue.key));
+    } finally {
+      _saving = false;
     }
-    final item = Asset(
-      id: widget.initial?.id ?? newId('asset'),
-      name: name.text.trim().isEmpty
-          ? tr('editor.unnamedAsset')
-          : name.text.trim(),
-      iconValue: icon.text.trim().isEmpty ? '📦' : icon.text.trim(),
-      valueMode: valueMode,
-      price: valueMode == AssetValueMode.priceless ? 0 : asDouble(price.text),
-      purchaseDate: parsedPurchaseDate,
-      categoryId: categoryId,
-      tagIds: tagIds,
-      addons: valueMode == AssetValueMode.priceless ? [] : List.of(addons),
-      note: note.text.trim(),
-      status: savedStatus,
-      includeInTotal:
-          valueMode == AssetValueMode.priceless ? false : includeInTotal,
-      includeInDailyCost:
-          valueMode == AssetValueMode.priceless ? false : includeInDailyCost,
-      retiredAt: savedStatus == AssetStatus.retired ? statusDate : null,
-      soldAt: savedStatus == AssetStatus.sold ? statusDate : null,
-      soldPrice:
-          savedStatus == AssetStatus.sold && soldPrice.text.trim().isNotEmpty
-              ? asDouble(soldPrice.text)
-              : null,
-      targetMode: valueMode == AssetValueMode.priceless &&
-              targetMode == TargetMode.daily
-          ? TargetMode.none
-          : targetMode,
-      targetDailyCost: valueMode == AssetValueMode.priceless ||
-              targetDaily.text.trim().isEmpty
-          ? null
-          : asDouble(targetDaily.text),
-      targetDate: targetDate.text.trim().isEmpty ? null : parsedTargetDate,
-      targetCustomDays:
-          targetDays.text.trim().isEmpty ? null : asInt(targetDays.text),
-      expiresAt: expiresAt.text.trim().isEmpty ? null : parsedExpiresAt,
-      remindBeforeDays:
-          remindDays.text.trim().isEmpty ? null : asInt(remindDays.text),
-      createdAt: widget.initial?.createdAt ?? now,
-      updatedAt: now,
-    );
-    await store.upsertAsset(item);
-    if (!mounted) return;
-    Navigator.pop(context);
   }
 }
 

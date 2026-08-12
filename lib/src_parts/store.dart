@@ -2494,6 +2494,42 @@ class AppStore extends ChangeNotifier {
         ..sort((a, b) => b.date.compareTo(a.date));
 
   Future<void> addRecoveryRecord(ValueRecoveryRecord record) async {
+    final referenced = record.assetIds
+        .map((id) => assets.where((asset) => asset.id == id).firstOrNull)
+        .whereType<Asset>()
+        .toList();
+    if (referenced.length != record.assetIds.toSet().length) {
+      throw const DomainValidationException(<DomainIssue>[
+        DomainIssue('validation.recoveryAssetMissing', 'assetIds'),
+      ]);
+    }
+    if (referenced.isNotEmpty) {
+      final purchaseDate = referenced
+          .map((asset) => asset.purchaseDate)
+          .reduce((a, b) => a.isAfter(b) ? a : b);
+      final lifecycleEnd = referenced
+          .map((asset) => asset.serviceEndDate)
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+      _validateDomain(DomainValidators.recovery(
+        RecoveryValidationInput(
+          amount: record.amount,
+          date: record.date,
+          purchaseDate: purchaseDate,
+          lifecycleEnd: lifecycleEnd,
+          assetIds: record.assetIds,
+        ),
+      ));
+    } else {
+      _validateDomain(DomainValidators.recovery(
+        RecoveryValidationInput(
+          amount: record.amount,
+          date: record.date,
+          purchaseDate: record.date,
+          lifecycleEnd: record.date,
+          assetIds: record.assetIds,
+        ),
+      ));
+    }
     recoveryRecords.add(record);
     recoveryRecords.sort((a, b) => b.date.compareTo(a.date));
     await save();
@@ -2561,7 +2597,152 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _validateDomain(DomainValidationResult result) {
+    if (!result.isValid) {
+      throw DomainValidationException(result.issues);
+    }
+  }
+
+  AssetValidationInput _assetValidationInput(Asset asset) =>
+      AssetValidationInput(
+        name: asset.name,
+        priceless: asset.isPriceless,
+        price: asset.price,
+        purchaseDate: asset.purchaseDate,
+        isRetired: asset.status == AssetStatus.retired,
+        retiredAt: asset.retiredAt,
+        isSold: asset.status == AssetStatus.sold,
+        soldAt: asset.soldAt,
+        soldPrice: asset.soldPrice,
+        expiresAt: asset.expiresAt,
+        addons: asset.addons
+            .map((item) => AddonInput(
+                  name: item.name,
+                  price: item.price,
+                  purchaseDate: item.purchaseDate,
+                  followsParentPurchaseDate: item.followParentPurchaseDate,
+                ))
+            .toList(),
+      );
+
+  WishValidationInput _wishValidationInput(Wish wish) => WishValidationInput(
+        name: wish.name,
+        expectedPrice: wish.expectedPrice,
+        addons: wish.addons
+            .map((item) => AddonInput(
+                  name: item.name,
+                  price: item.price,
+                  purchaseDate: item.purchaseDate,
+                  followsParentPurchaseDate: item.followParentPurchaseDate,
+                ))
+            .toList(),
+      );
+
+  List<String> _resolveTagIds(
+      Iterable<String> names, DateTime now, List<Tag> newTags) {
+    final tagIds = <String>[];
+    final pending = <String, Tag>{};
+    for (final raw in names) {
+      final name = raw.trim();
+      if (name.isEmpty) continue;
+      final existed =
+          tags.where((tag) => tag.name == name || tag.id == name).firstOrNull;
+      if (existed != null) {
+        if (!tagIds.contains(existed.id)) tagIds.add(existed.id);
+        continue;
+      }
+      final pendingTag = pending[name];
+      if (pendingTag != null) {
+        if (!tagIds.contains(pendingTag.id)) tagIds.add(pendingTag.id);
+        continue;
+      }
+      final tag = Tag(
+        id: newId('tag'),
+        name: name,
+        color: '#7cc6f2',
+        sortOrder: tags.length + newTags.length,
+        createdAt: dateTimeStorageText(now),
+        updatedAt: dateTimeStorageText(now),
+      );
+      pending[name] = tag;
+      newTags.add(tag);
+      tagIds.add(tag.id);
+    }
+    return tagIds;
+  }
+
+  Future<void> _commitAssetWithTags(Asset asset, List<Tag> newTags) async {
+    final previousTags = List<Tag>.of(tags);
+    final previousAssets = List<Asset>.of(assets);
+    try {
+      tags.addAll(newTags);
+      tags.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      final index = assets.indexWhere((e) => e.id == asset.id);
+      if (index >= 0) {
+        assets[index] = asset;
+      } else {
+        assets.add(asset);
+      }
+      await save();
+    } catch (_) {
+      tags
+        ..clear()
+        ..addAll(previousTags);
+      assets
+        ..clear()
+        ..addAll(previousAssets);
+      rethrow;
+    }
+    _invalidateAnalytics();
+    notifyListeners();
+  }
+
+  Future<void> _commitWishWithTags(Wish wish, List<Tag> newTags) async {
+    final previousTags = List<Tag>.of(tags);
+    final previousWishes = List<Wish>.of(wishes);
+    try {
+      tags.addAll(newTags);
+      tags.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      final index = wishes.indexWhere((e) => e.id == wish.id);
+      if (index >= 0) {
+        wishes[index] = wish;
+      } else {
+        wishes.add(wish);
+      }
+      await save();
+    } catch (_) {
+      tags
+        ..clear()
+        ..addAll(previousTags);
+      wishes
+        ..clear()
+        ..addAll(previousWishes);
+      rethrow;
+    }
+    _invalidateAnalytics();
+    notifyListeners();
+  }
+
+  Future<void> upsertAssetWithTagNames(
+      Asset asset, Iterable<String> tagNames) async {
+    final nextTags = <Tag>[];
+    final tagIds = _resolveTagIds(tagNames, DateTime.now(), nextTags);
+    final nextAsset = asset.copyWith(tagIds: tagIds);
+    _validateDomain(DomainValidators.asset(_assetValidationInput(nextAsset)));
+    await _commitAssetWithTags(nextAsset, nextTags);
+  }
+
+  Future<void> upsertWishWithTagNames(
+      Wish wish, Iterable<String> tagNames) async {
+    final nextTags = <Tag>[];
+    final tagIds = _resolveTagIds(tagNames, DateTime.now(), nextTags);
+    final nextWish = wish.copyWith(tagIds: tagIds);
+    _validateDomain(DomainValidators.wish(_wishValidationInput(nextWish)));
+    await _commitWishWithTags(nextWish, nextTags);
+  }
+
   Future<void> upsertAsset(Asset asset) async {
+    _validateDomain(DomainValidators.asset(_assetValidationInput(asset)));
     final i = assets.indexWhere((e) => e.id == asset.id);
     if (i >= 0) {
       assets[i] = asset;
@@ -2600,6 +2781,7 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> upsertWish(Wish wish) async {
+    _validateDomain(DomainValidators.wish(_wishValidationInput(wish)));
     final i = wishes.indexWhere((e) => e.id == wish.id);
     if (i >= 0) {
       wishes[i] = wish;
@@ -2663,6 +2845,7 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> upsertCategory(Category item) async {
+    _validateDomain(DomainValidators.label(item.name));
     final i = categories.indexWhere((e) => e.id == item.id);
     if (i >= 0) {
       categories[i] = item;
@@ -2719,6 +2902,7 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> upsertTag(Tag item) async {
+    _validateDomain(DomainValidators.label(item.name));
     final i = tags.indexWhere((e) => e.id == item.id);
     if (i >= 0) {
       tags[i] = item;

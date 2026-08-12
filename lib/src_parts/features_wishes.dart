@@ -36,6 +36,7 @@ class _ComposePageState extends State<ComposePage> {
   bool reminder = false;
   bool _savePressed = false;
   bool _cancelPressed = false;
+  bool _saving = false;
   final List<AddonItem> addons = [];
 
   @override
@@ -984,103 +985,114 @@ class _ComposePageState extends State<ComposePage> {
   }
 
   Future<void> save() async {
-    if (!(formKey.currentState?.validate() ?? false)) return;
-    final pricelessAsset =
-        tab == ComposeTab.asset && valueMode == AssetValueMode.priceless;
-    final parsedPurchaseDate = parseUserDateOrNull(purchaseDate.text);
-    final parsedExpiresAt = parseOptionalUserDate(expiresAt.text);
-    final parsedTargetDate = parseOptionalUserDate(targetDate.text);
-    final parsedTargetCustomDays = targetCustomDays.text.trim().isEmpty
-        ? null
-        : asInt(targetCustomDays.text);
-    if (tab == ComposeTab.asset && parsedPurchaseDate == null) {
-      showNativeSnack(
-          context,
-          pricelessAsset
-              ? tr('compose.recordDateInvalid')
-              : tr('compose.purchaseDateInvalid'));
-      return;
+    if (_saving) return;
+    _saving = true;
+    try {
+      if (!(formKey.currentState?.validate() ?? false)) return;
+      final pricelessAsset =
+          tab == ComposeTab.asset && valueMode == AssetValueMode.priceless;
+      final parsedPurchaseDate = parseUserDateOrNull(purchaseDate.text);
+      final parsedExpiresAt = parseOptionalUserDate(expiresAt.text);
+      final parsedTargetDate = parseOptionalUserDate(targetDate.text);
+      final parsedTargetCustomDays = targetCustomDays.text.trim().isEmpty
+          ? null
+          : asInt(targetCustomDays.text);
+      if (tab == ComposeTab.asset && parsedPurchaseDate == null) {
+        showNativeSnack(
+            context,
+            pricelessAsset
+                ? tr('compose.recordDateInvalid')
+                : tr('compose.purchaseDateInvalid'));
+        return;
+      }
+      if (tab == ComposeTab.asset &&
+          !pricelessAsset &&
+          targetMode == TargetMode.daily &&
+          (targetDaily.text.trim().isEmpty ||
+              asDouble(targetDaily.text) <= 0)) {
+        showNativeSnack(context, tr('compose.targetDailyCostRequired'));
+        return;
+      }
+      if (tab == ComposeTab.asset &&
+          targetMode == TargetMode.date &&
+          (targetDate.text.trim().isEmpty || parsedTargetDate == null)) {
+        showNativeSnack(context, tr('compose.targetDateRequired'));
+        return;
+      }
+      if (tab == ComposeTab.asset &&
+          targetMode == TargetMode.custom &&
+          (parsedTargetCustomDays == null || parsedTargetCustomDays <= 0)) {
+        showNativeSnack(context, tr('compose.targetCustomDaysRequired'));
+        return;
+      }
+      final store = context.store;
+      final now = DateTime.now();
+      final enteredTags = splitTags(tagsText.text);
+      if (tab == ComposeTab.asset) {
+        final status = !pricelessAsset && sold
+            ? AssetStatus.sold
+            : retired
+                ? AssetStatus.retired
+                : AssetStatus.serving;
+        final item = Asset(
+          id: newId('asset'),
+          name: name.text.trim(),
+          iconValue: icon.text.trim().isEmpty ? '📦' : icon.text.trim(),
+          valueMode: valueMode,
+          price: pricelessAsset ? 0 : asDouble(price.text),
+          purchaseDate: parsedPurchaseDate ?? dateOnly(now),
+          categoryId: categoryId,
+          tagIds: const [],
+          addons: pricelessAsset ? [] : List.of(addons),
+          note: note.text.trim(),
+          status: status,
+          includeInTotal: pricelessAsset ? false : includeInTotal,
+          includeInDailyCost: pricelessAsset ? false : includeInDailyCost,
+          retiredAt: retired ? DateTime.now() : null,
+          soldAt: !pricelessAsset && sold ? DateTime.now() : null,
+          soldPrice: null,
+          targetMode: pricelessAsset && targetMode == TargetMode.daily
+              ? TargetMode.none
+              : targetMode,
+          targetDailyCost: !pricelessAsset &&
+                  targetMode == TargetMode.daily &&
+                  targetDaily.text.trim().isNotEmpty
+              ? asDouble(targetDaily.text)
+              : null,
+          targetDate: targetMode == TargetMode.date ? parsedTargetDate : null,
+          targetCustomDays:
+              targetMode == TargetMode.custom ? parsedTargetCustomDays : null,
+          expiresAt: expiresAt.text.trim().isEmpty ? null : parsedExpiresAt,
+          remindBeforeDays: reminder ? 7 : null,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await store.upsertAssetWithTagNames(item, enteredTags);
+      } else {
+        final item = Wish(
+          id: newId('wish'),
+          name: name.text.trim(),
+          iconValue: icon.text.trim().isEmpty ? '✨' : icon.text.trim(),
+          expectedPrice: asDouble(price.text),
+          note: note.text.trim(),
+          categoryId: categoryId,
+          tagIds: const [],
+          archived: false,
+          convertedAt: null,
+          convertedAssetId: null,
+          addons: List.of(addons),
+          createdAt: now,
+          updatedAt: now,
+        );
+        await store.upsertWishWithTagNames(item, enteredTags);
+      }
+      if (!mounted) return;
+      Navigator.pop(context);
+    } on DomainValidationException catch (error) {
+      if (mounted) showNativeSnack(context, tr(error.firstIssue.key));
+    } finally {
+      _saving = false;
     }
-    if (tab == ComposeTab.asset &&
-        !pricelessAsset &&
-        targetMode == TargetMode.daily &&
-        (targetDaily.text.trim().isEmpty || asDouble(targetDaily.text) <= 0)) {
-      showNativeSnack(context, tr('compose.targetDailyCostRequired'));
-      return;
-    }
-    if (tab == ComposeTab.asset &&
-        targetMode == TargetMode.date &&
-        (targetDate.text.trim().isEmpty || parsedTargetDate == null)) {
-      showNativeSnack(context, tr('compose.targetDateRequired'));
-      return;
-    }
-    if (tab == ComposeTab.asset &&
-        targetMode == TargetMode.custom &&
-        (parsedTargetCustomDays == null || parsedTargetCustomDays <= 0)) {
-      showNativeSnack(context, tr('compose.targetCustomDaysRequired'));
-      return;
-    }
-    final store = context.store;
-    final now = DateTime.now();
-    final tagIds = await ensureTags(store, splitTags(tagsText.text), now);
-    if (tab == ComposeTab.asset) {
-      final status = !pricelessAsset && sold
-          ? AssetStatus.sold
-          : retired
-              ? AssetStatus.retired
-              : AssetStatus.serving;
-      await store.upsertAsset(Asset(
-        id: newId('asset'),
-        name: name.text.trim(),
-        iconValue: icon.text.trim().isEmpty ? '📦' : icon.text.trim(),
-        valueMode: valueMode,
-        price: pricelessAsset ? 0 : asDouble(price.text),
-        purchaseDate: parsedPurchaseDate ?? dateOnly(now),
-        categoryId: categoryId,
-        tagIds: tagIds,
-        addons: pricelessAsset ? [] : List.of(addons),
-        note: note.text.trim(),
-        status: status,
-        includeInTotal: pricelessAsset ? false : includeInTotal,
-        includeInDailyCost: pricelessAsset ? false : includeInDailyCost,
-        retiredAt: retired ? DateTime.now() : null,
-        soldAt: !pricelessAsset && sold ? DateTime.now() : null,
-        soldPrice: null,
-        targetMode: pricelessAsset && targetMode == TargetMode.daily
-            ? TargetMode.none
-            : targetMode,
-        targetDailyCost: !pricelessAsset &&
-                targetMode == TargetMode.daily &&
-                targetDaily.text.trim().isNotEmpty
-            ? asDouble(targetDaily.text)
-            : null,
-        targetDate: targetMode == TargetMode.date ? parsedTargetDate : null,
-        targetCustomDays:
-            targetMode == TargetMode.custom ? parsedTargetCustomDays : null,
-        expiresAt: expiresAt.text.trim().isEmpty ? null : parsedExpiresAt,
-        remindBeforeDays: reminder ? 7 : null,
-        createdAt: now,
-        updatedAt: now,
-      ));
-    } else {
-      await store.upsertWish(Wish(
-        id: newId('wish'),
-        name: name.text.trim(),
-        iconValue: icon.text.trim().isEmpty ? '✨' : icon.text.trim(),
-        expectedPrice: asDouble(price.text),
-        note: note.text.trim(),
-        categoryId: categoryId,
-        tagIds: tagIds,
-        archived: false,
-        convertedAt: null,
-        convertedAssetId: null,
-        addons: List.of(addons),
-        createdAt: now,
-        updatedAt: now,
-      ));
-    }
-    if (!mounted) return;
-    Navigator.pop(context);
   }
 }
 
@@ -1161,29 +1173,6 @@ class _TargetModeSwitch extends StatelessWidget {
       }).toList()),
     );
   }
-}
-
-Future<List<String>> ensureTags(
-    AppStore store, List<String> names, DateTime now) async {
-  final tagIds = <String>[];
-  for (final name in names) {
-    final existed =
-        store.tags.where((t) => t.name == name || t.id == name).firstOrNull;
-    if (existed != null) {
-      tagIds.add(existed.id);
-    } else {
-      final tag = Tag(
-          id: newId('tag'),
-          name: name,
-          color: '#7cc6f2',
-          sortOrder: store.tags.length,
-          createdAt: dateTimeStorageText(now),
-          updatedAt: dateTimeStorageText(now));
-      await store.upsertTag(tag);
-      tagIds.add(tag.id);
-    }
-  }
-  return tagIds;
 }
 
 class _PlainRightText extends StatelessWidget {
@@ -1447,6 +1436,7 @@ class _WishEditorPageState extends State<WishEditorPage> {
   late String? categoryId;
   late bool archived;
   bool _wishSavePressed = false;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -1610,13 +1600,16 @@ class _WishEditorPageState extends State<WishEditorPage> {
                           maxLines: 5,
                           decoration: InputDecoration(
                               labelText: tr('wish.purchaseReason'))),
-                      SwitchListTile(
-                          value: archived,
-                          onChanged: (v) {
-                            tapHaptic();
-                            setState(() => archived = v);
-                          },
-                          title: Text(tr('wish.archive'))),
+                      Material(
+                        color: Colors.transparent,
+                        child: SwitchListTile(
+                            value: archived,
+                            onChanged: (v) {
+                              tapHaptic();
+                              setState(() => archived = v);
+                            },
+                            title: Text(tr('wish.archive'))),
+                      ),
                     ])),
                   ])),
           GlobalBackButton(onTap: () => Navigator.pop(context)),
@@ -1795,25 +1788,33 @@ class _WishEditorPageState extends State<WishEditorPage> {
   }
 
   Future<void> saveWish() async {
-    if (!(formKey.currentState?.validate() ?? false)) return;
-    final store = context.store;
-    final now = DateTime.now();
-    final tagIds = await ensureTags(store, splitTags(tagsText.text), now);
-    await store.upsertWish(Wish(
-        id: widget.initial?.id ?? newId('wish'),
-        name: name.text.trim(),
-        iconValue: icon.text.trim().isEmpty ? '✨' : icon.text.trim(),
-        expectedPrice: asDouble(price.text),
-        note: note.text.trim(),
-        categoryId: categoryId,
-        tagIds: tagIds,
-        archived: archived,
-        convertedAt: widget.initial?.convertedAt,
-        convertedAssetId: widget.initial?.convertedAssetId,
-        addons: widget.initial?.addons ?? [],
-        createdAt: widget.initial?.createdAt ?? now,
-        updatedAt: now));
-    if (!mounted) return;
-    Navigator.pop(context);
+    if (_saving) return;
+    _saving = true;
+    try {
+      if (!(formKey.currentState?.validate() ?? false)) return;
+      final store = context.store;
+      final now = DateTime.now();
+      final item = Wish(
+          id: widget.initial?.id ?? newId('wish'),
+          name: name.text.trim(),
+          iconValue: icon.text.trim().isEmpty ? '✨' : icon.text.trim(),
+          expectedPrice: asDouble(price.text),
+          note: note.text.trim(),
+          categoryId: categoryId,
+          tagIds: const [],
+          archived: archived,
+          convertedAt: widget.initial?.convertedAt,
+          convertedAssetId: widget.initial?.convertedAssetId,
+          addons: widget.initial?.addons ?? [],
+          createdAt: widget.initial?.createdAt ?? now,
+          updatedAt: now);
+      await store.upsertWishWithTagNames(item, splitTags(tagsText.text));
+      if (!mounted) return;
+      Navigator.pop(context);
+    } on DomainValidationException catch (error) {
+      if (mounted) showNativeSnack(context, tr(error.firstIssue.key));
+    } finally {
+      _saving = false;
+    }
   }
 }
