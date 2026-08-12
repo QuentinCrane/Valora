@@ -688,6 +688,8 @@ class CloudSyncSettings {
       provider != CloudSyncProvider.off &&
       provider != CloudSyncProvider.manualFile &&
       serverUrl.trim().isNotEmpty;
+  bool get hasCredentials =>
+      username.trim().isNotEmpty || password.trim().isNotEmpty;
   String get providerLabel => cloudSyncProviderLabel(provider);
 
   CloudSyncSettings copyWith({
@@ -700,14 +702,15 @@ class CloudSyncSettings {
     bool? syncOnLaunch,
     DateTime? lastUploadAt,
     DateTime? lastDownloadAt,
+    bool clearCredentials = false,
     bool clearLastUploadAt = false,
     bool clearLastDownloadAt = false,
   }) =>
       CloudSyncSettings(
         provider: provider ?? this.provider,
         serverUrl: serverUrl ?? this.serverUrl,
-        username: username ?? this.username,
-        password: password ?? this.password,
+        username: clearCredentials ? '' : (username ?? this.username),
+        password: clearCredentials ? '' : (password ?? this.password),
         remotePath: remotePath ?? this.remotePath,
         autoUploadOnSave: autoUploadOnSave ?? this.autoUploadOnSave,
         syncOnLaunch: syncOnLaunch ?? this.syncOnLaunch,
@@ -721,8 +724,7 @@ class CloudSyncSettings {
   Map<String, dynamic> toMap() => {
         'provider': provider.name,
         'serverUrl': serverUrl,
-        'username': username,
-        'password': password,
+        'credentialsStored': hasCredentials,
         'remotePath': remotePath,
         'autoUploadOnSave': autoUploadOnSave,
         'syncOnLaunch': syncOnLaunch,

@@ -145,6 +145,37 @@ class StorageLoadResult {
       lastValidatedPayload != null && lastValidatedPayload!.trim().isNotEmpty;
 }
 
+class StoredCloudCredentials {
+  final String username;
+  final String password;
+
+  const StoredCloudCredentials(
+      {required this.username, required this.password});
+
+  bool get hasValues =>
+      username.trim().isNotEmpty || password.trim().isNotEmpty;
+}
+
+class SecureCredentialLoadResult {
+  final bool ok;
+  final StoredCloudCredentials? credentials;
+  final String? errorCode;
+
+  const SecureCredentialLoadResult._({
+    required this.ok,
+    this.credentials,
+    this.errorCode,
+  });
+
+  const SecureCredentialLoadResult.empty() : this._(ok: true);
+
+  const SecureCredentialLoadResult.success(StoredCloudCredentials credentials)
+      : this._(ok: true, credentials: credentials);
+
+  const SecureCredentialLoadResult.failure(String errorCode)
+      : this._(ok: false, errorCode: errorCode);
+}
+
 const int kCurrentStorageSchemaVersion = 1;
 const int kCurrentExportSchemaVersion = 3;
 const String kValoraAppVersion = '0.80.1+81';
@@ -775,6 +806,66 @@ class LocalSqliteStorage {
       throw StateError(tr('store.localSnapshotFailed'));
     }
   }
+
+  Future<SecureCredentialLoadResult> loadCredentials() async {
+    try {
+      final response = await _channel.invokeMethod<Object?>('loadCredentials');
+      if (response is! Map) {
+        return const SecureCredentialLoadResult.failure(
+            'credentials_invalid_response');
+      }
+      final map = Map<Object?, Object?>.from(response);
+      switch (map['status']?.toString()) {
+        case 'empty':
+          return const SecureCredentialLoadResult.empty();
+        case 'success':
+          return SecureCredentialLoadResult.success(StoredCloudCredentials(
+            username: map['username']?.toString() ?? '',
+            password: map['password']?.toString() ?? '',
+          ));
+        default:
+          return const SecureCredentialLoadResult.failure(
+              'credentials_invalid_status');
+      }
+    } on PlatformException catch (error) {
+      return SecureCredentialLoadResult.failure(
+          error.code.isEmpty ? 'credentials_read_failed' : error.code);
+    } on MissingPluginException {
+      return const SecureCredentialLoadResult.failure(
+          'credentials_channel_unavailable');
+    } catch (_) {
+      return const SecureCredentialLoadResult.failure(
+          'credentials_read_failed');
+    }
+  }
+
+  Future<void> saveCredentials({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final ok = await _channel.invokeMethod<bool>('saveCredentials', {
+        'username': username,
+        'password': password,
+      });
+      if (ok != true) throw StateError(tr('store.credentialsSaveFailed'));
+    } on PlatformException catch (error) {
+      throw StateError('${tr('store.credentialsSaveFailed')} (${error.code})');
+    } on MissingPluginException {
+      throw StateError(tr('store.credentialsSaveFailed'));
+    }
+  }
+
+  Future<void> clearCredentials() async {
+    try {
+      final ok = await _channel.invokeMethod<bool>('clearCredentials');
+      if (ok != true) throw StateError(tr('store.credentialsClearFailed'));
+    } on PlatformException catch (error) {
+      throw StateError('${tr('store.credentialsClearFailed')} (${error.code})');
+    } on MissingPluginException {
+      throw StateError(tr('store.credentialsClearFailed'));
+    }
+  }
 }
 
 class CloudSyncResult {
@@ -971,6 +1062,33 @@ class AppStore extends ChangeNotifier {
   String? get lastValidatedSnapshot => _lastValidatedSnapshot;
   bool get isStorageReadOnly => _storageLoadResult.isFailure;
 
+  Future<bool> _hydrateCloudCredentials() async {
+    final localCloud = settings.cloudSync;
+    final result = await _storage.loadCredentials();
+    if (!result.ok) return false;
+    final stored = result.credentials;
+    if (stored != null && stored.hasValues) {
+      settings = settings.copyWith(
+        cloudSync: localCloud.copyWith(
+          username: stored.username,
+          password: stored.password,
+        ),
+      );
+      // A secure entry may already exist after an interrupted migration while
+      // the local JSON still contains the legacy plaintext fields.
+      return localCloud.hasCredentials;
+    }
+    if (!localCloud.hasCredentials) return false;
+
+    // v1/v2 payloads may still contain credentials. Move them once to the
+    // secure store, then let the caller rewrite the local JSON without them.
+    await _storage.saveCredentials(
+      username: localCloud.username,
+      password: localCloud.password,
+    );
+    return true;
+  }
+
   String _analyticsKey() {
     final buffer = StringBuffer()
       ..write('day:')
@@ -1093,7 +1211,10 @@ class AppStore extends ChangeNotifier {
         await save();
       } else {
         importMap(Map<String, dynamic>.from(jsonDecode(raw)));
-        if (result.lastValidatedPayload != raw) {
+        final migratedLegacyCredentials = await _hydrateCloudCredentials();
+        if (migratedLegacyCredentials) {
+          await save();
+        } else if (result.lastValidatedPayload != raw) {
           await _storage.markValidated(raw);
         }
         _lastValidatedSnapshot = raw;
@@ -1135,8 +1256,20 @@ class AppStore extends ChangeNotifier {
 
   void importMap(Map<String, dynamic> data) {
     final normalized = migratePersistedMap(data);
-    final nextSettings = AppSettings.fromMap(
+    final importedSettings = AppSettings.fromMap(
         Map<String, dynamic>.from(normalized['settings'] ?? normalized));
+    final importedCloud = importedSettings.cloudSync;
+    final localCloud = settings.cloudSync;
+    final nextSettings = importedSettings.copyWith(
+      cloudSync: importedCloud.copyWith(
+        username: importedCloud.username.trim().isNotEmpty
+            ? importedCloud.username
+            : localCloud.username,
+        password: importedCloud.password.isNotEmpty
+            ? importedCloud.password
+            : localCloud.password,
+      ),
+    );
     final nextCategories = ((normalized['categories'] as List?) ?? [])
         .map((e) => Category.fromMap(Map<String, dynamic>.from(e)))
         .toList();
@@ -1243,7 +1376,25 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> updateCloudSyncSettings(CloudSyncSettings value) async {
+    if (value.hasCredentials) {
+      await _storage.saveCredentials(
+        username: value.username,
+        password: value.password,
+      );
+    } else {
+      await _storage.clearCredentials();
+    }
     settings = settings.copyWith(cloudSync: value);
+    await save();
+    _invalidateAnalytics();
+    notifyListeners();
+  }
+
+  Future<void> clearCloudCredentials() async {
+    await _storage.clearCredentials();
+    settings = settings.copyWith(
+      cloudSync: settings.cloudSync.copyWith(clearCredentials: true),
+    );
     await save();
     _invalidateAnalytics();
     notifyListeners();

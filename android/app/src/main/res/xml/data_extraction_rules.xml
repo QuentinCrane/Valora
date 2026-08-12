@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Keystore keys are device-bound; the encrypted blob is intentionally excluded. -->
+        <exclude domain="sharedpref" path="valora_secure_credentials.xml" />
+        <exclude domain="sharedpref" path="valora_assets_store.xml" />
+        <exclude domain="database" path="valora_assets_local.db-wal" />
+        <exclude domain="database" path="valora_assets_local.db-shm" />
+    </cloud-backup>
+    <device-transfer>
+        <!-- A device transfer must require fresh credential entry on the new device. -->
+        <exclude domain="sharedpref" path="valora_secure_credentials.xml" />
+        <exclude domain="sharedpref" path="valora_assets_store.xml" />
+        <exclude domain="database" path="valora_assets_local.db-wal" />
+        <exclude domain="database" path="valora_assets_local.db-shm" />
+    </device-transfer>
+</data-extraction-rules>

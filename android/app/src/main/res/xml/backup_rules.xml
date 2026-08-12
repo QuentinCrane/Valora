@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Keystore keys are not transferable; never back up the encrypted credential blob. -->
+    <exclude domain="sharedpref" path="valora_secure_credentials.xml" />
+    <!-- The legacy JSON preference may contain plaintext credentials on pre-B04 installs. -->
+    <exclude domain="sharedpref" path="valora_assets_store.xml" />
+    <!-- WAL/SHM can retain old pages even after the main database is redacted. -->
+    <exclude domain="database" path="valora_assets_local.db-wal" />
+    <exclude domain="database" path="valora_assets_local.db-shm" />
+</full-backup-content>

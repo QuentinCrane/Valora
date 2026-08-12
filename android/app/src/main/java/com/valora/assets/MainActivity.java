@@ -70,12 +70,17 @@ import android.graphics.Paint;
 import android.graphics.Canvas;
 import android.graphics.BitmapFactory;
 import android.graphics.BlurMaskFilter;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.FloatBuffer;
+import java.security.KeyStore;
+import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -91,6 +96,16 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipInputStream;
 
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+
+import org.json.JSONObject;
+import org.json.JSONArray;
+
+import java.util.Iterator;
+
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.MethodChannel;
@@ -100,6 +115,10 @@ public class MainActivity extends FlutterActivity {
     private static final String NATIVE_CHANNEL = "valora/native";
     private static final String PREFS_NAME = "valora_assets_store";
     private static final String STICKER_PREFS_NAME = "valora_sticker_engine";
+    private static final String SECURE_PREFS_NAME = "valora_secure_credentials";
+    private static final String SECURE_KEY_ALIAS = "valora_cloud_credentials_v1";
+    private static final String SECURE_IV = "iv";
+    private static final String SECURE_CIPHERTEXT = "ciphertext";
     private static final String KEY_JSON = "payload_json";
 
     private static final int REQ_PICK_IMAGE = 4101;
@@ -173,6 +192,28 @@ public class MainActivity extends FlutterActivity {
                             result.success(storeDb.markValidated(json == null ? "" : json));
                         } catch (Exception e) {
                             result.error("storage_snapshot_failed", e.getMessage(), null);
+                        }
+                    } else if ("loadCredentials".equals(call.method)) {
+                        try {
+                            result.success(loadSecureCredentials());
+                        } catch (Exception e) {
+                            result.error("credentials_read_failed", e.getMessage(), null);
+                        }
+                    } else if ("saveCredentials".equals(call.method)) {
+                        try {
+                            String username = call.argument("username");
+                            String password = call.argument("password");
+                            result.success(saveSecureCredentials(
+                                    username == null ? "" : username,
+                                    password == null ? "" : password));
+                        } catch (Exception e) {
+                            result.error("credentials_write_failed", e.getMessage(), null);
+                        }
+                    } else if ("clearCredentials".equals(call.method)) {
+                        try {
+                            result.success(clearSecureCredentials());
+                        } catch (Exception e) {
+                            result.error("credentials_clear_failed", e.getMessage(), null);
                         }
                     } else if ("clearJson".equals(call.method)) {
                         try {
@@ -320,17 +361,104 @@ public class MainActivity extends FlutterActivity {
         storageMigrationErrorCode = null;
         storageMigrationErrorMessage = null;
         try {
-            if (storeDb == null || !storeDb.isEmpty()) return;
+            if (storeDb == null) return;
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            if (!storeDb.isEmpty()) {
+                if (prefs.contains(KEY_JSON) && !prefs.edit().remove(KEY_JSON).commit()) {
+                    throw new IllegalStateException("Legacy Valora data was not cleared");
+                }
+                return;
+            }
             String legacy = prefs.getString(KEY_JSON, "");
             if (legacy != null && legacy.trim().length() > 0) {
                 if (!storeDb.saveJson(legacy)) {
                     throw new IllegalStateException("Legacy Valora data was not saved");
                 }
             }
+            if (!prefs.edit().remove(KEY_JSON).commit()) {
+                throw new IllegalStateException("Legacy Valora data was not cleared");
+            }
         } catch (Exception e) {
             storageMigrationErrorCode = "storage_migration_failed";
             storageMigrationErrorMessage = e.getMessage();
+        }
+    }
+
+    private Map<String, Object> loadSecureCredentials() throws Exception {
+        SharedPreferences prefs = getSharedPreferences(SECURE_PREFS_NAME, Context.MODE_PRIVATE);
+        String ivText = prefs.getString(SECURE_IV, "");
+        String ciphertextText = prefs.getString(SECURE_CIPHERTEXT, "");
+        Map<String, Object> result = new HashMap<>();
+        if (ivText == null || ivText.trim().isEmpty()
+                || ciphertextText == null || ciphertextText.trim().isEmpty()) {
+            result.put("status", "empty");
+            return result;
+        }
+        String json = decryptSecurePayload(ivText, ciphertextText);
+        JSONObject object = new JSONObject(json);
+        result.put("status", "success");
+        result.put("username", object.optString("username", ""));
+        result.put("password", object.optString("password", ""));
+        return result;
+    }
+
+    private boolean saveSecureCredentials(String username, String password) throws Exception {
+        if (username == null) username = "";
+        if (password == null) password = "";
+        if (username.trim().isEmpty() && password.isEmpty()) {
+            return clearSecureCredentials();
+        }
+        JSONObject object = new JSONObject();
+        object.put("username", username.trim());
+        object.put("password", password);
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, getSecureCredentialsKey());
+        byte[] ciphertext = cipher.doFinal(object.toString().getBytes(StandardCharsets.UTF_8));
+        SharedPreferences prefs = getSharedPreferences(SECURE_PREFS_NAME, Context.MODE_PRIVATE);
+        boolean saved = prefs.edit()
+                .putString(SECURE_IV, Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP))
+                .putString(SECURE_CIPHERTEXT, Base64.encodeToString(ciphertext, Base64.NO_WRAP))
+                .commit();
+        if (!saved) throw new IllegalStateException("Secure credentials were not persisted");
+        return true;
+    }
+
+    private boolean clearSecureCredentials() {
+        return getSharedPreferences(SECURE_PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .commit();
+    }
+
+    private String decryptSecurePayload(String ivText, String ciphertextText) throws Exception {
+        byte[] iv = Base64.decode(ivText, Base64.DEFAULT);
+        byte[] ciphertext = Base64.decode(ciphertextText, Base64.DEFAULT);
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, getSecureCredentialsKey(), new GCMParameterSpec(128, iv));
+        return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
+    }
+
+    private SecretKey getSecureCredentialsKey() throws GeneralSecurityException {
+        try {
+            KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+            keyStore.load(null);
+            if (keyStore.containsAlias(SECURE_KEY_ALIAS)) {
+                KeyStore.Entry entry = keyStore.getEntry(SECURE_KEY_ALIAS, null);
+                if (entry instanceof KeyStore.SecretKeyEntry) {
+                    return ((KeyStore.SecretKeyEntry) entry).getSecretKey();
+                }
+            }
+            KeyGenerator generator = KeyGenerator.getInstance(
+                    KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+            generator.init(new KeyGenParameterSpec.Builder(
+                    SECURE_KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .build());
+            return generator.generateKey();
+        } catch (Exception e) {
+            throw new GeneralSecurityException("Android Keystore is unavailable", e);
         }
     }
 
@@ -1571,7 +1699,7 @@ public class MainActivity extends FlutterActivity {
     private void shareDataArchive(Object arguments) {
         Map<String, Object> args = arguments instanceof Map ? (Map<String, Object>) arguments : new HashMap<>();
         String title = arg(args.get("title"), getString(R.string.archive_share_title));
-        String json = arg(args.get("json"), "{}");
+        String rawJson = arg(args.get("json"), "{}");
         String csv = arg(args.get("csv"), "");
         String markdown = arg(args.get("markdown"), "");
         String fileName = sanitizeArchiveFileName(arg(args.get("fileName"), "zhipu_complete_backup.zip"));
@@ -1583,7 +1711,11 @@ public class MainActivity extends FlutterActivity {
             }
         }
         try {
-            if (storeDb != null && json.trim().length() > 0) storeDb.saveJson(json);
+            String json = redactCredentialFields(rawJson);
+            if (storeDb != null && json.trim().length() > 0) {
+                storeDb.saveJson(json);
+                storeDb.markValidated(json);
+            }
             File shareDir = new File(getCacheDir(), "share");
             if (!shareDir.exists()) shareDir.mkdirs();
             File zip = new File(shareDir, fileName.endsWith(".zip") ? fileName : fileName + ".zip");
@@ -1596,7 +1728,7 @@ public class MainActivity extends FlutterActivity {
             addTextEntry(zos, "backup/valora_report.md", markdown);
             addTextEntry(zos, "backup/zhipu_report.md", markdown);
             addTextEntry(zos, "README.txt", getString(R.string.archive_readme));
-            addSqliteFiles(zos);
+            addSqliteFiles(zos, json);
             String mediaManifest = addMediaFiles(zos, mediaPaths);
             addTextEntry(zos, "backup/media_manifest.tsv", mediaManifest);
             zos.close();
@@ -1609,6 +1741,60 @@ public class MainActivity extends FlutterActivity {
             startActivity(Intent.createChooser(send, title));
         } catch (Exception e) {
             shareText(title, getString(R.string.archive_share_failed, e.getMessage()) + "\n\n" + markdown);
+        }
+    }
+
+    private String redactCredentialFields(String json) {
+        try {
+            JSONObject root = new JSONObject(json == null || json.trim().isEmpty() ? "{}" : json);
+            redactCredentialObject(root);
+            return root.toString();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Backup JSON could not be sanitized", e);
+        }
+    }
+
+    private void redactCredentialObject(JSONObject object) throws Exception {
+        Iterator<String> keys = object.keys();
+        List<String> remove = new ArrayList<>();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            String lower = key == null ? "" : key.toLowerCase(java.util.Locale.US);
+            Object value = object.opt(key);
+            if ("username".equals(lower)
+                    || "password".equals(lower)
+                    || "authorization".equals(lower)) {
+                remove.add(key);
+                continue;
+            }
+            if (value instanceof JSONObject) {
+                redactCredentialObject((JSONObject) value);
+            } else if (value instanceof JSONArray) {
+                redactCredentialArray((JSONArray) value);
+            } else if (value instanceof String && "payload".equalsIgnoreCase(key)) {
+                String payload = value.toString().trim();
+                if (payload.startsWith("{")) {
+                    try {
+                        JSONObject nested = new JSONObject(payload);
+                        redactCredentialObject(nested);
+                        object.put(key, nested.toString());
+                    } catch (Exception ignored) {
+                        // Non-JSON user text is not a persisted credential object.
+                    }
+                }
+            }
+        }
+        for (String key : remove) object.remove(key);
+    }
+
+    private void redactCredentialArray(JSONArray array) throws Exception {
+        for (int i = 0; i < array.length(); i++) {
+            Object value = array.opt(i);
+            if (value instanceof JSONObject) {
+                redactCredentialObject((JSONObject) value);
+            } else if (value instanceof JSONArray) {
+                redactCredentialArray((JSONArray) value);
+            }
         }
     }
 
@@ -1637,11 +1823,25 @@ public class MainActivity extends FlutterActivity {
         zos.closeEntry();
     }
 
-    private void addSqliteFiles(ZipOutputStream zos) throws Exception {
-        String[] names = new String[]{"valora_assets_local.db", "valora_assets_local.db-wal", "valora_assets_local.db-shm"};
-        for (String name : names) {
-            File db = getDatabasePath(name);
-            if (db != null && db.exists()) addFileEntry(zos, db, "sqlite/" + name);
+    private void addSqliteFiles(ZipOutputStream zos, String redactedJson) throws Exception {
+        File sanitizedFile = File.createTempFile("valora_redacted_", ".db", getCacheDir());
+        SQLiteDatabase sanitizedDb = null;
+        try {
+            sanitizedDb = SQLiteDatabase.openOrCreateDatabase(sanitizedFile.getAbsolutePath(), null);
+            sanitizedDb.execSQL("CREATE TABLE IF NOT EXISTS kv_store (k TEXT PRIMARY KEY NOT NULL, v TEXT NOT NULL, updated_at INTEGER NOT NULL)");
+            ContentValues values = new ContentValues();
+            values.put("k", "app_payload_json");
+            values.put("v", redactedJson == null ? "" : redactedJson);
+            values.put("updated_at", System.currentTimeMillis());
+            sanitizedDb.insertWithOnConflict("kv_store", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+            values.put("k", "last_validated_payload_json");
+            sanitizedDb.insertWithOnConflict("kv_store", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+            sanitizedDb.close();
+            sanitizedDb = null;
+            addFileEntry(zos, sanitizedFile, "sqlite/valora_assets_local.db");
+        } finally {
+            if (sanitizedDb != null) sanitizedDb.close();
+            if (sanitizedFile.exists()) sanitizedFile.delete();
         }
     }
 

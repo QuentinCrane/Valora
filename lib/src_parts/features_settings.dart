@@ -701,8 +701,8 @@ void showCloudSyncEditor(BuildContext context) {
       text: current.serverUrl.isEmpty
           ? defaultCloudServerUrl(provider)
           : current.serverUrl);
-  final userCtl = TextEditingController(text: current.username);
-  final passCtl = TextEditingController(text: current.password);
+  final userCtl = TextEditingController();
+  final passCtl = TextEditingController();
   final pathCtl = TextEditingController(text: current.remotePath);
   appSheet(
     context,
@@ -738,19 +738,35 @@ void showCloudSyncEditor(BuildContext context) {
         const SizedBox(height: 10),
         TextField(
             controller: userCtl,
-            decoration: InputDecoration(labelText: tl('账号 / 用户名'))),
+            decoration: InputDecoration(
+                labelText: tl('账号 / 用户名'),
+                hintText: current.hasCredentials
+                    ? tl('留空以保留已保存凭据')
+                    : null)),
         const SizedBox(height: 10),
         TextField(
             controller: passCtl,
             obscureText: true,
-            decoration: InputDecoration(labelText: tl('密码 / 应用专用密码'))),
+            decoration: InputDecoration(
+                labelText: tl('密码 / 应用专用密码'),
+                hintText: current.hasCredentials
+                    ? tl('不会回显；重新输入以替换')
+                    : null)),
+        if (current.hasCredentials) ...[
+          const SizedBox(height: 8),
+          Text(
+            tl('凭据已安全保存，不会回显密码；两项留空即可保留'),
+            style: TextStyle(
+                fontSize: 12, height: 1.38, color: kMuted.withOpacity(.95)),
+          ),
+        ],
         const SizedBox(height: 10),
         TextField(
             controller: pathCtl,
             decoration: InputDecoration(
                 labelText: tl('云端文件路径'), hintText: 'zhipu/zhipu_backup.json')),
         const SizedBox(height: 10),
-        Text(tl('提示：坚果云通常要使用“应用密码”；Nextcloud 地址一般类似 /remote.php/dav/files/用户名/。当前版本会把配置保存在本机 JSON 中，正式发布前建议再接入 Android Keystore 加密。'),
+        Text(tl('提示：坚果云通常要使用“应用密码”；Nextcloud 地址一般类似 /remote.php/dav/files/用户名/。账号和密码使用 Android Keystore 保护，不会进入 JSON、剪贴板或云端备份。'),
             style: TextStyle(
                 fontSize: 12, height: 1.38, color: kMuted.withOpacity(.95))),
         const SizedBox(height: 14),
@@ -759,8 +775,12 @@ void showCloudSyncEditor(BuildContext context) {
             final next = current.copyWith(
               provider: provider,
               serverUrl: urlCtl.text.trim(),
-              username: userCtl.text.trim(),
-              password: passCtl.text,
+              username: userCtl.text.trim().isEmpty && passCtl.text.isEmpty
+                  ? current.username
+                  : userCtl.text.trim(),
+              password: userCtl.text.isEmpty && passCtl.text.isEmpty
+                  ? current.password
+                  : passCtl.text,
               remotePath: pathCtl.text.trim().isEmpty
                   ? 'zhipu/zhipu_backup.json'
                   : pathCtl.text.trim(),
@@ -774,6 +794,19 @@ void showCloudSyncEditor(BuildContext context) {
           icon: const Icon(Icons.check_rounded),
           label: Text(tl('保存云端设置')),
         ),
+        if (current.hasCredentials) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await store.clearCloudCredentials();
+              if (!context.mounted) return;
+              Navigator.pop(context);
+              showNativeSnack(context, tl('已清除安全凭据'));
+            },
+            icon: const Icon(Icons.lock_reset_rounded),
+            label: Text(tl('清除已保存凭据')),
+          ),
+        ],
       ]);
     }),
   );
