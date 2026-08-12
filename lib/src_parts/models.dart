@@ -671,6 +671,11 @@ class CloudSyncSettings {
   final bool syncOnLaunch;
   final DateTime? lastUploadAt;
   final DateTime? lastDownloadAt;
+  final String? remoteEtag;
+  final String? remoteContentHash;
+  final int? remoteAssetCount;
+  final int? remoteWishCount;
+  final DateTime? remoteLastModifiedAt;
 
   const CloudSyncSettings({
     this.provider = CloudSyncProvider.off,
@@ -682,6 +687,11 @@ class CloudSyncSettings {
     this.syncOnLaunch = false,
     this.lastUploadAt,
     this.lastDownloadAt,
+    this.remoteEtag,
+    this.remoteContentHash,
+    this.remoteAssetCount,
+    this.remoteWishCount,
+    this.remoteLastModifiedAt,
   });
 
   bool get enabled =>
@@ -702,9 +712,15 @@ class CloudSyncSettings {
     bool? syncOnLaunch,
     DateTime? lastUploadAt,
     DateTime? lastDownloadAt,
+    String? remoteEtag,
+    String? remoteContentHash,
+    int? remoteAssetCount,
+    int? remoteWishCount,
+    DateTime? remoteLastModifiedAt,
     bool clearCredentials = false,
     bool clearLastUploadAt = false,
     bool clearLastDownloadAt = false,
+    bool clearRemoteMetadata = false,
   }) =>
       CloudSyncSettings(
         provider: provider ?? this.provider,
@@ -719,6 +735,20 @@ class CloudSyncSettings {
         lastDownloadAt: clearLastDownloadAt
             ? null
             : (lastDownloadAt ?? this.lastDownloadAt),
+        remoteEtag:
+            clearRemoteMetadata ? null : (remoteEtag ?? this.remoteEtag),
+        remoteContentHash: clearRemoteMetadata
+            ? null
+            : (remoteContentHash ?? this.remoteContentHash),
+        remoteAssetCount: clearRemoteMetadata
+            ? null
+            : (remoteAssetCount ?? this.remoteAssetCount),
+        remoteWishCount: clearRemoteMetadata
+            ? null
+            : (remoteWishCount ?? this.remoteWishCount),
+        remoteLastModifiedAt: clearRemoteMetadata
+            ? null
+            : (remoteLastModifiedAt ?? this.remoteLastModifiedAt),
       );
 
   Map<String, dynamic> toMap() => {
@@ -733,6 +763,13 @@ class CloudSyncSettings {
         'lastDownloadAt': lastDownloadAt == null
             ? null
             : dateTimeStorageText(lastDownloadAt!),
+        'remoteEtag': remoteEtag,
+        'remoteContentHash': remoteContentHash,
+        'remoteAssetCount': remoteAssetCount,
+        'remoteWishCount': remoteWishCount,
+        'remoteLastModifiedAt': remoteLastModifiedAt == null
+            ? null
+            : dateTimeStorageText(remoteLastModifiedAt!),
       };
 
   factory CloudSyncSettings.fromMap(Map<String, dynamic>? map) {
@@ -754,6 +791,21 @@ class CloudSyncSettings {
       syncOnLaunch: map['syncOnLaunch'] == true,
       lastUploadAt: parseOptionalPersistedDateTime(map['lastUploadAt']),
       lastDownloadAt: parseOptionalPersistedDateTime(map['lastDownloadAt']),
+      remoteEtag: map['remoteEtag']?.toString().trim().isNotEmpty == true
+          ? map['remoteEtag'].toString()
+          : null,
+      remoteContentHash:
+          map['remoteContentHash']?.toString().trim().isNotEmpty == true
+              ? map['remoteContentHash'].toString()
+              : null,
+      remoteAssetCount: map['remoteAssetCount'] is num
+          ? (map['remoteAssetCount'] as num).toInt()
+          : int.tryParse(map['remoteAssetCount']?.toString() ?? ''),
+      remoteWishCount: map['remoteWishCount'] is num
+          ? (map['remoteWishCount'] as num).toInt()
+          : int.tryParse(map['remoteWishCount']?.toString() ?? ''),
+      remoteLastModifiedAt:
+          parseOptionalPersistedDateTime(map['remoteLastModifiedAt']),
     );
   }
 }
@@ -895,10 +947,9 @@ class AppSettings {
             StickerEngineModeX.fromValue(map['stickerEngineMode']?.toString()),
         glassEffectMode:
             GlassEffectModeX.fromValue(map['glassEffectMode']?.toString()),
-        liquidGlassSoftness:
-            asDouble(map['liquidGlassSoftness'], fallback: .5)
-                .clamp(0.0, 1.0)
-                .toDouble(),
+        liquidGlassSoftness: asDouble(map['liquidGlassSoftness'], fallback: .5)
+            .clamp(0.0, 1.0)
+            .toDouble(),
         keepStickerCandidates: map['keepStickerCandidates'] == true,
         homeMetaFontScale: (asDouble(map['homeMetaFontScale'], fallback: 1.0))
             .clamp(0.82, 1.12)

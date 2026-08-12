@@ -382,9 +382,10 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 label: tr('settings.glassSoftness'),
                 description: tr('settings.glassSoftness.desc'),
                 value: store.settings.liquidGlassSoftness,
-                valueLabel: glassSoftnessLabel(store.settings.liquidGlassSoftness),
-                onChanged: (value) => store.updateSettings(store.settings
-                    .copyWith(liquidGlassSoftness: value)),
+                valueLabel:
+                    glassSoftnessLabel(store.settings.liquidGlassSoftness),
+                onChanged: (value) => store.updateSettings(
+                    store.settings.copyWith(liquidGlassSoftness: value)),
               ),
             SettingRow(
                 icon: Icons.view_carousel_rounded,
@@ -577,6 +578,9 @@ class _CloudSyncPanelState extends State<CloudSyncPanel> {
     if (!mounted) return;
     setState(() => busy = false);
     showNativeSnack(context, result.message);
+    if (result.conflict && mounted) {
+      await showCloudConflictDialog(context);
+    }
   }
 
   @override
@@ -585,6 +589,19 @@ class _CloudSyncPanelState extends State<CloudSyncPanel> {
     final cloud = store.settings.cloudSync;
     final enabled = cloud.enabled;
     return Column(children: [
+      if (store.cloudConflict != null) ...[
+        SettingsSection(title: tl('云端冲突'), children: [
+          SettingRow(
+            icon: Icons.warning_amber_rounded,
+            iconBg: const Color(0xFFFFC6B8),
+            label: tl('云端版本冲突'),
+            description: tl('本机和云端都发生过变化，未自动覆盖任何一方'),
+            trailing: const ValuePill('409/412'),
+            onTap: () => showCloudConflictDialog(context),
+          ),
+        ]),
+        const SizedBox(height: 12),
+      ],
       SettingsSection(title: tl('同步方式'), children: [
         SettingRow(
           icon: Icons.cloud_sync_rounded,
@@ -674,6 +691,54 @@ class _CloudSyncPanelState extends State<CloudSyncPanel> {
   }
 }
 
+Future<void> showCloudConflictDialog(BuildContext context) async {
+  final store = context.store;
+  final conflict = store.cloudConflict;
+  if (conflict == null) return;
+  final local = conflict.localSummary;
+  final remote = conflict.remoteResult.remoteSummary;
+  final action = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(tl('云端版本冲突')),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(tl('为避免静默覆盖，上传已停止。请明确选择保留本机或从云端恢复。')),
+            const SizedBox(height: 14),
+            Text(
+                '${tl('本机摘要')}：${local.assets} ${tl('项资产')} · ${local.wishes} ${tl('个心愿')}'),
+            if (remote != null)
+              Text(
+                  '${tl('云端摘要')}：${remote.assets} ${tl('项资产')} · ${remote.wishes} ${tl('个心愿')}'),
+            if (conflict.remoteResult.etag != null)
+              Text('${tl('云端 ETag')}：${conflict.remoteResult.etag}'),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, 'keep'),
+          child: Text(tl('保留本机')),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, 'download'),
+          child: Text(tl('确认从云端恢复')),
+        ),
+      ],
+    ),
+  );
+  if (!context.mounted) return;
+  if (action == 'keep') {
+    store.clearCloudConflict();
+  } else if (action == 'download') {
+    final result = await store.downloadCloudBackup();
+    if (context.mounted) showNativeSnack(context, result.message);
+  }
+}
+
 Future<bool?> showConfirmDialog(BuildContext context,
     {required String title, required String message}) {
   return showDialog<bool>(
@@ -740,18 +805,14 @@ void showCloudSyncEditor(BuildContext context) {
             controller: userCtl,
             decoration: InputDecoration(
                 labelText: tl('账号 / 用户名'),
-                hintText: current.hasCredentials
-                    ? tl('留空以保留已保存凭据')
-                    : null)),
+                hintText: current.hasCredentials ? tl('留空以保留已保存凭据') : null)),
         const SizedBox(height: 10),
         TextField(
             controller: passCtl,
             obscureText: true,
             decoration: InputDecoration(
                 labelText: tl('密码 / 应用专用密码'),
-                hintText: current.hasCredentials
-                    ? tl('不会回显；重新输入以替换')
-                    : null)),
+                hintText: current.hasCredentials ? tl('不会回显；重新输入以替换') : null)),
         if (current.hasCredentials) ...[
           const SizedBox(height: 8),
           Text(
@@ -1193,28 +1254,26 @@ class SettingSliderRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon,
-                size: 18,
-                color: dark ? Colors.white.withOpacity(.86) : iconBg),
+                size: 18, color: dark ? Colors.white.withOpacity(.86) : iconBg),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: TextStyle(
-                          fontWeight: FontWeight.normal,
-                          fontSize: 15,
-                          letterSpacing: -.08,
-                          color: dark ? Colors.white.withOpacity(.92) : kText)),
-                  const SizedBox(height: 2),
-                  Text(description,
-                      style: const TextStyle(
-                          color: kMuted,
-                          fontSize: 12,
-                          height: 1.32,
-                          fontWeight: FontWeight.normal)),
-                ]),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label,
+                  style: TextStyle(
+                      fontWeight: FontWeight.normal,
+                      fontSize: 15,
+                      letterSpacing: -.08,
+                      color: dark ? Colors.white.withOpacity(.92) : kText)),
+              const SizedBox(height: 2),
+              Text(description,
+                  style: const TextStyle(
+                      color: kMuted,
+                      fontSize: 12,
+                      height: 1.32,
+                      fontWeight: FontWeight.normal)),
+            ]),
           ),
           ValuePill(valueLabel),
         ]),

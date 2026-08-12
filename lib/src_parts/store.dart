@@ -572,6 +572,7 @@ void _canonicalizePersistedDates(Map<String, dynamic> data) {
     final cloudMap = Map<String, dynamic>.from(cloud);
     _normalizeDateTimeField(cloudMap, 'lastUploadAt', 'cloudSync');
     _normalizeDateTimeField(cloudMap, 'lastDownloadAt', 'cloudSync');
+    _normalizeDateTimeField(cloudMap, 'remoteLastModifiedAt', 'cloudSync');
     settings['cloudSync'] = cloudMap;
   }
 }
@@ -779,8 +780,11 @@ void _validatePersistedData(Map<String, dynamic> data) {
     final cloudMap = Map<String, dynamic>.from(cloud);
     _validateEnum(
         cloudMap, 'provider', CloudSyncProvider.values, 'settings.cloudSync');
-    _validateDateFields(cloudMap, 'settings.cloudSync',
-        dateTimeFields: const ['lastUploadAt', 'lastDownloadAt']);
+    _validateDateFields(cloudMap, 'settings.cloudSync', dateTimeFields: const [
+      'lastUploadAt',
+      'lastDownloadAt',
+      'remoteLastModifiedAt'
+    ]);
   }
 }
 
@@ -1061,20 +1065,131 @@ class CloudSyncResult {
   final bool ok;
   final String message;
   final String? payload;
-  const CloudSyncResult(
-      {required this.ok, required this.message, this.payload});
+  final bool conflict;
+  final bool skipped;
+  final int? statusCode;
+  final String? etag;
+  final String? contentHash;
+  final DateTime? remoteLastModifiedAt;
+  final CloudRemoteSummary? remoteSummary;
+
+  const CloudSyncResult({
+    required this.ok,
+    required this.message,
+    this.payload,
+    this.conflict = false,
+    this.skipped = false,
+    this.statusCode,
+    this.etag,
+    this.contentHash,
+    this.remoteLastModifiedAt,
+    this.remoteSummary,
+  });
+}
+
+class CloudRemoteSummary {
+  final int categories;
+  final int tags;
+  final int assets;
+  final int wishes;
+  final int recoveryRecords;
+  final int bytes;
+  final String contentHash;
+
+  const CloudRemoteSummary({
+    required this.categories,
+    required this.tags,
+    required this.assets,
+    required this.wishes,
+    required this.recoveryRecords,
+    required this.bytes,
+    required this.contentHash,
+  });
+
+  factory CloudRemoteSummary.fromJson(
+      Map<String, dynamic> json, String contentHash, int bytes) {
+    int count(String key) => json[key] is List ? (json[key] as List).length : 0;
+    return CloudRemoteSummary(
+      categories: count('categories'),
+      tags: count('tags'),
+      assets: count('assets'),
+      wishes: count('wishes'),
+      recoveryRecords: count('recoveryRecords'),
+      bytes: bytes,
+      contentHash: contentHash,
+    );
+  }
+}
+
+class CloudSyncConflict {
+  final CloudSyncResult remoteResult;
+  final CloudRemoteSummary localSummary;
+  final DateTime detectedAt;
+
+  const CloudSyncConflict({
+    required this.remoteResult,
+    required this.localSummary,
+    required this.detectedAt,
+  });
+}
+
+class _CloudHttpResponse {
+  final int statusCode;
+  final List<int> body;
+  final String? etag;
+  final DateTime? lastModifiedAt;
+
+  const _CloudHttpResponse({
+    required this.statusCode,
+    required this.body,
+    this.etag,
+    this.lastModifiedAt,
+  });
+}
+
+class _CloudSyncException implements Exception {
+  final String message;
+  const _CloudSyncException(this.message);
+
+  @override
+  String toString() => message;
 }
 
 class CloudSyncService {
-  const CloudSyncService();
+  static const int maxPayloadBytes = 10 * 1024 * 1024;
+  final bool allowInsecureLoopback;
+
+  const CloudSyncService({this.allowInsecureLoopback = false});
+  const CloudSyncService.test() : allowInsecureLoopback = true;
 
   Uri _buildUri(CloudSyncSettings settings, [String? overridePath]) {
     final rawBase = settings.serverUrl.trim();
-    final base = rawBase.endsWith('/') ? rawBase : '$rawBase/';
+    final parsedBase = Uri.parse(rawBase.endsWith('/') ? rawBase : '$rawBase/');
+    _validateUri(parsedBase);
     final safePath = (overridePath ?? settings.remotePath)
         .trim()
         .replaceAll(RegExp(r'^/+'), '');
-    return Uri.parse(base).resolve(safePath);
+    if (safePath.isEmpty || safePath.contains('..')) {
+      throw const _CloudSyncException('Remote path is invalid');
+    }
+    final resolved = parsedBase.resolve(safePath);
+    _validateUri(resolved);
+    return resolved;
+  }
+
+  void _validateUri(Uri uri) {
+    final loopback =
+        uri.host == '127.0.0.1' || uri.host == 'localhost' || uri.host == '::1';
+    final allowedInsecure =
+        allowInsecureLoopback && uri.scheme == 'http' && loopback;
+    if ((uri.scheme != 'https' && !allowedInsecure) ||
+        uri.host.trim().isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      throw const _CloudSyncException(
+          'WebDAV requires an HTTPS server URL without embedded credentials');
+    }
   }
 
   String _basicAuth(CloudSyncSettings settings) {
@@ -1083,33 +1198,80 @@ class CloudSyncService {
     return 'Basic $token';
   }
 
-  Future<HttpClientResponse> _send(
+  Future<_CloudHttpResponse> _send(
       CloudSyncSettings settings, String method, Uri uri,
       {String? body,
-      String contentType = 'application/json; charset=utf-8'}) async {
+      String contentType = 'application/json; charset=utf-8',
+      Map<String, String> headers = const {}}) async {
+    final bytes = body == null ? const <int>[] : utf8.encode(body);
+    if (bytes.length > maxPayloadBytes) {
+      throw const _CloudSyncException('Cloud payload exceeds the 10 MB limit');
+    }
     final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 16);
+      ..connectionTimeout = const Duration(seconds: 16)
+      ..idleTimeout = const Duration(seconds: 28);
     try {
       final req = await client
           .openUrl(method, uri)
           .timeout(const Duration(seconds: 18));
-      req.followRedirects = true;
+      req.followRedirects = false;
       req.headers
           .set(HttpHeaders.userAgentHeader, 'Valora-Assets/1.0 Flutter WebDAV');
       if (settings.username.trim().isNotEmpty || settings.password.isNotEmpty) {
         req.headers.set(HttpHeaders.authorizationHeader, _basicAuth(settings));
       }
+      headers.forEach(req.headers.set);
       if (body != null) {
-        final bytes = utf8.encode(body);
         req.headers.set(HttpHeaders.contentTypeHeader, contentType);
-        req.headers
-            .set(HttpHeaders.contentLengthHeader, bytes.length.toString());
+        req.contentLength = bytes.length;
         req.add(bytes);
       }
-      return await req.close().timeout(const Duration(seconds: 28));
+      final resp = await req.close().timeout(const Duration(seconds: 28));
+      if (resp.contentLength > maxPayloadBytes) {
+        throw const _CloudSyncException(
+            'Cloud response exceeds the 10 MB limit');
+      }
+      final responseBytes = <int>[];
+      await for (final chunk in resp.timeout(const Duration(seconds: 28))) {
+        responseBytes.addAll(chunk);
+        if (responseBytes.length > maxPayloadBytes) {
+          throw const _CloudSyncException(
+              'Cloud response exceeds the 10 MB limit');
+        }
+      }
+      return _CloudHttpResponse(
+        statusCode: resp.statusCode,
+        body: responseBytes,
+        etag: resp.headers.value(HttpHeaders.etagHeader),
+        lastModifiedAt:
+            _parseHttpDate(resp.headers.value(HttpHeaders.lastModifiedHeader)),
+      );
     } finally {
-      client.close(force: false);
+      client.close(force: true);
     }
+  }
+
+  DateTime? _parseHttpDate(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    return DateTime.tryParse(value)?.toUtc();
+  }
+
+  String _responseText(_CloudHttpResponse response) =>
+      utf8.decode(response.body, allowMalformed: true).take(160);
+
+  String _hashBytes(List<int> bytes) => sha256.convert(bytes).toString();
+
+  String? _cleanEtag(String? value) {
+    final clean = value?.trim();
+    return clean == null || clean.isEmpty ? null : clean;
+  }
+
+  bool _sameEtag(String? left, String? right) =>
+      left != null && right != null && left.trim() == right.trim();
+
+  CloudRemoteSummary _summaryFromJson(
+      Map<String, dynamic> json, String contentHash, int bytes) {
+    return CloudRemoteSummary.fromJson(json, contentHash, bytes);
   }
 
   Future<void> _ensureWebDavFolders(CloudSyncSettings settings) async {
@@ -1123,8 +1285,7 @@ class CloudSyncService {
       folder = folder.isEmpty ? parts[i] : '$folder/${parts[i]}';
       final uri = _buildUri(settings, '$folder/');
       try {
-        final resp = await _send(settings, 'MKCOL', uri);
-        await resp.drain();
+        await _send(settings, 'MKCOL', uri);
       } catch (_) {
         // Many WebDAV servers return 405 if the collection already exists. Directory creation is best-effort.
       }
@@ -1138,11 +1299,11 @@ class CloudSyncService {
       final root = Uri.parse(settings.serverUrl.trim().endsWith('/')
           ? settings.serverUrl.trim()
           : '${settings.serverUrl.trim()}/');
+      _validateUri(root);
       final xml =
           '<?xml version="1.0" encoding="utf-8" ?><propfind xmlns="DAV:"><prop><displayname/></prop></propfind>';
       final resp = await _send(settings, 'PROPFIND', root,
           body: xml, contentType: 'application/xml; charset=utf-8');
-      final text = await utf8.decoder.bind(resp).join();
       final ok = resp.statusCode == 207 ||
           resp.statusCode == 200 ||
           resp.statusCode == 301 ||
@@ -1151,7 +1312,8 @@ class CloudSyncService {
           ok: ok,
           message: ok
               ? '${tr('store.cloudTestOk')}（HTTP ${resp.statusCode}）'
-              : '${tr('store.cloudTestFail')}：HTTP ${resp.statusCode} ${text.take(120)}');
+              : '${tr('store.cloudTestFail')}：HTTP ${resp.statusCode} ${_responseText(resp)}',
+          statusCode: resp.statusCode);
     } catch (e) {
       return CloudSyncResult(
           ok: false, message: '${tr('store.connectFailed')}：$e');
@@ -1163,16 +1325,92 @@ class CloudSyncService {
     if (!settings.enabled)
       return CloudSyncResult(ok: false, message: tr('store.cloudConfigFirst'));
     try {
+      final bytes = utf8.encode(json);
+      final contentHash = _hashBytes(bytes);
       await _ensureWebDavFolders(settings);
       final uri = _buildUri(settings);
-      final resp = await _send(settings, 'PUT', uri, body: json);
-      final text = await utf8.decoder.bind(resp).join();
+      _CloudHttpResponse? head;
+      try {
+        head = await _send(settings, 'HEAD', uri);
+      } on _CloudSyncException {
+        rethrow;
+      }
+      final headExists = head.statusCode >= 200 && head.statusCode < 400;
+      final knownEtag = _cleanEtag(settings.remoteEtag);
+      final headEtag = _cleanEtag(head.etag);
+      if (headExists &&
+          settings.remoteContentHash == contentHash &&
+          (knownEtag == null || _sameEtag(knownEtag, headEtag))) {
+        return CloudSyncResult(
+          ok: true,
+          skipped: true,
+          message: tr('store.cloudNoChanges'),
+          statusCode: head.statusCode,
+          etag: headEtag ?? knownEtag,
+          contentHash: contentHash,
+          remoteLastModifiedAt: head.lastModifiedAt,
+          remoteSummary: _summaryFromJson(
+              Map<String, dynamic>.from(jsonDecode(json)),
+              contentHash,
+              bytes.length),
+        );
+      }
+
+      final requestHeaders = <String, String>{};
+      if (headExists) {
+        if (knownEtag == null) {
+          return CloudSyncResult(
+            ok: false,
+            conflict: true,
+            message: tr('store.cloudConflict'),
+            statusCode: head.statusCode,
+            etag: headEtag,
+            contentHash: contentHash,
+            remoteLastModifiedAt: head.lastModifiedAt,
+          );
+        }
+        if (headEtag != null && !_sameEtag(knownEtag, headEtag)) {
+          return CloudSyncResult(
+            ok: false,
+            conflict: true,
+            message: tr('store.cloudConflict'),
+            statusCode: 412,
+            etag: headEtag,
+            contentHash: contentHash,
+            remoteLastModifiedAt: head.lastModifiedAt,
+          );
+        }
+        requestHeaders[HttpHeaders.ifMatchHeader] = knownEtag;
+      } else {
+        requestHeaders[HttpHeaders.ifNoneMatchHeader] = '*';
+      }
+      final resp = await _send(settings, 'PUT', uri,
+          body: json, headers: requestHeaders);
+      if (resp.statusCode == 409 || resp.statusCode == 412) {
+        return CloudSyncResult(
+          ok: false,
+          conflict: true,
+          message: tr('store.cloudConflict'),
+          statusCode: resp.statusCode,
+          etag: _cleanEtag(resp.etag) ?? headEtag,
+          contentHash: contentHash,
+          remoteLastModifiedAt: resp.lastModifiedAt ?? head.lastModifiedAt,
+        );
+      }
       final ok = resp.statusCode >= 200 && resp.statusCode < 300;
       return CloudSyncResult(
           ok: ok,
           message: ok
               ? '${tr('store.cloudUploaded')}：${settings.remotePath}'
-              : '${tr('store.uploadFailed')}：HTTP ${resp.statusCode} ${text.take(120)}');
+              : '${tr('store.uploadFailed')}：HTTP ${resp.statusCode} ${_responseText(resp)}',
+          statusCode: resp.statusCode,
+          etag: _cleanEtag(resp.etag) ?? headEtag ?? knownEtag,
+          contentHash: contentHash,
+          remoteLastModifiedAt: resp.lastModifiedAt ?? head.lastModifiedAt,
+          remoteSummary: ok
+              ? _summaryFromJson(Map<String, dynamic>.from(jsonDecode(json)),
+                  contentHash, bytes.length)
+              : null);
     } catch (e) {
       return CloudSyncResult(
           ok: false, message: '${tr('store.uploadFailed')}：$e');
@@ -1184,16 +1422,25 @@ class CloudSyncService {
       return CloudSyncResult(ok: false, message: tr('store.cloudConfigFirst'));
     try {
       final resp = await _send(settings, 'GET', _buildUri(settings));
-      final text = await utf8.decoder.bind(resp).join();
-      final ok = resp.statusCode >= 200 &&
-          resp.statusCode < 300 &&
-          text.trim().startsWith('{');
+      final text = utf8.decode(resp.body, allowMalformed: true);
+      final decoded = jsonDecode(text);
+      final ok =
+          resp.statusCode >= 200 && resp.statusCode < 300 && decoded is Map;
+      final contentHash = _hashBytes(resp.body);
       return CloudSyncResult(
           ok: ok,
           message: ok
               ? tr('store.cloudDownloaded')
-              : '${tr('store.downloadFailed')}：HTTP ${resp.statusCode} ${text.take(120)}',
-          payload: ok ? text : null);
+              : '${tr('store.downloadFailed')}：HTTP ${resp.statusCode} ${_responseText(resp)}',
+          payload: ok ? text : null,
+          statusCode: resp.statusCode,
+          etag: _cleanEtag(resp.etag),
+          contentHash: ok ? contentHash : null,
+          remoteLastModifiedAt: resp.lastModifiedAt,
+          remoteSummary: ok
+              ? _summaryFromJson(Map<String, dynamic>.from(decoded),
+                  contentHash, resp.body.length)
+              : null);
     } catch (e) {
       return CloudSyncResult(
           ok: false, message: '${tr('store.downloadFailed')}：$e');
@@ -1228,6 +1475,7 @@ class AppStore extends ChangeNotifier {
   StorageLoadResult _storageLoadResult = const StorageLoadResult.empty();
   String? _lastValidatedSnapshot;
   PersistenceSaveState _persistenceState = const PersistenceSaveState.idle();
+  CloudSyncConflict? _cloudConflict;
 
   AppStore() {
     _saveCoordinator = SaveCoordinator(
@@ -1265,6 +1513,7 @@ class AppStore extends ChangeNotifier {
   PersistenceSaveState get persistenceState => _persistenceState;
   int get persistenceRevision => _saveCoordinator.revision;
   int get persistedRevision => _saveCoordinator.persistedRevision;
+  CloudSyncConflict? get cloudConflict => _cloudConflict;
 
   Future<bool> _hydrateCloudCredentials() async {
     final localCloud = settings.cloudSync;
@@ -1291,6 +1540,33 @@ class AppStore extends ChangeNotifier {
       password: localCloud.password,
     );
     return true;
+  }
+
+  CloudRemoteSummary _summaryForJson(String raw) {
+    final bytes = utf8.encode(raw);
+    return CloudRemoteSummary.fromJson(
+      Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      sha256.convert(bytes).toString(),
+      bytes.length,
+    );
+  }
+
+  CloudSyncSettings _settingsWithRemoteResult(
+      CloudSyncSettings base, CloudSyncResult result) {
+    final cleared = base.copyWith(clearRemoteMetadata: true);
+    return cleared.copyWith(
+      remoteEtag: result.etag,
+      remoteContentHash: result.contentHash,
+      remoteAssetCount: result.remoteSummary?.assets,
+      remoteWishCount: result.remoteSummary?.wishes,
+      remoteLastModifiedAt: result.remoteLastModifiedAt,
+    );
+  }
+
+  void clearCloudConflict() {
+    if (_cloudConflict == null) return;
+    _cloudConflict = null;
+    notifyListeners();
   }
 
   String _analyticsKey() {
@@ -1592,7 +1868,7 @@ class AppStore extends ChangeNotifier {
     if (isLatestPersisted &&
         settings.cloudSync.autoUploadOnSave &&
         settings.cloudSync.enabled) {
-      unawaited(uploadCloudBackup(silent: true));
+      await NativeBridge.enqueueCloudBackup();
     }
   }
 
@@ -1602,15 +1878,21 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> updateCloudSyncSettings(CloudSyncSettings value) async {
-    if (value.hasCredentials) {
+    final endpointChanged =
+        value.serverUrl.trim() != settings.cloudSync.serverUrl.trim() ||
+            value.remotePath.trim() != settings.cloudSync.remotePath.trim() ||
+            value.provider != settings.cloudSync.provider;
+    final nextValue =
+        endpointChanged ? value.copyWith(clearRemoteMetadata: true) : value;
+    if (nextValue.hasCredentials) {
       await _storage.saveCredentials(
-        username: value.username,
-        password: value.password,
+        username: nextValue.username,
+        password: nextValue.password,
       );
     } else {
       await _storage.clearCredentials();
     }
-    settings = settings.copyWith(cloudSync: value);
+    settings = settings.copyWith(cloudSync: nextValue);
     await save(kind: PersistenceSaveKind.settings);
     _invalidateAnalytics();
     notifyListeners();
@@ -1630,12 +1912,27 @@ class AppStore extends ChangeNotifier {
       _cloud.test(settings.cloudSync);
 
   Future<CloudSyncResult> uploadCloudBackup({bool silent = false}) async {
-    final result = await _cloud.upload(settings.cloudSync, exportJson());
+    final json = exportJson();
+    final result = await _cloud.upload(settings.cloudSync, json);
+    if (result.conflict) {
+      _cloudConflict = CloudSyncConflict(
+        remoteResult: result,
+        localSummary: _summaryForJson(json),
+        detectedAt: DateTime.now(),
+      );
+      if (!silent) notifyListeners();
+      return result;
+    }
     if (result.ok) {
       settings = settings.copyWith(
-          cloudSync: settings.cloudSync.copyWith(lastUploadAt: DateTime.now()));
+        cloudSync: _settingsWithRemoteResult(
+          settings.cloudSync,
+          result,
+        ).copyWith(lastUploadAt: DateTime.now()),
+      );
       final snapshot = jsonEncode(exportMap());
       await _enqueueSnapshot(snapshot, kind: PersistenceSaveKind.settings);
+      _cloudConflict = null;
       _invalidateAnalytics();
       if (!silent) notifyListeners();
     }
@@ -1644,13 +1941,61 @@ class AppStore extends ChangeNotifier {
 
   Future<CloudSyncResult> downloadCloudBackup({bool silent = false}) async {
     final result = await _cloud.download(settings.cloudSync);
-    if (result.ok && result.payload != null) {
-      final localCloud = settings.cloudSync;
-      importMap(Map<String, dynamic>.from(jsonDecode(result.payload!)));
+    if (!result.ok || result.payload == null) return result;
+
+    final localJson = exportJson();
+    final localCloud = settings.cloudSync;
+    final localHash = sha256.convert(utf8.encode(localJson)).toString();
+    if (silent && localHash != result.contentHash) {
+      final conflictResult = CloudSyncResult(
+        ok: false,
+        conflict: true,
+        message: tr('store.cloudConflict'),
+        statusCode: result.statusCode,
+        etag: result.etag,
+        contentHash: result.contentHash,
+        remoteLastModifiedAt: result.remoteLastModifiedAt,
+        remoteSummary: result.remoteSummary,
+      );
+      _cloudConflict = CloudSyncConflict(
+        remoteResult: conflictResult,
+        localSummary: _summaryForJson(localJson),
+        detectedAt: DateTime.now(),
+      );
+      notifyListeners();
+      return conflictResult;
+    }
+
+    try {
+      final prepared = prepareRestoreJson(result.payload!);
+      importMap(prepared);
       settings = settings.copyWith(
-          cloudSync: localCloud.copyWith(lastDownloadAt: DateTime.now()));
-      await save();
+        cloudSync: _settingsWithRemoteResult(
+          localCloud,
+          result,
+        ).copyWith(lastDownloadAt: DateTime.now()),
+      );
+      await _enqueueSnapshot(jsonEncode(exportMap()));
+      _cloudConflict = null;
+      _invalidateAnalytics();
       if (!silent) notifyListeners();
+    } catch (error) {
+      try {
+        importMap(Map<String, dynamic>.from(jsonDecode(localJson) as Map));
+        await _enqueueSnapshot(jsonEncode(exportMap()));
+      } catch (_) {
+        // Keep the in-memory rollback best effort; the prior validated local
+        // snapshot remains the durable recovery point.
+      }
+      return CloudSyncResult(
+        ok: false,
+        message: '${tr('store.downloadFailed')}：$error',
+        statusCode: result.statusCode,
+        etag: result.etag,
+        contentHash: result.contentHash,
+        remoteLastModifiedAt: result.remoteLastModifiedAt,
+        remoteSummary: result.remoteSummary,
+      );
     }
     return result;
   }

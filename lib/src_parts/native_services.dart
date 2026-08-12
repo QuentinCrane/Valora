@@ -164,6 +164,9 @@ class NativeBridge {
     });
   }
 
+  static Future<bool> enqueueCloudBackup() async =>
+      await _call<bool>('enqueueCloudBackup') ?? false;
+
   static Future<String?> getInitialIntentInfo() =>
       _call<String>('getInitialIntentInfo');
 

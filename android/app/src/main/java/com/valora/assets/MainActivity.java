@@ -120,10 +120,10 @@ public class MainActivity extends FlutterActivity {
     private static final String NATIVE_CHANNEL = "valora/native";
     private static final String PREFS_NAME = "valora_assets_store";
     private static final String STICKER_PREFS_NAME = "valora_sticker_engine";
-    private static final String SECURE_PREFS_NAME = "valora_secure_credentials";
-    private static final String SECURE_KEY_ALIAS = "valora_cloud_credentials_v1";
-    private static final String SECURE_IV = "iv";
-    private static final String SECURE_CIPHERTEXT = "ciphertext";
+    static final String SECURE_PREFS_NAME = "valora_secure_credentials";
+    static final String SECURE_KEY_ALIAS = "valora_cloud_credentials_v1";
+    static final String SECURE_IV = "iv";
+    static final String SECURE_CIPHERTEXT = "ciphertext";
     private static final String KEY_JSON = "payload_json";
     private static final String ARCHIVE_STAGE_ROOT = "valora_archive_staging";
     private static final long ARCHIVE_MAX_COMPRESSED_BYTES = 50L * 1024L * 1024L;
@@ -358,6 +358,10 @@ public class MainActivity extends FlutterActivity {
                     updateHomeWidget(call.arguments);
                     result.success(true);
                     break;
+                case "enqueueCloudBackup":
+                    CloudBackupWorker.enqueue(this);
+                    result.success(true);
+                    break;
                 case "getInitialIntentInfo":
                     result.success(lastIntentInfo);
                     break;
@@ -407,7 +411,11 @@ public class MainActivity extends FlutterActivity {
     }
 
     private Map<String, Object> loadSecureCredentials() throws Exception {
-        SharedPreferences prefs = getSharedPreferences(SECURE_PREFS_NAME, Context.MODE_PRIVATE);
+        return loadSecureCredentials(this);
+    }
+
+    static Map<String, Object> loadSecureCredentials(Context context) throws Exception {
+        SharedPreferences prefs = context.getSharedPreferences(SECURE_PREFS_NAME, Context.MODE_PRIVATE);
         String ivText = prefs.getString(SECURE_IV, "");
         String ciphertextText = prefs.getString(SECURE_CIPHERTEXT, "");
         Map<String, Object> result = new HashMap<>();
@@ -452,7 +460,7 @@ public class MainActivity extends FlutterActivity {
                 .commit();
     }
 
-    private String decryptSecurePayload(String ivText, String ciphertextText) throws Exception {
+    static String decryptSecurePayload(String ivText, String ciphertextText) throws Exception {
         byte[] iv = Base64.decode(ivText, Base64.DEFAULT);
         byte[] ciphertext = Base64.decode(ciphertextText, Base64.DEFAULT);
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -460,7 +468,7 @@ public class MainActivity extends FlutterActivity {
         return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
     }
 
-    private SecretKey getSecureCredentialsKey() throws GeneralSecurityException {
+    static SecretKey getSecureCredentialsKey() throws GeneralSecurityException {
         try {
             KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
             keyStore.load(null);
@@ -484,7 +492,7 @@ public class MainActivity extends FlutterActivity {
         }
     }
 
-    private static final class LocalStoreDb extends SQLiteOpenHelper {
+    static final class LocalStoreDb extends SQLiteOpenHelper {
         private static final String DB_NAME = "valora_assets_local.db";
         private static final int DB_VERSION = 1;
         private static final String TABLE = "kv_store";
@@ -544,6 +552,29 @@ public class MainActivity extends FlutterActivity {
 
         synchronized boolean saveJson(String json) {
             return saveValue(KEY, json);
+        }
+
+        synchronized boolean saveJsonIfCurrent(String expected, String replacement) {
+            SQLiteDatabase db = null;
+            boolean transactionStarted = false;
+            try {
+                db = getWritableDatabase();
+                db.beginTransaction();
+                transactionStarted = true;
+                String current = loadValue(KEY);
+                if (!java.util.Objects.equals(current, expected)) return false;
+                ContentValues values = new ContentValues();
+                values.put("k", KEY);
+                values.put("v", replacement == null ? "" : replacement);
+                values.put("updated_at", System.currentTimeMillis());
+                db.insertWithOnConflict(TABLE, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+                db.setTransactionSuccessful();
+                return true;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to conditionally write local Valora JSON", e);
+            } finally {
+                if (transactionStarted && db != null) db.endTransaction();
+            }
         }
 
         synchronized boolean markValidated(String json) {

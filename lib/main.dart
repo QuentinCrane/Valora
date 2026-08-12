@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:crypto/crypto.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart' as lge;
 
 part 'src_parts/l10n.dart';
