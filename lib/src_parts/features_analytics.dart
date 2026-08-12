@@ -10,248 +10,266 @@ class AnalyticsHomePage extends StatelessWidget {
     final category = analytics.categoryDistribution;
     final tags = analytics.tagDistribution;
     final topDaily = analytics.topDailyAssets;
-    return PageFrame(children: [
-      Text(tr('analytics.title'),
-          style: Theme.of(context)
-              .textTheme
-              .displaySmall
-              ?.copyWith(fontWeight: FontWeight.normal, height: 0.95)),
-      const SizedBox(height: 6),
-      Text(tr('analytics.subtitle'), style: const TextStyle(color: kMuted)),
-      const SizedBox(height: 14),
-      TutorialTargetAnchor(
-          id: 'analytics.core',
-          child: InkWell(
-            borderRadius: BorderRadius.circular(kRadiusLg),
-            onTap: () {
-              tapHaptic();
-              showAnalyticsSummaryDetail(context, store);
-            },
-            child: AppCard(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Row(children: [
-                    Expanded(
-                        child: Text(tr('analytics.coreMetrics'),
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.normal))),
-                    const Icon(Icons.chevron_right_rounded, color: kMuted)
-                  ]),
-                  const SizedBox(height: 12),
-                  GridWrap(children: [
-                    DetailCell(
-                        label: tr('analytics.totalAssetValue'),
-                        value:
-                            money(analytics.totalAssetValue, store.settings)),
-                    DetailCell(
-                        label: tr('analytics.avgDailyCost'),
-                        value:
-                            money(analytics.averageDailyCost, store.settings)),
-                    DetailCell(
-                        label: tr('analytics.totalInvested'),
-                        value:
-                            money(analytics.totalPurchaseCost, store.settings)),
-                    DetailCell(
-                        label: tr('analytics.wishBudget'),
-                        value: money(analytics.wishBudget, store.settings)),
-                  ]),
-                ])),
-          )),
-      const SizedBox(height: 12),
-      TutorialTargetAnchor(
-          id: 'analytics.insights', child: InsightStrip(store: store)),
-      const SizedBox(height: 12),
-      TutorialTargetAnchor(
-          id: 'analytics.lifecycle',
-          child: LifecycleDashboardCard(store: store)),
-      const SizedBox(height: 12),
-      TutorialTargetAnchor(
-          id: 'analytics.quality', child: PortfolioQualityCard(store: store)),
-      const SizedBox(height: 12),
-      AssetTimeMachineCard(store: store),
-      const SizedBox(height: 12),
-      if (store.walletLeaks().isNotEmpty) ...[
-        WalletLeakCard(store: store),
-        const SizedBox(height: 12)
-      ],
-      if (store.dueSoonAssets().isNotEmpty) ...[
-        DueSoonCard(store: store),
-        const SizedBox(height: 12)
-      ],
-      if (store.pricelessAssets().isNotEmpty) ...[
-        PricelessHomeCard(store: store),
-        const SizedBox(height: 12)
-      ],
-      TutorialTargetAnchor(
-          id: 'analytics.valueTrend',
-          child: ChartPanel(
-              title: tr('analytics.valueTrend'),
-              subtitle: tr('analytics.valueTrendDesc'),
-              onTap: () => showValueTrendDetail(context, store),
-              child: SizedBox(
-                  height: 190,
-                  child: ValueTrendChart(points: analytics.valueTrend)))),
-      const SizedBox(height: 12),
-      ChartPanel(
-          title: tr('analytics.dailyCostTrend'),
-          subtitle: tr('analytics.dailyCostTrendDesc'),
-          onTap: () => showDailyCostTrendDetail(context, store),
-          child: SizedBox(
-              height: 190,
-              child: ValueTrendChart(points: analytics.dailyCostTrend))),
-      const SizedBox(height: 12),
-      LifecycleTimelineCard(store: store),
-      const SizedBox(height: 12),
-      ValueQuadrantCard(store: store),
-      const SizedBox(height: 12),
-      SnapshotCompareCard(store: store),
-      const SizedBox(height: 12),
-      AppCard(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(tr('analytics.assetCheckup'),
-            style:
-                const TextStyle(fontWeight: FontWeight.normal, fontSize: 18)),
-        const SizedBox(height: 10),
-        ...analytics.insights.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                      color: item.color.withOpacity(.16),
-                      borderRadius: BorderRadius.circular(13)),
-                  child: Icon(item.icon, color: item.color, size: 20)),
-              const SizedBox(width: 10),
-              Expanded(
+    return SliverPageFrame(
+      scrollKey: const PageStorageKey<String>('valora.analytics'),
+      sections: [
+        (_) => Text(tr('analytics.title'),
+            style: Theme.of(context)
+                .textTheme
+                .displaySmall
+                ?.copyWith(fontWeight: FontWeight.normal, height: 0.95)),
+        (_) => const SizedBox(height: 6),
+        (_) => Text(tr('analytics.subtitle'),
+            style: const TextStyle(color: kMuted)),
+        (_) => const SizedBox(height: 14),
+        (_) => TutorialTargetAnchor(
+            id: 'analytics.core',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(kRadiusLg),
+              onTap: () {
+                tapHaptic();
+                showAnalyticsSummaryDetail(context, store);
+              },
+              child: AppCard(
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text(item.title,
-                        style: const TextStyle(fontWeight: FontWeight.normal)),
-                    const SizedBox(height: 2),
-                    Text(item.description,
-                        style: const TextStyle(color: kMuted, height: 1.35))
-                  ])),
-            ]))),
-        const Divider(height: 22),
-        GridWrap(children: [
-          DetailCell(
-              label: tr('analytics.netCost'),
-              value: money(analytics.lifecycleNetConsumption, store.settings)),
-          DetailCell(
-              label: tr('analytics.valueRecovered'),
-              value: money(analytics.lifecycleRecoveredValue, store.settings)),
-        ]),
-      ])),
-      const SizedBox(height: 12),
-      ChartPanel(
-          title: tr('analytics.categoryValuation'),
-          subtitle: tr('analytics.categoryValuationDesc'),
-          onTap: () => showCategoryDistributionDetail(context, store),
-          child: category.isEmpty
-              ? SizedBox(
-                  height: 120,
-                  child: Center(child: Text(tr('analytics.noData'))))
-              : Row(children: [
-                  SizedBox(
-                      width: 150,
-                      height: 150,
-                      child: PieChartLite(values: category.values.toList())),
-                  const SizedBox(width: 14),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: category.entries
-                              .map((e) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Text(
-                                      '${store.categoryDistributionLabel(e.key)}  ${money(e.value, store.settings)}',
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.normal))))
-                              .toList()))
-                ])),
-      const SizedBox(height: 12),
-      ChartPanel(
-          title: tr('analytics.tagDistribution'),
-          subtitle: tr('analytics.tagDistributionDesc'),
-          onTap: () => showTagDistributionDetail(context, store),
-          child: tags.isEmpty
-              ? SizedBox(
-                  height: 80,
-                  child: Center(child: Text(tr('analytics.noTags'))))
-              : Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: tags.entries
-                      .map((e) => TinyTag(
-                          label:
-                              '${store.tagDistributionLabel(e.key)} · ${e.value}',
-                          color: kBrandStrong))
-                      .toList())),
-      const SizedBox(height: 12),
-      InkWell(
-        borderRadius: BorderRadius.circular(kRadiusLg),
-        onTap: () {
-          tapHaptic();
-          showDailyCostRankingDetail(context, store);
-        },
-        child: AppCard(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(
-                child: Text(tr('analytics.dailyCostRanking'),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.normal, fontSize: 18))),
-            const Icon(Icons.chevron_right_rounded, color: kMuted)
-          ]),
-          const SizedBox(height: 12),
-          if (topDaily.isEmpty)
-            Text(tr('analytics.noDailyCostAssets'),
-                style: const TextStyle(color: kMuted)),
-          ...topDaily.take(6).map((a) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => Navigator.of(context)
-                      .push(softRoute(AssetDetailPage(assetId: a.id))),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(children: [
-                      SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: valoraIconVisual(context, a.iconValue,
-                              emojiSize: 20, borderRadius: 10)),
-                      const SizedBox(width: 10),
+                    Row(children: [
                       Expanded(
-                          child: Text(a.name,
+                          child: Text(tr('analytics.coreMetrics'),
                               style: const TextStyle(
+                                  fontSize: 16,
                                   fontWeight: FontWeight.normal))),
-                      Text(
-                          '${money(a.dailyCost, store.settings)} ${tr('time.perDay')}',
-                          style: const TextStyle(fontWeight: FontWeight.normal))
+                      const Icon(Icons.chevron_right_rounded, color: kMuted)
                     ]),
-                  ),
-                ),
-              )),
-        ])),
-      ),
-      const SizedBox(height: 12),
-      ChartPanel(
-          title: tr('analytics.serviceDuration'),
-          subtitle: tr('analytics.serviceDurationDesc'),
-          onTap: () => showServiceDurationDetail(context, store),
-          child: SizedBox(
-              height: 170,
-              child: BarChartLite(
-                  values: store.assets
-                      .map((a) => a.serviceDays.toDouble())
-                      .toList()))),
-    ]);
+                    const SizedBox(height: 12),
+                    GridWrap(children: [
+                      DetailCell(
+                          label: tr('analytics.totalAssetValue'),
+                          value:
+                              money(analytics.totalAssetValue, store.settings)),
+                      DetailCell(
+                          label: tr('analytics.avgDailyCost'),
+                          value: money(
+                              analytics.averageDailyCost, store.settings)),
+                      DetailCell(
+                          label: tr('analytics.totalInvested'),
+                          value: money(
+                              analytics.totalPurchaseCost, store.settings)),
+                      DetailCell(
+                          label: tr('analytics.wishBudget'),
+                          value: money(analytics.wishBudget, store.settings)),
+                    ]),
+                  ])),
+            )),
+        (_) => const SizedBox(height: 12),
+        (_) => TutorialTargetAnchor(
+            id: 'analytics.insights', child: InsightStrip(store: store)),
+        (_) => const SizedBox(height: 12),
+        (_) => TutorialTargetAnchor(
+            id: 'analytics.lifecycle',
+            child: LifecycleDashboardCard(store: store)),
+        (_) => const SizedBox(height: 12),
+        (_) => TutorialTargetAnchor(
+            id: 'analytics.quality', child: PortfolioQualityCard(store: store)),
+        (_) => const SizedBox(height: 12),
+        (_) => AssetTimeMachineCard(store: store),
+        (_) => const SizedBox(height: 12),
+        if (store.walletLeaks().isNotEmpty) ...[
+          (_) => WalletLeakCard(store: store),
+          (_) => const SizedBox(height: 12)
+        ],
+        if (store.dueSoonAssets().isNotEmpty) ...[
+          (_) => DueSoonCard(store: store),
+          (_) => const SizedBox(height: 12)
+        ],
+        if (store.pricelessAssets().isNotEmpty) ...[
+          (_) => PricelessHomeCard(store: store),
+          (_) => const SizedBox(height: 12)
+        ],
+        (_) => TutorialTargetAnchor(
+            id: 'analytics.valueTrend',
+            child: ChartPanel(
+                title: tr('analytics.valueTrend'),
+                subtitle: tr('analytics.valueTrendDesc'),
+                onTap: () => showValueTrendDetail(context, store),
+                child: SizedBox(
+                    height: 190,
+                    child: ValueTrendChart(points: analytics.valueTrend)))),
+        (_) => const SizedBox(height: 12),
+        (_) => ChartPanel(
+            title: tr('analytics.dailyCostTrend'),
+            subtitle: tr('analytics.dailyCostTrendDesc'),
+            onTap: () => showDailyCostTrendDetail(context, store),
+            child: SizedBox(
+                height: 190,
+                child: ValueTrendChart(points: analytics.dailyCostTrend))),
+        (_) => const SizedBox(height: 12),
+        (_) => LifecycleTimelineCard(store: store),
+        (_) => const SizedBox(height: 12),
+        (_) => ValueQuadrantCard(store: store),
+        (_) => const SizedBox(height: 12),
+        (_) => SnapshotCompareCard(store: store),
+        (_) => const SizedBox(height: 12),
+        (_) => AppCard(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(tr('analytics.assetCheckup'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.normal, fontSize: 18)),
+                  const SizedBox(height: 10),
+                  ...analytics.insights.map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                    color: item.color.withOpacity(.16),
+                                    borderRadius: BorderRadius.circular(13)),
+                                child: Icon(item.icon,
+                                    color: item.color, size: 20)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(item.title,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.normal)),
+                                  const SizedBox(height: 2),
+                                  Text(item.description,
+                                      style: const TextStyle(
+                                          color: kMuted, height: 1.35))
+                                ])),
+                          ]))),
+                  const Divider(height: 22),
+                  GridWrap(children: [
+                    DetailCell(
+                        label: tr('analytics.netCost'),
+                        value: money(
+                            analytics.lifecycleNetConsumption, store.settings)),
+                    DetailCell(
+                        label: tr('analytics.valueRecovered'),
+                        value: money(
+                            analytics.lifecycleRecoveredValue, store.settings)),
+                  ]),
+                ])),
+        (_) => const SizedBox(height: 12),
+        (_) => ChartPanel(
+            title: tr('analytics.categoryValuation'),
+            subtitle: tr('analytics.categoryValuationDesc'),
+            onTap: () => showCategoryDistributionDetail(context, store),
+            child: category.isEmpty
+                ? SizedBox(
+                    height: 120,
+                    child: Center(child: Text(tr('analytics.noData'))))
+                : Row(children: [
+                    SizedBox(
+                        width: 150,
+                        height: 150,
+                        child: PieChartLite(values: category.values.toList())),
+                    const SizedBox(width: 14),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: category.entries
+                                .map((e) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Text(
+                                        '${store.categoryDistributionLabel(e.key)}  ${money(e.value, store.settings)}',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.normal))))
+                                .toList()))
+                  ])),
+        (_) => const SizedBox(height: 12),
+        (_) => ChartPanel(
+            title: tr('analytics.tagDistribution'),
+            subtitle: tr('analytics.tagDistributionDesc'),
+            onTap: () => showTagDistributionDetail(context, store),
+            child: tags.isEmpty
+                ? SizedBox(
+                    height: 80,
+                    child: Center(child: Text(tr('analytics.noTags'))))
+                : Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: tags.entries
+                        .map((e) => TinyTag(
+                            label:
+                                '${store.tagDistributionLabel(e.key)} · ${e.value}',
+                            color: kBrandStrong))
+                        .toList())),
+        (_) => const SizedBox(height: 12),
+        (_) => InkWell(
+              borderRadius: BorderRadius.circular(kRadiusLg),
+              onTap: () {
+                tapHaptic();
+                showDailyCostRankingDetail(context, store);
+              },
+              child: AppCard(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text(tr('analytics.dailyCostRanking'),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.normal,
+                                  fontSize: 18))),
+                      const Icon(Icons.chevron_right_rounded, color: kMuted)
+                    ]),
+                    const SizedBox(height: 12),
+                    if (topDaily.isEmpty)
+                      Text(tr('analytics.noDailyCostAssets'),
+                          style: const TextStyle(color: kMuted)),
+                    ...topDaily.take(6).map((a) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () => Navigator.of(context).push(
+                                softRoute(AssetDetailPage(assetId: a.id))),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(children: [
+                                SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: valoraIconVisual(
+                                        context, a.iconValue,
+                                        emojiSize: 20, borderRadius: 10)),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                    child: Text(a.name,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.normal))),
+                                Text(
+                                    '${money(a.dailyCost, store.settings)} ${tr('time.perDay')}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.normal))
+                              ]),
+                            ),
+                          ),
+                        )),
+                  ])),
+            ),
+        (_) => const SizedBox(height: 12),
+        (_) => ChartPanel(
+            title: tr('analytics.serviceDuration'),
+            subtitle: tr('analytics.serviceDurationDesc'),
+            onTap: () => showServiceDurationDetail(context, store),
+            child: SizedBox(
+                height: 170,
+                child: BarChartLite(
+                    values: store.assets
+                        .map((a) => a.serviceDays.toDouble())
+                        .toList()))),
+      ],
+    );
   }
 }
 

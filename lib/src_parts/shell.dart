@@ -1476,3 +1476,39 @@ class PageFrame extends StatelessWidget {
     );
   }
 }
+
+class SliverPageFrame extends StatelessWidget {
+  final List<WidgetBuilder> sections;
+  final EdgeInsets? padding;
+  final Key? scrollKey;
+
+  const SliverPageFrame({
+    super.key,
+    required this.sections,
+    this.padding,
+    this.scrollKey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final contentPadding =
+        padding ?? const EdgeInsets.fromLTRB(14, 16, 14, 116);
+    return CustomScrollView(
+      key: scrollKey,
+      physics:
+          const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        SliverPadding(
+          padding: contentPadding,
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => sections[index](context),
+              childCount: sections.length,
+              addAutomaticKeepAlives: false,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

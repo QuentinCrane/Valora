@@ -91,53 +91,76 @@ class AssetHomePage extends StatelessWidget {
 
   Widget _buildHome(BuildContext context, AppStore store) {
     final filtered = store.filteredAssets;
-    return PageFrame(
-      padding: const EdgeInsets.fromLTRB(10, 12, 10, 116),
-      children: [
-        HomeHeroHeader(store: store, visibleCount: filtered.length),
-        const SizedBox(height: 14),
-        TutorialTargetAnchor(
-            id: 'home.filters', child: StatusAndViewRow(store: store)),
+    final header = <Widget>[
+      HomeHeroHeader(store: store, visibleCount: filtered.length),
+      const SizedBox(height: 14),
+      TutorialTargetAnchor(
+          id: 'home.filters', child: StatusAndViewRow(store: store)),
+      const SizedBox(height: 12),
+      if (store.pricelessAssets().isNotEmpty) ...[
+        PricelessHomeCard(store: store),
         const SizedBox(height: 12),
-        if (store.pricelessAssets().isNotEmpty) ...[
-          PricelessHomeCard(store: store),
-          const SizedBox(height: 12),
-        ],
+      ],
+    ];
+    return CustomScrollView(
+      key: const PageStorageKey<String>('valora.home'),
+      physics:
+          const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(10, 12, 10, 0),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate(
+              header,
+              addAutomaticKeepAlives: false,
+            ),
+          ),
+        ),
         if (filtered.isEmpty)
-          TutorialTargetAnchor(
-              id: 'home.empty',
-              child: EmptyStateCard(
-                  icon: '📦',
-                  title: tr('home.emptyTitle'),
-                  subtitle: tr('home.emptySubtitle'),
-                  actionLabel: tr('home.addAsset'),
-                  onAction: () => Navigator.of(context).push(softRoute(
-                      const ComposePage(initialTab: ComposeTab.asset)))))
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            sliver: SliverToBoxAdapter(
+              child: TutorialTargetAnchor(
+                id: 'home.empty',
+                child: EmptyStateCard(
+                    icon: '📦',
+                    title: tr('home.emptyTitle'),
+                    subtitle: tr('home.emptySubtitle'),
+                    actionLabel: tr('home.addAsset'),
+                    onAction: () => Navigator.of(context).push(softRoute(
+                        const ComposePage(initialTab: ComposeTab.asset)))),
+              ),
+            ),
+          )
         else if (store.viewMode == HomeViewMode.grid)
           ResponsiveAssetGrid(assets: filtered, store: store)
         else if (store.viewMode == HomeViewMode.list)
-          ...List.generate(
-              filtered.length,
-              (i) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: i == 0
-                      ? TutorialTargetAnchor(
-                          id: 'home.assetCard',
-                          child: AssetListTileCard(
-                              asset: filtered[i], store: store))
-                      : AssetListTileCard(asset: filtered[i], store: store)))
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final card = AssetListTileCard(
+                    key: ValueKey(filtered[index].id),
+                    asset: filtered[index],
+                    store: store,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: index == 0
+                        ? TutorialTargetAnchor(
+                            id: 'home.assetCard', child: card)
+                        : card,
+                  );
+                },
+                childCount: filtered.length,
+                addAutomaticKeepAlives: false,
+              ),
+            ),
+          )
         else
-          Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: List.generate(
-                  filtered.length,
-                  (i) => i == 0
-                      ? TutorialTargetAnchor(
-                          id: 'home.assetCard',
-                          child: AssetStickerChip(
-                              asset: filtered[i], store: store))
-                      : AssetStickerChip(asset: filtered[i], store: store))),
+          AssetStickerGrid(assets: filtered, store: store),
+        const SliverToBoxAdapter(child: SizedBox(height: 116)),
       ],
     );
   }
@@ -158,27 +181,76 @@ class ResponsiveAssetGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
+    return SliverLayoutBuilder(builder: (context, constraints) {
       const spacing = 10.0;
-      final columns = _columnCount(constraints.maxWidth);
-      final cardWidth =
-          (constraints.maxWidth - spacing * (columns - 1)) / columns;
+      final columns = _columnCount(constraints.crossAxisExtent);
       final cardHeight = columns >= 3 ? 168.0 : 176.0;
-      return Wrap(
-        spacing: spacing,
-        runSpacing: spacing,
-        children: List.generate(
-            assets.length,
-            (i) => SizedBox(
-                width: cardWidth,
-                height: cardHeight,
-                child: i == 0
-                    ? TutorialTargetAnchor(
-                        id: 'home.assetCard',
-                        child: AssetGridCard(asset: assets[i], store: store))
-                    : AssetGridCard(asset: assets[i], store: store))),
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        sliver: SliverGrid(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisExtent: cardHeight,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final card = AssetGridCard(
+                key: ValueKey(assets[index].id),
+                asset: assets[index],
+                store: store,
+              );
+              return index == 0
+                  ? TutorialTargetAnchor(id: 'home.assetCard', child: card)
+                  : card;
+            },
+            childCount: assets.length,
+            addAutomaticKeepAlives: false,
+          ),
+        ),
       );
     });
+  }
+}
+
+class AssetStickerGrid extends StatelessWidget {
+  final List<Asset> assets;
+  final AppStore store;
+
+  const AssetStickerGrid({
+    super.key,
+    required this.assets,
+    required this.store,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisExtent: 166,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final card = AssetStickerChip(
+              key: ValueKey(assets[index].id),
+              asset: assets[index],
+              store: store,
+            );
+            return index == 0
+                ? TutorialTargetAnchor(id: 'home.assetCard', child: card)
+                : card;
+          },
+          childCount: assets.length,
+          addAutomaticKeepAlives: false,
+        ),
+      ),
+    );
   }
 }
 
@@ -1358,7 +1430,6 @@ class AssetStickerChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = context.isDark;
-    final width = (MediaQuery.sizeOf(context).width - 42) / 2;
     final hash = asset.id.hashCode.abs();
     final tilt = [-0.062, 0.052, -0.044, 0.058, -0.050][hash % 5];
     final bg = dark ? kCardDark.withOpacity(.96) : Colors.white;
@@ -1373,7 +1444,7 @@ class AssetStickerChip extends StatelessWidget {
         onTap: () => Navigator.of(context)
             .push(softRoute(AssetDetailPage(assetId: asset.id))),
         child: Container(
-          width: width.clamp(146.0, 210.0).toDouble(),
+          width: double.infinity,
           height: 166,
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           decoration: BoxDecoration(

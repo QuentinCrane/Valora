@@ -1221,7 +1221,7 @@ class WishHomePage extends StatelessWidget {
     final archived = store.wishes.where((w) => w.archived).toList();
     final list = store.wishShowArchived ? archived : active;
     final total = active.fold(0.0, (s, w) => s + w.expectedPrice);
-    return PageFrame(children: [
+    final header = <Widget>[
       Row(children: [
         Expanded(
             child: Text(tr('wish.title'),
@@ -1290,44 +1290,80 @@ class WishHomePage extends StatelessWidget {
                 onTap: () => store.setWishArchivedFilter(true)),
           ])),
       const SizedBox(height: 12),
-      if (list.isEmpty)
-        TutorialTargetAnchor(
-            id: 'wish.list',
-            child: Padding(
-              padding:
-                  EdgeInsets.only(top: MediaQuery.sizeOf(context).height * .22),
-              child: Column(children: [
-                Text('📦',
-                    style: TextStyle(
-                        fontSize: 76, color: kMuted.withOpacity(.25))),
-                const SizedBox(height: 10),
-                Text(tr('wish.empty'),
-                    style: const TextStyle(
-                        fontSize: 21, fontWeight: FontWeight.normal)),
-                const SizedBox(height: 8),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(tr('wish.emptyTapPrefix'),
-                      style: const TextStyle(color: kMuted, fontSize: 18)),
-                  const CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Color(0xFF111214),
-                      child: Icon(Icons.add_rounded,
-                          color: Colors.white, size: 20)),
-                  Text(tr('wish.emptyTapSuffix'),
-                      style: const TextStyle(color: kMuted, fontSize: 18))
-                ]),
-              ]),
-            ))
-      else
-        ...List.generate(
-            list.length,
-            (i) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: i == 0
-                    ? TutorialTargetAnchor(
-                        id: 'wish.list', child: WishCard(wish: list[i]))
-                    : WishCard(wish: list[i]))),
-    ]);
+    ];
+    return CustomScrollView(
+      key: const PageStorageKey<String>('valora.wishes'),
+      physics:
+          const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(14, 16, 14, 0),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate(
+              header,
+              addAutomaticKeepAlives: false,
+            ),
+          ),
+        ),
+        if (list.isEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            sliver: SliverToBoxAdapter(
+              child: TutorialTargetAnchor(
+                id: 'wish.list',
+                child: Padding(
+                  padding: EdgeInsets.only(
+                      top: MediaQuery.sizeOf(context).height * .22),
+                  child: Column(children: [
+                    Text('📦',
+                        style: TextStyle(
+                            fontSize: 76, color: kMuted.withOpacity(.25))),
+                    const SizedBox(height: 10),
+                    Text(tr('wish.empty'),
+                        style: const TextStyle(
+                            fontSize: 21, fontWeight: FontWeight.normal)),
+                    const SizedBox(height: 8),
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(tr('wish.emptyTapPrefix'),
+                          style: const TextStyle(color: kMuted, fontSize: 18)),
+                      const CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Color(0xFF111214),
+                          child: Icon(Icons.add_rounded,
+                              color: Colors.white, size: 20)),
+                      Text(tr('wish.emptyTapSuffix'),
+                          style: const TextStyle(color: kMuted, fontSize: 18))
+                    ]),
+                  ]),
+                ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final card = WishCard(
+                    key: ValueKey(list[index].id),
+                    wish: list[index],
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: index == 0
+                        ? TutorialTargetAnchor(id: 'wish.list', child: card)
+                        : card,
+                  );
+                },
+                childCount: list.length,
+                addAutomaticKeepAlives: false,
+              ),
+            ),
+          ),
+        const SliverToBoxAdapter(child: SizedBox(height: 116)),
+      ],
+    );
   }
 }
 
