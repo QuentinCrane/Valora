@@ -243,6 +243,13 @@ class DomainValidators {
     if (isSold && soldAt == null) {
       issues.add(const DomainIssue('validation.soldDateRequired', 'soldAt'));
     }
+    // A missing sold price is intentional: it means the recovery amount was
+    // not recorded, and analytics treat it as zero. Non-sold records must not
+    // carry a stale recovery amount from an older edit or import.
+    if (!isSold && soldPrice != null) {
+      issues.add(
+          const DomainIssue('validation.soldPriceOnlyForSold', 'soldPrice'));
+    }
     if (soldPrice != null) _money(soldPrice, 'soldPrice', issues);
     for (final entry in <String, DateTime?>{
       'retiredAt': retiredAt,

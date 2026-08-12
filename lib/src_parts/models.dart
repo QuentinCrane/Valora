@@ -508,6 +508,8 @@ class Asset {
             : AssetValueModeX.fromValue(map['valueMode']?.toString());
     final priceless = valueMode == AssetValueMode.priceless;
     final status = AssetStatusX.fromValue(map['status']?.toString());
+    final normalizedStatus =
+        priceless && status == AssetStatus.sold ? AssetStatus.serving : status;
     final targetMode = TargetModeX.fromValue(map['targetMode']?.toString());
     return Asset(
       id: map['id']?.toString() ?? newId('asset'),
@@ -531,15 +533,15 @@ class Asset {
               .map((e) => AddonItem.fromMap(Map<String, dynamic>.from(e)))
               .toList(),
       note: map['note']?.toString() ?? '',
-      status: priceless && status == AssetStatus.sold
-          ? AssetStatus.serving
-          : status,
+      status: normalizedStatus,
       includeInTotal: priceless ? false : map['includeInTotal'] != false,
       includeInDailyCost:
           priceless ? false : map['includeInDailyCost'] != false,
       retiredAt: parseOptionalPersistedDate(map['retiredAt']),
-      soldAt: priceless ? null : parseOptionalPersistedDate(map['soldAt']),
-      soldPrice: priceless || map['soldPrice'] == null
+      soldAt: normalizedStatus == AssetStatus.sold
+          ? parseOptionalPersistedDate(map['soldAt'])
+          : null,
+      soldPrice: normalizedStatus != AssetStatus.sold || map['soldPrice'] == null
           ? null
           : asDouble(map['soldPrice']),
       targetMode: priceless && targetMode == TargetMode.daily

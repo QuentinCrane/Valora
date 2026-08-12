@@ -43,6 +43,284 @@ class ValoraRightSlideFadePageTransitionsBuilder
   }
 }
 
+enum AddonEditorResultKind { saved, deleted }
+
+class AddonEditorResult {
+  final AddonEditorResultKind kind;
+  final AddonItem? item;
+
+  const AddonEditorResult._(this.kind, this.item);
+
+  const AddonEditorResult.saved(AddonItem item)
+      : this._(AddonEditorResultKind.saved, item);
+
+  const AddonEditorResult.deleted()
+      : this._(AddonEditorResultKind.deleted, null);
+}
+
+Future<AddonEditorResult?> showAddonEditorDialog(
+  BuildContext context, {
+  AddonItem? existing,
+  required DateTime parentDate,
+  bool enforceParentDate = true,
+}) async {
+  final nameCtl = TextEditingController(text: existing?.name ?? '');
+  final priceCtl = TextEditingController(
+      text: existing == null
+          ? ''
+          : existing.price.toStringAsFixed(
+              existing.price.truncateToDouble() == existing.price ? 0 : 2));
+  final dateCtl = TextEditingController(
+      text: existing?.purchaseDate == null
+          ? ''
+          : dateText(existing!.purchaseDate!));
+  var followParent = existing?.followParentPurchaseDate ?? false;
+  var inTotal = existing?.includeInTotal ?? true;
+  var inDaily = existing?.includeInDailyCost ?? true;
+  AddonEditorResult? result;
+  try {
+    result = await showDialog<AddonEditorResult>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setLocal) {
+          return AlertDialog(
+            title: Text(existing == null
+                ? tr('editor.addAddon')
+                : tr('editor.editAddon')),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameCtl,
+                    decoration:
+                        InputDecoration(labelText: tr('editor.addonName')),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: priceCtl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration:
+                        InputDecoration(labelText: tr('editor.addonPrice')),
+                  ),
+                  const SizedBox(height: 10),
+                  SwitchListTile(
+                    value: followParent,
+                    onChanged: (value) {
+                      tapHaptic();
+                      setLocal(() => followParent = value);
+                    },
+                    title: Text(tr('editor.followParentDate')),
+                    subtitle: Text(
+                        '${tr('editor.parentPurchaseTime')}：${dateText(dateOnly(parentDate))}'),
+                  ),
+                  if (!followParent)
+                    DateFormField(
+                      controller: dateCtl,
+                      label: tr('editor.addonPurchaseDate'),
+                      onChanged: () => setLocal(() {}),
+                    ),
+                  SwitchListTile(
+                    value: inTotal,
+                    onChanged: (value) {
+                      tapHaptic();
+                      setLocal(() => inTotal = value);
+                    },
+                    title: Text(tr('editor.includeInTotal')),
+                  ),
+                  SwitchListTile(
+                    value: inDaily,
+                    onChanged: (value) {
+                      tapHaptic();
+                      setLocal(() => inDaily = value);
+                    },
+                    title: Text(tr('editor.includeInDailyCost')),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              if (existing != null)
+                TextButton(
+                  onPressed: () => Navigator.pop(
+                      dialogContext, const AddonEditorResult.deleted()),
+                  child: Text(tr('common.delete')),
+                ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(tr('common.cancel')),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final rawPrice = priceCtl.text.trim();
+                  final parsedPrice =
+                      rawPrice.isEmpty ? 0.0 : parseUserDouble(rawPrice);
+                  if (parsedPrice == null ||
+                      !parsedPrice.isFinite ||
+                      parsedPrice < 0) {
+                    showNativeSnack(context, tr('common.invalidNumber'));
+                    return;
+                  }
+                  final parsedDate = followParent || dateCtl.text.trim().isEmpty
+                      ? null
+                      : parseUserDateOrNull(dateCtl.text);
+                  if (!followParent &&
+                      dateCtl.text.trim().isNotEmpty &&
+                      parsedDate == null) {
+                    showNativeSnack(context, tr('editor.invalidAddonDate'));
+                    return;
+                  }
+                  final next = AddonItem(
+                    id: existing?.id ?? newId('addon'),
+                    name: nameCtl.text.trim().isEmpty
+                        ? tr('editor.defaultAddonName')
+                        : nameCtl.text.trim(),
+                    price: parsedPrice,
+                    purchaseDate: parsedDate,
+                    followParentPurchaseDate: followParent,
+                    includeInTotal: inTotal,
+                    includeInDailyCost: inDaily,
+                  );
+                  final validation = DomainValidators.addon(
+                    AddonInput(
+                      name: next.name,
+                      price: next.price,
+                      purchaseDate: next.purchaseDate,
+                    ),
+                    parentPurchaseDate: enforceParentDate ? parentDate : null,
+                  );
+                  if (!validation.isValid) {
+                    showNativeSnack(context, tr(validation.firstIssue!.key));
+                    return;
+                  }
+                  Navigator.pop(dialogContext, AddonEditorResult.saved(next));
+                },
+                child: Text(
+                    existing == null ? tr('common.add') : tr('common.save')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  } finally {
+    nameCtl.dispose();
+    priceCtl.dispose();
+    dateCtl.dispose();
+  }
+  return result;
+}
+
+class AddonListEditor extends StatelessWidget {
+  final List<AddonItem> addons;
+  final DateTime parentDate;
+  final String emptyText;
+  final bool compact;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onEdit;
+  final ValueChanged<int> onDelete;
+  final void Function(int oldIndex, int newIndex) onReorder;
+
+  const AddonListEditor({
+    super.key,
+    required this.addons,
+    required this.parentDate,
+    required this.emptyText,
+    required this.onAdd,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onReorder,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (addons.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(emptyText, style: TextStyle(color: kMuted)),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(tr('common.add')),
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      children: [
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          itemCount: addons.length,
+          onReorderItem: onReorder,
+          itemBuilder: (context, index) {
+            final addon = addons[index];
+            final subtitle = compact
+                ? '${tr('editor.addonPurchaseTime')}：${addon.effectivePurchaseDateLabel(dateOnly(parentDate))}'
+                : '${tr('editor.addonPurchaseTime')}：${addon.effectivePurchaseDateLabel(dateOnly(parentDate))} · ${tr('editor.includeInTotal')}：${addon.includeInTotal ? tr('common.yes') : tr('common.no')} · ${tr('editor.includeInDailyCost')}：${addon.includeInDailyCost ? tr('common.yes') : tr('common.no')}';
+            return Material(
+              key: ValueKey(addon.id),
+              color: Colors.transparent,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: compact,
+                title: Text(addon.name,
+                    style: const TextStyle(fontWeight: FontWeight.normal)),
+                subtitle: Text(subtitle,
+                    style: compact
+                        ? const TextStyle(color: kMuted, fontSize: 12)
+                        : null),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(money(addon.price, context.store.settings)),
+                    ValoraGlassIconButton(
+                      tooltip: tr('common.edit'),
+                      icon: Icons.edit_rounded,
+                      size: 36,
+                      onTap: () => onEdit(index),
+                    ),
+                    ValoraGlassIconButton(
+                      tooltip: tr('common.delete'),
+                      icon: Icons.delete_outline_rounded,
+                      size: 36,
+                      onTap: () => onDelete(index),
+                    ),
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6),
+                        child: Icon(Icons.drag_handle_rounded),
+                      ),
+                    ),
+                  ],
+                ),
+                onTap: () => onEdit(index),
+              ),
+            );
+          },
+        ),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_rounded),
+            label: Text(tr('common.add')),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 ValoraRouteStyle valoraRouteStyleFor(Widget page) {
   final name = page.runtimeType.toString();
   if (name.contains('AssetDetail') || name.contains('WishDetail'))

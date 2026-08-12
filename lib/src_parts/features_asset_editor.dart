@@ -445,42 +445,25 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                               child: Text(tr('editor.addons'),
                                   style: TextStyle(
                                       fontWeight: FontWeight.normal,
-                                      fontSize: 18))),
-                          TextButton.icon(
-                              onPressed: () {
-                                lightHaptic();
-                                addAddon();
-                              },
-                              icon: const Icon(Icons.add_rounded),
-                              label: Text(tr('common.add')))
+                                      fontSize: 18)))
                         ]),
-                        if (addons.isEmpty)
-                          Text(tr('editor.addonHint'),
-                              style: TextStyle(color: kMuted)),
-                        ...addons.map((a) => ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(a.name),
-                              subtitle: Text(
-                                  '${tr('editor.addonPurchaseTime')}：${a.effectivePurchaseDateLabel(parseUserDateOrNull(purchaseDate.text) ?? DateTime.now())} · ${tr('editor.includeInTotal')}：${a.includeInTotal ? tr('common.yes') : tr('common.no')} · ${tr('editor.includeInDailyCost')}：${a.includeInDailyCost ? tr('common.yes') : tr('common.no')}'),
-                              trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(money(a.price, store.settings)),
-                                    ValoraGlassIconButton(
-                                        tooltip: tr('common.edit'),
-                                        icon: Icons.edit_rounded,
-                                        size: 36,
-                                        onTap: () => editAddon(a)),
-                                    ValoraGlassIconButton(
-                                        tooltip: tr('common.delete'),
-                                        icon: Icons.delete_outline_rounded,
-                                        size: 36,
-                                        onTap: () => setState(() =>
-                                            addons.removeWhere(
-                                                (item) => item.id == a.id))),
-                                  ]),
-                              onTap: () => editAddon(a),
-                            )),
+                        AddonListEditor(
+                          addons: addons,
+                          parentDate: parseUserDateOrNull(purchaseDate.text) ??
+                              DateTime.now(),
+                          emptyText: tr('editor.addonHint'),
+                          onAdd: editAddon,
+                          onEdit: editAddonAt,
+                          onDelete: (index) =>
+                              setState(() => addons.removeAt(index)),
+                          onReorder: (oldIndex, newIndex) {
+                            setState(() {
+                              if (newIndex > oldIndex) newIndex -= 1;
+                              final item = addons.removeAt(oldIndex);
+                              addons.insert(newIndex, item);
+                            });
+                          },
+                        ),
                       ])),
               ]),
         ),
@@ -728,126 +711,27 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
               : '${tr('editor.ocrPriceFilled')}：$priceText');
   }
 
-  void addAddon() => editAddon(null);
+  void editAddon() => editAddonAt(null);
 
-  void editAddon(AddonItem? existing) {
-    final parentDate = parseUserDateOrNull(purchaseDate.text) ?? DateTime.now();
-    final nameCtl = TextEditingController(text: existing?.name ?? '');
-    final priceCtl = TextEditingController(
-        text: existing == null
-            ? ''
-            : existing.price.toStringAsFixed(
-                existing.price.truncateToDouble() == existing.price ? 0 : 2));
-    final dateCtl = TextEditingController(
-        text: existing?.purchaseDate == null
-            ? ''
-            : dateText(existing!.purchaseDate!));
-    bool followParent = existing?.followParentPurchaseDate ?? true;
-    bool inTotal = existing?.includeInTotal ?? true;
-    bool inDaily = existing?.includeInDailyCost ?? true;
-    showDialog(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-            builder: (context, setLocal) => AlertDialog(
-                  title: Text(existing == null
-                      ? tr('editor.addAddon')
-                      : tr('editor.editAddon')),
-                  content: SingleChildScrollView(
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    TextField(
-                        controller: nameCtl,
-                        decoration:
-                            InputDecoration(labelText: tr('editor.addonName'))),
-                    const SizedBox(height: 10),
-                    TextField(
-                        controller: priceCtl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: InputDecoration(
-                            labelText: tr('editor.addonPrice'))),
-                    const SizedBox(height: 10),
-                    SwitchListTile(
-                      value: followParent,
-                      onChanged: (v) {
-                        tapHaptic();
-                        setLocal(() => followParent = v);
-                      },
-                      title: Text(tr('editor.followParentDate')),
-                      subtitle: Text(
-                          '${tr('editor.parentPurchaseTime')}：${dateText(parentDate)}'),
-                    ),
-                    if (!followParent)
-                      DateFormField(
-                          controller: dateCtl,
-                          label: tr('editor.addonPurchaseDate'),
-                          onChanged: () => setLocal(() {})),
-                    SwitchListTile(
-                        value: inTotal,
-                        onChanged: (v) {
-                          tapHaptic();
-                          setLocal(() => inTotal = v);
-                        },
-                        title: Text(tr('editor.includeInTotal'))),
-                    SwitchListTile(
-                        value: inDaily,
-                        onChanged: (v) {
-                          tapHaptic();
-                          setLocal(() => inDaily = v);
-                        },
-                        title: Text(tr('editor.includeInDailyCost'))),
-                  ])),
-                  actions: [
-                    if (existing != null)
-                      TextButton(
-                          onPressed: () {
-                            setState(() =>
-                                addons.removeWhere((a) => a.id == existing.id));
-                            Navigator.pop(dialogContext);
-                          },
-                          child: Text(tr('common.delete'))),
-                    TextButton(
-                        onPressed: () => Navigator.pop(dialogContext),
-                        child: Text(tr('common.cancel'))),
-                    FilledButton(
-                        onPressed: () {
-                          final parsedDate =
-                              followParent || dateCtl.text.trim().isEmpty
-                                  ? null
-                                  : parseUserDateOrNull(dateCtl.text);
-                          if (!followParent &&
-                              dateCtl.text.trim().isNotEmpty &&
-                              parsedDate == null) {
-                            showNativeSnack(
-                                context, tr('editor.invalidAddonDate'));
-                            return;
-                          }
-                          final next = AddonItem(
-                            id: existing?.id ?? newId('addon'),
-                            name: nameCtl.text.trim().isEmpty
-                                ? tr('editor.defaultAddonName')
-                                : nameCtl.text.trim(),
-                            price: asDouble(priceCtl.text),
-                            purchaseDate: parsedDate,
-                            followParentPurchaseDate: followParent,
-                            includeInTotal: inTotal,
-                            includeInDailyCost: inDaily,
-                          );
-                          setState(() {
-                            final index =
-                                addons.indexWhere((a) => a.id == next.id);
-                            if (index >= 0) {
-                              addons[index] = next;
-                            } else {
-                              addons.add(next);
-                            }
-                          });
-                          Navigator.pop(dialogContext);
-                        },
-                        child: Text(existing == null
-                            ? tr('common.add')
-                            : tr('common.save'))),
-                  ],
-                )));
+  Future<void> editAddonAt(int? index) async {
+    final existing = index == null ? null : addons[index];
+    final result = await showAddonEditorDialog(
+      context,
+      existing: existing,
+      parentDate: parseUserDateOrNull(purchaseDate.text) ?? DateTime.now(),
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      if (result.kind == AddonEditorResultKind.deleted && index != null) {
+        addons.removeAt(index);
+      } else if (result.item != null) {
+        if (index == null) {
+          addons.add(result.item!);
+        } else {
+          addons[index] = result.item!;
+        }
+      }
+    });
   }
 
   Future<void> saveAsset() async {

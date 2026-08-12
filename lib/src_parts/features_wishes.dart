@@ -393,28 +393,24 @@ class _ComposePageState extends State<ComposePage> {
                           SmallCaret()
                         ]),
                         const SizedBox(height: 10),
-                        if (addons.isNotEmpty)
-                          ...addons.map((a) => ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                dense: true,
-                                title: Text(a.name,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.normal)),
-                                subtitle: Text(
-                                    '${tr('compose.addonPurchaseTime')}${a.purchaseDateLabel}',
-                                    style: const TextStyle(
-                                        color: kMuted, fontSize: 12)),
-                                trailing: Text(
-                                    money(a.price, context.store.settings)),
-                                onLongPress: () =>
-                                    setState(() => addons.remove(a)),
-                              )),
-                        SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                                onPressed: addAddon,
-                                icon: const Icon(Icons.add_rounded),
-                                label: Text(tr('compose.addItem')))),
+                        AddonListEditor(
+                          addons: addons,
+                          parentDate: parseUserDateOrNull(purchaseDate.text) ??
+                              DateTime.now(),
+                          emptyText: tr('editor.addonHint'),
+                          compact: true,
+                          onAdd: addAddon,
+                          onEdit: editAddonAt,
+                          onDelete: (index) =>
+                              setState(() => addons.removeAt(index)),
+                          onReorder: (oldIndex, newIndex) {
+                            setState(() {
+                              if (newIndex > oldIndex) newIndex -= 1;
+                              final item = addons.removeAt(oldIndex);
+                              addons.insert(newIndex, item);
+                            });
+                          },
+                        ),
                       ]))),
             const SizedBox(height: 12),
             SoftFormCard(
@@ -950,50 +946,28 @@ class _ComposePageState extends State<ComposePage> {
     }));
   }
 
-  void addAddon() {
-    final nameCtl = TextEditingController();
-    final priceCtl = TextEditingController();
-    final dateCtl = TextEditingController(text: dateText(DateTime.now()));
-    appSheet(context,
-        title: tr('compose.addAddonTitle'),
-        subtitle: tr('compose.addAddonSubtitle'),
-        child: Column(children: [
-          TextField(
-              controller: nameCtl,
-              decoration: InputDecoration(labelText: tr('compose.addonName'))),
-          const SizedBox(height: 10),
-          TextField(
-              controller: priceCtl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(labelText: tr('compose.addonPrice'))),
-          const SizedBox(height: 10),
-          DateFormField(
-              controller: dateCtl, label: tr('compose.addonPurchaseTime')),
-          const SizedBox(height: 12),
-          SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                  onPressed: () {
-                    final parsedDate = dateCtl.text.trim().isEmpty
-                        ? null
-                        : parseUserDateOrNull(dateCtl.text);
-                    if (dateCtl.text.trim().isNotEmpty && parsedDate == null) {
-                      showNativeSnack(context, tr('compose.addonDateInvalid'));
-                      return;
-                    }
-                    setState(() => addons.add(AddonItem(
-                          id: newId('addon'),
-                          name: nameCtl.text.trim().isEmpty
-                              ? tr('compose.addonDefaultName')
-                              : nameCtl.text.trim(),
-                          price: asDouble(priceCtl.text),
-                          purchaseDate: parsedDate,
-                        )));
-                    Navigator.pop(context);
-                  },
-                  child: Text(tr('common.add')))),
-        ]));
+  void addAddon() => editAddonAt(null);
+
+  Future<void> editAddonAt(int? index) async {
+    final existing = index == null ? null : addons[index];
+    final result = await showAddonEditorDialog(
+      context,
+      existing: existing,
+      parentDate: parseUserDateOrNull(purchaseDate.text) ?? DateTime.now(),
+      enforceParentDate: tab == ComposeTab.asset,
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      if (result.kind == AddonEditorResultKind.deleted && index != null) {
+        addons.removeAt(index);
+      } else if (result.item != null) {
+        if (index == null) {
+          addons.add(result.item!);
+        } else {
+          addons[index] = result.item!;
+        }
+      }
+    });
   }
 
   Future<void> save() async {
@@ -1412,9 +1386,18 @@ class WishCard extends StatelessWidget {
               : Colors.white,
           onSelected: (v) async {
             if (v == 'convert') {
-              await store.convertWishToAsset(wish.id);
-              if (!context.mounted) return;
-              showNativeSnack(context, tr('wish.convertedToAsset'));
+              try {
+                final assetId = await store.convertWishToAsset(wish.id);
+                if (!context.mounted) return;
+                showNativeSnack(
+                    context,
+                    assetId == null
+                        ? tr('wish.convertFailed')
+                        : tr('wish.convertedToAsset'));
+              } catch (_) {
+                if (!context.mounted) return;
+                showNativeSnack(context, tr('wish.convertFailed'));
+              }
             }
             if (v == 'archive')
               await store.upsertWish(wish.copyWith(archived: !wish.archived));
@@ -1462,6 +1445,7 @@ class _WishEditorPageState extends State<WishEditorPage> {
   late TextEditingController name, icon, price, tagsText, note;
   late String? categoryId;
   late bool archived;
+  final List<AddonItem> addons = [];
   bool _wishSavePressed = false;
   bool _saving = false;
 
@@ -1477,6 +1461,7 @@ class _WishEditorPageState extends State<WishEditorPage> {
     note = TextEditingController(text: item?.note ?? '');
     categoryId = item?.categoryId;
     archived = item?.archived ?? false;
+    addons.addAll(item?.addons ?? []);
   }
 
   @override
@@ -1627,6 +1612,30 @@ class _WishEditorPageState extends State<WishEditorPage> {
                           maxLines: 5,
                           decoration: InputDecoration(
                               labelText: tr('wish.purchaseReason'))),
+                      const SizedBox(height: 14),
+                      Row(children: [
+                        Expanded(
+                            child: Text(tr('editor.addons'),
+                                style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.normal))),
+                      ]),
+                      AddonListEditor(
+                        addons: addons,
+                        parentDate: DateTime.now(),
+                        emptyText: tr('editor.addonHint'),
+                        onAdd: addAddon,
+                        onEdit: editAddonAt,
+                        onDelete: (index) =>
+                            setState(() => addons.removeAt(index)),
+                        onReorder: (oldIndex, newIndex) {
+                          setState(() {
+                            if (newIndex > oldIndex) newIndex -= 1;
+                            final item = addons.removeAt(oldIndex);
+                            addons.insert(newIndex, item);
+                          });
+                        },
+                      ),
                       Material(
                         color: Colors.transparent,
                         child: SwitchListTile(
@@ -1820,6 +1829,30 @@ class _WishEditorPageState extends State<WishEditorPage> {
               : tr('wish.stickerCoverGenerated'));
   }
 
+  void addAddon() => editAddonAt(null);
+
+  Future<void> editAddonAt(int? index) async {
+    final existing = index == null ? null : addons[index];
+    final result = await showAddonEditorDialog(
+      context,
+      existing: existing,
+      parentDate: DateTime.now(),
+      enforceParentDate: false,
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      if (result.kind == AddonEditorResultKind.deleted && index != null) {
+        addons.removeAt(index);
+      } else if (result.item != null) {
+        if (index == null) {
+          addons.add(result.item!);
+        } else {
+          addons[index] = result.item!;
+        }
+      }
+    });
+  }
+
   Future<void> saveWish() async {
     if (_saving) return;
     _saving = true;
@@ -1838,7 +1871,7 @@ class _WishEditorPageState extends State<WishEditorPage> {
           archived: archived,
           convertedAt: widget.initial?.convertedAt,
           convertedAssetId: widget.initial?.convertedAssetId,
-          addons: widget.initial?.addons ?? [],
+          addons: List.of(addons),
           createdAt: widget.initial?.createdAt ?? now,
           updatedAt: now);
       await store.upsertWishWithTagNames(item, splitTags(tagsText.text));

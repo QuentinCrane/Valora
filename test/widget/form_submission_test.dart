@@ -85,7 +85,7 @@ void main() {
     expect(store.wishes, isEmpty);
   });
 
-  testWidgets('wish editor saves through the shared path', (tester) async {
+  testWidgets('wish editor double save creates one wish', (tester) async {
     final store = _testStore();
     await tester.pumpWidget(_harness(store, const WishEditorPage()));
     await tester.pumpAndSettle();
@@ -93,13 +93,51 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'Lamp');
     await tester.enterText(fields.at(1), '60');
-    await tester.tap(find.byWidgetPredicate((widget) =>
-        widget is ValoraGlassSaveContent && widget.label == tr('wish.save')));
+    await _tapTwice(
+      tester,
+      find.byWidgetPredicate((widget) =>
+          widget is ValoraGlassSaveContent && widget.label == tr('wish.save')),
+    );
     saveGate.complete();
     await tester.pumpAndSettle();
 
     expect(store.wishes, hasLength(1));
     expect(store.wishes.single.name, 'Lamp');
+  });
+
+  testWidgets('wish editor exposes existing addons for editing',
+      (tester) async {
+    final now = DateTime(2026, 8, 1);
+    final store = _testStore()
+      ..wishes.add(Wish(
+        id: 'wish-with-addon',
+        name: 'Camera',
+        iconValue: '📷',
+        expectedPrice: 1000,
+        note: '',
+        categoryId: null,
+        tagIds: const [],
+        archived: false,
+        convertedAt: null,
+        convertedAssetId: null,
+        addons: [
+          AddonItem(
+            id: 'strap',
+            name: 'Strap',
+            price: 30,
+            purchaseDate: now,
+          ),
+        ],
+        createdAt: now,
+        updatedAt: now,
+      ));
+
+    await tester.pumpWidget(
+        _harness(store, WishEditorPage(initial: store.wishes.single)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Strap'), findsOneWidget);
+    expect(find.byIcon(Icons.drag_handle_rounded), findsOneWidget);
   });
 }
 

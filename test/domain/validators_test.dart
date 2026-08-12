@@ -98,6 +98,45 @@ void main() {
     );
   });
 
+  test('allows an unknown sold price but rejects it on a non-sold asset', () {
+    final soldWithoutPrice = DomainValidators.asset(
+      AssetValidationInput(
+        name: 'Phone',
+        priceless: false,
+        price: 500,
+        purchaseDate: purchaseDate,
+        isRetired: false,
+        retiredAt: null,
+        isSold: true,
+        soldAt: DateTime(2026, 8, 10),
+        soldPrice: null,
+        expiresAt: null,
+        addons: const [],
+      ),
+      today: today,
+    );
+    final stalePrice = DomainValidators.asset(
+      AssetValidationInput(
+        name: 'Phone',
+        priceless: false,
+        price: 500,
+        purchaseDate: purchaseDate,
+        isRetired: false,
+        retiredAt: null,
+        isSold: false,
+        soldAt: null,
+        soldPrice: 300,
+        expiresAt: null,
+        addons: const [],
+      ),
+      today: today,
+    );
+
+    expect(soldWithoutPrice.isValid, isTrue);
+    expect(stalePrice.issues.map((issue) => issue.key),
+        contains('validation.soldPriceOnlyForSold'));
+  });
+
   test('keeps recovery records inside the referenced asset lifecycle', () {
     final beforePurchase = DomainValidators.recovery(
       RecoveryValidationInput(

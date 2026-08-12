@@ -3191,6 +3191,17 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  DateTime _wishConversionPurchaseDate(Wish wish, DateTime convertedAt) {
+    var purchaseDate = dateOnly(convertedAt);
+    for (final addon in wish.addons) {
+      final addonDate = addon.purchaseDate;
+      if (addon.followParentPurchaseDate || addonDate == null) continue;
+      final candidate = dateOnly(addonDate);
+      if (candidate.isBefore(purchaseDate)) purchaseDate = candidate;
+    }
+    return purchaseDate;
+  }
+
   Future<String?> convertWishToAsset(String wishId) async {
     final index = wishes.indexWhere((w) => w.id == wishId);
     if (index < 0) return null;
@@ -3200,16 +3211,17 @@ class AppStore extends ChangeNotifier {
         assets.any((asset) => asset.id == convertedAssetId)) {
       return convertedAssetId;
     }
+    final convertedAt = DateTime.now();
     final assetId = newId('asset');
     final asset = Asset(
       id: assetId,
       name: wish.name,
       iconValue: wish.iconValue,
       price: wish.expectedPrice,
-      purchaseDate: DateTime.now(),
+      purchaseDate: _wishConversionPurchaseDate(wish, convertedAt),
       categoryId: wish.categoryId,
       tagIds: List.of(wish.tagIds),
-      addons: wish.addons.map((e) => e).toList(),
+      addons: wish.addons.map((addon) => addon.copyWith()).toList(),
       note: wish.note,
       status: AssetStatus.serving,
       includeInTotal: true,
@@ -3223,13 +3235,26 @@ class AppStore extends ChangeNotifier {
       targetCustomDays: null,
       expiresAt: null,
       remindBeforeDays: null,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      createdAt: wish.createdAt,
+      updatedAt: convertedAt,
     );
-    assets.add(asset);
-    wishes[index] = wish.copyWith(
-        archived: true, convertedAt: DateTime.now(), convertedAssetId: assetId);
-    await save();
+    _validateDomain(DomainValidators.asset(_assetValidationInput(asset)));
+    final previousAssets = List<Asset>.of(assets);
+    final previousWishes = List<Wish>.of(wishes);
+    try {
+      assets.add(asset);
+      wishes[index] = wish.copyWith(
+          archived: true, convertedAt: convertedAt, convertedAssetId: assetId);
+      await save();
+    } catch (_) {
+      assets
+        ..clear()
+        ..addAll(previousAssets);
+      wishes
+        ..clear()
+        ..addAll(previousWishes);
+      rethrow;
+    }
     _invalidateAnalytics();
     notifyListeners();
     return assetId;
