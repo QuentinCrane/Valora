@@ -1707,8 +1707,10 @@ class _IconPickerSheetState extends State<IconPickerSheet> {
                   children: [
                     FilledButton.icon(
                       onPressed: () async {
-                        final uri = await NativeBridge.pickImage();
+                        final result = await NativeBridge.pickImageResult();
                         if (!context.mounted) return;
+                        if (showNativeBridgeFailure(context, result)) return;
+                        final uri = result.value;
                         if (uri != null && uri.trim().isNotEmpty)
                           Navigator.pop(context, uri);
                       },
@@ -2746,8 +2748,7 @@ class _DatePickerHeader extends StatelessWidget {
             onTap: onToggleMode,
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                  datePickerMonthTitle(month),
+              Text(datePickerMonthTitle(month),
                   style: TextStyle(
                       fontSize: 21,
                       height: 1.05,

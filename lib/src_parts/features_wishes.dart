@@ -686,8 +686,11 @@ class _ComposePageState extends State<ComposePage> {
 
   Future<void> pickNativeCover() async {
     lightHaptic();
-    final uri = await NativeBridge.pickImage();
-    if (uri == null || uri.trim().isEmpty) return;
+    final result = await NativeBridge.pickImageResult();
+    if (!mounted) return;
+    if (showNativeBridgeFailure(context, result)) return;
+    final uri = result.value;
+    if (result.isCancelled || uri == null || uri.trim().isEmpty) return;
     setState(() => icon.text = uri);
     if (mounted) showNativeSnack(context, tr('compose.coverSet'));
   }
@@ -710,7 +713,10 @@ class _ComposePageState extends State<ComposePage> {
 
   Future<void> cutoutCoverIntoForm() async {
     mediumHaptic();
-    final payload = await NativeBridge.cutoutImageFromPickerDetailed();
+    final result = await NativeBridge.cutoutImageFromPickerDetailedResult();
+    if (!mounted) return;
+    if (showNativeBridgeFailure(context, result)) return;
+    final payload = result.value ?? <String, dynamic>{};
     final uri = mounted ? await chooseStickerCandidate(context, payload) : null;
     if (uri == null || uri.trim().isEmpty) {
       if (mounted) showNativeSnack(context, tr('compose.noStickerGenerated'));
@@ -730,7 +736,10 @@ class _ComposePageState extends State<ComposePage> {
 
   Future<void> scanBarcodeIntoForm() async {
     mediumHaptic();
-    final data = nativeJsonMap(await NativeBridge.scanBarcodeFromImage());
+    final result = await NativeBridge.scanBarcodeFromImageResult();
+    if (!mounted) return;
+    if (showNativeBridgeFailure(context, result)) return;
+    final data = nativeJsonMap(result.value);
     if (data['found'] != true) {
       if (mounted) showNativeSnack(context, tr('compose.barcodeNotFound'));
       return;
@@ -748,7 +757,10 @@ class _ComposePageState extends State<ComposePage> {
 
   Future<void> ocrReceiptIntoForm() async {
     mediumHaptic();
-    final data = nativeJsonMap(await NativeBridge.recognizeReceiptFromImage());
+    final result = await NativeBridge.recognizeReceiptFromImageResult();
+    if (!mounted) return;
+    if (showNativeBridgeFailure(context, result)) return;
+    final data = nativeJsonMap(result.value);
     if (data['found'] != true) {
       if (mounted) showNativeSnack(context, tr('compose.ocrNoText'));
       return;
@@ -1681,8 +1693,11 @@ class _WishEditorPageState extends State<WishEditorPage> {
 
   Future<void> pickNativeCover() async {
     lightHaptic();
-    final uri = await NativeBridge.pickImage();
-    if (uri == null || uri.trim().isEmpty) return;
+    final result = await NativeBridge.pickImageResult();
+    if (!mounted) return;
+    if (showNativeBridgeFailure(context, result)) return;
+    final uri = result.value;
+    if (result.isCancelled || uri == null || uri.trim().isEmpty) return;
     setState(() => icon.text = uri);
     if (mounted) showNativeSnack(context, tr('wish.coverSet'));
   }
@@ -1784,7 +1799,10 @@ class _WishEditorPageState extends State<WishEditorPage> {
 
   Future<void> cutoutCoverIntoForm() async {
     mediumHaptic();
-    final payload = await NativeBridge.cutoutImageFromPickerDetailed();
+    final result = await NativeBridge.cutoutImageFromPickerDetailedResult();
+    if (!mounted) return;
+    if (showNativeBridgeFailure(context, result)) return;
+    final payload = result.value ?? <String, dynamic>{};
     final uri = mounted ? await chooseStickerCandidate(context, payload) : null;
     if (uri == null || uri.trim().isEmpty) {
       if (mounted) showNativeSnack(context, tr('wish.noStickerGenerated'));

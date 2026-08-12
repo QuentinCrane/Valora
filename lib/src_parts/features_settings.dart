@@ -2653,9 +2653,11 @@ class _BackupManagerState extends State<BackupManager> {
         Expanded(
             child: OutlinedButton(
                 onPressed: () async {
-                  await NativeBridge.writeClipboard(store.exportJson());
-                  if (context.mounted)
-                    showNativeSnack(context, tl('JSON 已复制到剪贴板'));
+                  final result = await NativeBridge.writeClipboardResult(
+                      store.exportJson());
+                  if (!context.mounted) return;
+                  if (showNativeBridgeFailure(context, result)) return;
+                  showNativeSnack(context, tl('JSON 已复制到剪贴板'));
                 },
                 child: Text(tl('复制 JSON')))),
         const SizedBox(width: 8),
@@ -2673,16 +2675,17 @@ class _BackupManagerState extends State<BackupManager> {
         Expanded(
             child: OutlinedButton(
                 onPressed: () async {
-                  final uri = await NativeBridge.exportTextFile(
+                  final result = await NativeBridge.exportTextFileResult(
                       fileName: 'zhipu_backup_${dateStamp()}.json',
                       text: store.exportJson(),
                       mimeType: 'application/json');
-                  if (context.mounted)
-                    showNativeSnack(
-                        context,
-                        uri == null
-                            ? tr('common.exportCancelled')
-                            : tl('已导出到系统文件'));
+                  if (!context.mounted) return;
+                  if (showNativeBridgeFailure(context, result)) return;
+                  showNativeSnack(
+                      context,
+                      result.isCancelled || result.value == null
+                          ? tr('common.exportCancelled')
+                          : tl('已导出到系统文件'));
                 },
                 child: Text(tl('保存 JSON')))),
         const SizedBox(width: 8),
@@ -2701,9 +2704,12 @@ class _BackupManagerState extends State<BackupManager> {
           width: double.infinity,
           child: OutlinedButton.icon(
               onPressed: () async {
-                final text = await NativeBridge.importTextFile(
+                final result = await NativeBridge.importTextFileResult(
                     mimeType: 'application/json');
-                if (text != null) setState(() => importCtl.text = text);
+                if (!context.mounted) return;
+                if (showNativeBridgeFailure(context, result)) return;
+                if (result.value != null)
+                  setState(() => importCtl.text = result.value!);
               },
               icon: const Icon(Icons.file_open_rounded),
               label: Text(tl('从系统文件选择 JSON（纯数据）')))),

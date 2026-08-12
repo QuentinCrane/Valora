@@ -1,26 +1,225 @@
 part of '../main.dart';
 
-class NativeBridge {
-  static const MethodChannel _channel = MethodChannel('valora/native');
+enum NativeBridgeStatus { success, cancelled, failure }
 
-  static Future<T?> _call<T>(String method,
-      [Map<String, dynamic>? args]) async {
-    try {
-      return await _channel.invokeMethod<T>(method, args);
-    } catch (_) {
-      return null;
+enum NativeBridgeErrorCode {
+  cancelled,
+  busy,
+  permissionDenied,
+  insufficientStorage,
+  invalidFormat,
+  modelUnavailable,
+  timeout,
+  unavailable,
+  processingFailed,
+  notImplemented,
+  nativeFailure,
+  unknown,
+}
+
+extension NativeBridgeErrorCodeX on NativeBridgeErrorCode {
+  static NativeBridgeErrorCode fromWire(Object? raw) {
+    switch (raw?.toString().trim().toLowerCase()) {
+      case 'cancel':
+      case 'cancelled':
+      case 'canceled':
+        return NativeBridgeErrorCode.cancelled;
+      case 'busy':
+        return NativeBridgeErrorCode.busy;
+      case 'permission':
+      case 'permission_denied':
+      case 'security_exception':
+        return NativeBridgeErrorCode.permissionDenied;
+      case 'storage_full':
+      case 'no_space':
+      case 'insufficient_storage':
+        return NativeBridgeErrorCode.insufficientStorage;
+      case 'format':
+      case 'invalid_format':
+        return NativeBridgeErrorCode.invalidFormat;
+      case 'model':
+      case 'model_unavailable':
+        return NativeBridgeErrorCode.modelUnavailable;
+      case 'timeout':
+        return NativeBridgeErrorCode.timeout;
+      case 'not_implemented':
+        return NativeBridgeErrorCode.notImplemented;
+      case 'native_intent_error':
+      case 'unavailable':
+        return NativeBridgeErrorCode.unavailable;
+      case 'barcode_scan_error':
+      case 'ocr_error':
+      case 'cutout_error':
+      case 'processing_failed':
+        return NativeBridgeErrorCode.processingFailed;
+      case 'native_result_error':
+      case 'native_failure':
+        return NativeBridgeErrorCode.nativeFailure;
+      default:
+        return NativeBridgeErrorCode.unknown;
     }
   }
 
+  String get wireName {
+    switch (this) {
+      case NativeBridgeErrorCode.cancelled:
+        return 'cancelled';
+      case NativeBridgeErrorCode.busy:
+        return 'busy';
+      case NativeBridgeErrorCode.permissionDenied:
+        return 'permission_denied';
+      case NativeBridgeErrorCode.insufficientStorage:
+        return 'insufficient_storage';
+      case NativeBridgeErrorCode.invalidFormat:
+        return 'invalid_format';
+      case NativeBridgeErrorCode.modelUnavailable:
+        return 'model_unavailable';
+      case NativeBridgeErrorCode.timeout:
+        return 'timeout';
+      case NativeBridgeErrorCode.unavailable:
+        return 'unavailable';
+      case NativeBridgeErrorCode.processingFailed:
+        return 'processing_failed';
+      case NativeBridgeErrorCode.notImplemented:
+        return 'not_implemented';
+      case NativeBridgeErrorCode.nativeFailure:
+        return 'native_failure';
+      case NativeBridgeErrorCode.unknown:
+        return 'unknown';
+    }
+  }
+}
+
+class NativeBridgeError {
+  final NativeBridgeErrorCode code;
+  final String? safeDetail;
+
+  const NativeBridgeError(this.code, {this.safeDetail});
+}
+
+class NativeBridgeResult<T> {
+  final NativeBridgeStatus status;
+  final T? value;
+  final NativeBridgeError? error;
+
+  const NativeBridgeResult._({
+    required this.status,
+    this.value,
+    this.error,
+  });
+
+  const NativeBridgeResult.success([T? value])
+      : this._(status: NativeBridgeStatus.success, value: value);
+
+  const NativeBridgeResult.cancelled()
+      : this._(
+            status: NativeBridgeStatus.cancelled,
+            error: const NativeBridgeError(NativeBridgeErrorCode.cancelled));
+
+  const NativeBridgeResult.failure(NativeBridgeError error)
+      : this._(status: NativeBridgeStatus.failure, error: error);
+
+  bool get isSuccess => status == NativeBridgeStatus.success;
+  bool get isCancelled => status == NativeBridgeStatus.cancelled;
+  bool get isFailure => status == NativeBridgeStatus.failure;
+}
+
+class NativeBridge {
+  static const MethodChannel _channel = MethodChannel('valora/native');
+  static const Duration _callTimeout = Duration(seconds: 30);
+
+  static Future<NativeBridgeResult<T>> _callResult<T>(
+    String method, {
+    Map<String, dynamic>? args,
+    bool nullMeansCancellation = false,
+    Duration timeout = _callTimeout,
+  }) async {
+    Object? raw;
+    try {
+      raw = await _channel.invokeMethod<Object?>(method, args).timeout(timeout);
+    } on PlatformException catch (error) {
+      return NativeBridgeResult.failure(NativeBridgeError(
+        NativeBridgeErrorCodeX.fromWire(error.code),
+      ));
+    } on MissingPluginException {
+      return const NativeBridgeResult.failure(
+          NativeBridgeError(NativeBridgeErrorCode.notImplemented));
+    } on TimeoutException {
+      return const NativeBridgeResult.failure(
+          NativeBridgeError(NativeBridgeErrorCode.timeout));
+    } catch (_) {
+      return const NativeBridgeResult.failure(
+          NativeBridgeError(NativeBridgeErrorCode.unknown));
+    }
+
+    if (raw is Map && raw['status'] != null) {
+      final status = raw['status']?.toString().trim().toLowerCase();
+      if (status == 'cancelled') return const NativeBridgeResult.cancelled();
+      if (status == 'error' || status == 'failure') {
+        final errorMap = raw['error'];
+        final code = errorMap is Map ? errorMap['code'] : errorMap;
+        return NativeBridgeResult.failure(
+            NativeBridgeError(NativeBridgeErrorCodeX.fromWire(code)));
+      }
+      if (status == 'success') raw = raw['data'];
+    }
+
+    if (raw == null && nullMeansCancellation) {
+      return const NativeBridgeResult.cancelled();
+    }
+    if (raw != null && raw is! T) {
+      return const NativeBridgeResult.failure(
+          NativeBridgeError(NativeBridgeErrorCode.invalidFormat));
+    }
+    return NativeBridgeResult.success(raw as T?);
+  }
+
+  static Future<T?> _call<T>(String method,
+      [Map<String, dynamic>? args]) async {
+    return (await _callResult<T>(method, args: args)).value;
+  }
+
+  static NativeBridgeResult<Map<String, dynamic>> _decodeJsonMapResult(
+      NativeBridgeResult<String> result) {
+    if (!result.isSuccess) {
+      return NativeBridgeResult.failure(result.error ??
+          const NativeBridgeError(NativeBridgeErrorCode.unknown));
+    }
+    final raw = result.value;
+    if (raw == null || raw.trim().isEmpty) {
+      return const NativeBridgeResult.failure(
+          NativeBridgeError(NativeBridgeErrorCode.invalidFormat));
+    }
+    final decoded = nativeJsonMap(raw);
+    if (decoded.isEmpty) {
+      return const NativeBridgeResult.failure(
+          NativeBridgeError(NativeBridgeErrorCode.invalidFormat));
+    }
+    return NativeBridgeResult.success(decoded);
+  }
+
   static Future<void> configureSystemUi() async {
-    await _call<Object>('configureSystemUi');
+    await _fireAndForget('configureSystemUi');
   }
 
   static Future<void> haptic(String style) async {
-    await _call<Object>('haptic', {'style': style});
+    await _fireAndForget('haptic', {'style': style});
   }
 
-  static Future<String?> pickImage() => _call<String>('pickImage');
+  static Future<void> _fireAndForget(String method,
+      [Map<String, dynamic>? args]) async {
+    try {
+      await _channel.invokeMethod<Object?>(method, args);
+    } catch (_) {
+      // Haptics and system UI setup are best-effort side effects. They must
+      // never surface a native error or leave a timeout timer behind.
+    }
+  }
+
+  static Future<NativeBridgeResult<String>> pickImageResult() =>
+      _callResult<String>('pickImage', nullMeansCancellation: true);
+
+  static Future<String?> pickImage() async => (await pickImageResult()).value;
 
   static Future<String?> pickNativeDate({String? initialDate, String? title}) =>
       _call<String>('pickNativeDate', {
@@ -28,54 +227,136 @@ class NativeBridge {
         'title': title ?? tr('common.pickDate')
       });
 
-  static Future<String?> capturePhoto() => _call<String>('capturePhoto');
+  static Future<NativeBridgeResult<String>> capturePhotoResult() =>
+      _callResult<String>('capturePhoto', nullMeansCancellation: true);
 
-  static Future<String?> scanBarcodeFromImage() =>
-      _call<String>('scanBarcodeFromImage');
+  static Future<String?> capturePhoto() async =>
+      (await capturePhotoResult()).value;
 
-  static Future<String?> recognizeReceiptFromImage() =>
-      _call<String>('recognizeReceiptFromImage');
+  static Future<NativeBridgeResult<String>> scanBarcodeFromImageResult() =>
+      _callResult<String>('scanBarcodeFromImage', nullMeansCancellation: true);
 
-  static Future<String?> cutoutImageFromPicker() =>
-      _call<String>('cutoutImageFromPicker');
+  static Future<String?> scanBarcodeFromImage() async =>
+      (await scanBarcodeFromImageResult()).value;
+
+  static Future<NativeBridgeResult<String>> recognizeReceiptFromImageResult() =>
+      _callResult<String>('recognizeReceiptFromImage',
+          nullMeansCancellation: true);
+
+  static Future<String?> recognizeReceiptFromImage() async =>
+      (await recognizeReceiptFromImageResult()).value;
+
+  static Future<NativeBridgeResult<String>> cutoutImageFromPickerResult() =>
+      _callResult<String>('cutoutImageFromPicker', nullMeansCancellation: true);
+
+  static Future<String?> cutoutImageFromPicker() async =>
+      (await cutoutImageFromPickerResult()).value;
+
+  static Future<NativeBridgeResult<Map<String, dynamic>>>
+      cutoutImageFromPickerDetailedResult() async {
+    final result = await _callResult<String>('cutoutImageFromPickerDetailed',
+        nullMeansCancellation: true);
+    return _decodeJsonMapResult(result);
+  }
 
   static Future<Map<String, dynamic>> cutoutImageFromPickerDetailed() async =>
-      nativeJsonMap(await _call<String>('cutoutImageFromPickerDetailed'));
+      (await cutoutImageFromPickerDetailedResult()).value ??
+      <String, dynamic>{};
+
+  static Future<NativeBridgeResult<Object>> setStickerEngineConfigResult(
+      {required String mode, required bool keepCandidates}) async {
+    return _callResult<Object>(
+      'setStickerEngineConfig',
+      args: {'mode': mode, 'keepCandidates': keepCandidates},
+    );
+  }
 
   static Future<void> setStickerEngineConfig(
       {required String mode, required bool keepCandidates}) async {
-    await _call<Object>('setStickerEngineConfig',
-        {'mode': mode, 'keepCandidates': keepCandidates});
+    await setStickerEngineConfigResult(
+        mode: mode, keepCandidates: keepCandidates);
   }
 
   static Future<Map<String, dynamic>> getStickerEngineConfig() async =>
       nativeJsonMap(await _call<String>('getStickerEngineConfig'));
 
-  static Future<String?> persistImageUri(String uri) =>
-      _call<String>('persistImageUri', {'uri': uri});
+  static Future<NativeBridgeResult<String>> persistImageUriResult(String uri) =>
+      _callResult<String>('persistImageUri',
+          args: {'uri': uri}, nullMeansCancellation: true);
 
-  static Future<String?> readClipboard() => _call<String>('readClipboard');
+  static Future<String?> persistImageUri(String uri) async =>
+      (await persistImageUriResult(uri)).value;
+
+  static Future<NativeBridgeResult<String>> readClipboardResult() =>
+      _callResult<String>('readClipboard', nullMeansCancellation: true);
+
+  static Future<String?> readClipboard() async =>
+      (await readClipboardResult()).value;
+
+  static Future<NativeBridgeResult<Object>> writeClipboardResult(String text) =>
+      _callResult<Object>('writeClipboard', args: {'text': text});
 
   static Future<void> writeClipboard(String text) async {
-    await _call<Object>('writeClipboard', {'text': text});
+    await writeClipboardResult(text);
   }
 
-  static Future<String?> importTextFile({String mimeType = '*/*'}) =>
-      _call<String>('importTextFile', {'mimeType': mimeType});
+  static Future<NativeBridgeResult<String>> importTextFileResult(
+          {String mimeType = '*/*'}) =>
+      _callResult<String>('importTextFile',
+          args: {'mimeType': mimeType}, nullMeansCancellation: true);
+
+  static Future<String?> importTextFile({String mimeType = '*/*'}) async =>
+      (await importTextFileResult(mimeType: mimeType)).value;
+
+  static Future<NativeBridgeResult<String>> exportTextFileResult(
+          {required String fileName,
+          required String text,
+          String mimeType = 'text/plain'}) =>
+      _callResult<String>('exportTextFile',
+          args: {
+            'fileName': fileName,
+            'mimeType': mimeType,
+            'text': text,
+          },
+          nullMeansCancellation: true);
 
   static Future<String?> exportTextFile(
           {required String fileName,
           required String text,
-          String mimeType = 'text/plain'}) =>
-      _call<String>('exportTextFile', {
-        'fileName': fileName,
-        'mimeType': mimeType,
-        'text': text,
-      });
+          String mimeType = 'text/plain'}) async =>
+      (await exportTextFileResult(
+              fileName: fileName, text: text, mimeType: mimeType))
+          .value;
+
+  static Future<NativeBridgeResult<Object>> shareTextResult(
+      {required String title, required String text}) async {
+    return _callResult<Object>(
+      'shareText',
+      args: {'title': title, 'text': text},
+    );
+  }
 
   static Future<void> shareText(
       {required String title, required String text}) async {
-    await _call<Object>('shareText', {'title': title, 'text': text});
+    await shareTextResult(title: title, text: text);
+  }
+
+  static Future<NativeBridgeResult<Object>> shareDataArchiveResult({
+    required String title,
+    required String json,
+    required String csv,
+    required String markdown,
+    required List<String> mediaPaths,
+    required String fileName,
+  }) {
+    return _callResult<Object>('shareDataArchive', args: {
+      'title': title,
+      'json': json,
+      'csv': csv,
+      'markdown': markdown,
+      'mediaPaths': mediaPaths,
+      'fileName': fileName,
+    });
   }
 
   static Future<void> shareDataArchive({
@@ -86,57 +367,101 @@ class NativeBridge {
     required List<String> mediaPaths,
     required String fileName,
   }) async {
-    await _call<Object>('shareDataArchive', {
-      'title': title,
-      'json': json,
-      'csv': csv,
-      'markdown': markdown,
-      'mediaPaths': mediaPaths,
-      'fileName': fileName,
-    });
+    await shareDataArchiveResult(
+      title: title,
+      json: json,
+      csv: csv,
+      markdown: markdown,
+      mediaPaths: mediaPaths,
+      fileName: fileName,
+    );
   }
 
+  static Future<NativeBridgeResult<Map<String, dynamic>>>
+      importDataArchiveResult() async =>
+          _decodeJsonMapResult(await _callResult<String>('importDataArchive',
+              nullMeansCancellation: true));
+
   static Future<Map<String, dynamic>> importDataArchive() async =>
-      nativeJsonMap(await _call<String>('importDataArchive'));
+      (await importDataArchiveResult()).value ?? <String, dynamic>{};
+
+  static Future<NativeBridgeResult<Map<String, dynamic>>>
+      commitDataArchiveResult(String stagingId) async =>
+          _decodeJsonMapResult(await _callResult<String>('commitDataArchive',
+              args: {'stagingId': stagingId}));
 
   static Future<Map<String, dynamic>> commitDataArchive(
           String stagingId) async =>
-      nativeJsonMap(
-          await _call<String>('commitDataArchive', {'stagingId': stagingId}));
+      (await commitDataArchiveResult(stagingId)).value ?? <String, dynamic>{};
+
+  static Future<NativeBridgeResult<Map<String, dynamic>>>
+      discardDataArchiveResult(String stagingId) async =>
+          _decodeJsonMapResult(await _callResult<String>('discardDataArchive',
+              args: {'stagingId': stagingId}));
 
   static Future<Map<String, dynamic>> discardDataArchive(
           String stagingId) async =>
-      nativeJsonMap(
-          await _call<String>('discardDataArchive', {'stagingId': stagingId}));
+      (await discardDataArchiveResult(stagingId)).value ?? <String, dynamic>{};
+
+  static Future<NativeBridgeResult<Map<String, dynamic>>>
+      rollbackDataArchiveResult(String stagingId) async =>
+          _decodeJsonMapResult(await _callResult<String>('rollbackDataArchive',
+              args: {'stagingId': stagingId}));
 
   static Future<Map<String, dynamic>> rollbackDataArchive(
           String stagingId) async =>
-      nativeJsonMap(
-          await _call<String>('rollbackDataArchive', {'stagingId': stagingId}));
+      (await rollbackDataArchiveResult(stagingId)).value ?? <String, dynamic>{};
+
+  static Future<NativeBridgeResult<Map<String, dynamic>>>
+      finalizeDataArchiveResult(String stagingId) async =>
+          _decodeJsonMapResult(await _callResult<String>('finalizeDataArchive',
+              args: {'stagingId': stagingId}));
 
   static Future<Map<String, dynamic>> finalizeDataArchive(
           String stagingId) async =>
-      nativeJsonMap(
-          await _call<String>('finalizeDataArchive', {'stagingId': stagingId}));
+      (await finalizeDataArchiveResult(stagingId)).value ?? <String, dynamic>{};
 
-  static Future<String?> readPrivateTextFile(String path) =>
-      _call<String>('readPrivateTextFile', {'path': path});
+  static Future<NativeBridgeResult<String>> readPrivateTextFileResult(
+          String path) =>
+      _callResult<String>('readPrivateTextFile',
+          args: {'path': path}, nullMeansCancellation: true);
+
+  static Future<String?> readPrivateTextFile(String path) async =>
+      (await readPrivateTextFileResult(path)).value;
+
+  static Future<NativeBridgeResult<bool>> scheduleNotificationResult({
+    required String title,
+    required String text,
+    int delayMillis = 60000,
+  }) =>
+      _callResult<bool>('scheduleNotification', args: {
+        'title': title,
+        'text': text,
+        'delayMillis': delayMillis,
+      });
 
   static Future<bool> scheduleNotification(
           {required String title,
           required String text,
           int delayMillis = 60000}) async =>
-      await _call<bool>('scheduleNotification',
-          {'title': title, 'text': text, 'delayMillis': delayMillis}) ??
+      (await scheduleNotificationResult(
+              title: title, text: text, delayMillis: delayMillis))
+          .value ??
       false;
 
+  static Future<NativeBridgeResult<bool>> cancelNotificationsResult() =>
+      _callResult<bool>('cancelNotifications');
+
   static Future<bool> cancelNotifications() async =>
-      await _call<bool>('cancelNotifications') ?? false;
+      (await cancelNotificationsResult()).value ?? false;
+
+  static Future<NativeBridgeResult<bool>> createShortcutsResult() =>
+      _callResult<bool>('createShortcuts');
 
   static Future<bool> createShortcuts() async =>
-      await _call<bool>('createShortcuts') ?? false;
+      (await createShortcutsResult()).value ?? false;
 
-  static Future<void> updateHomeWidget({
+  static Future<NativeBridgeResult<Object>> updateHomeWidgetResult({
     required int assetCount,
     required int wishCount,
     required double totalAssetValue,
@@ -148,8 +473,8 @@ class NativeBridge {
     int dueSoonCount = 0,
     int leakCount = 0,
     int snapshotCount = 0,
-  }) async {
-    await _call<Object>('updateHomeWidget', {
+  }) {
+    return _callResult<Object>('updateHomeWidget', args: {
       'assetCount': assetCount,
       'wishCount': wishCount,
       'totalAssetValue': totalAssetValue,
@@ -164,11 +489,45 @@ class NativeBridge {
     });
   }
 
-  static Future<bool> enqueueCloudBackup() async =>
-      await _call<bool>('enqueueCloudBackup') ?? false;
+  static Future<void> updateHomeWidget({
+    required int assetCount,
+    required int wishCount,
+    required double totalAssetValue,
+    required double averageDailyCost,
+    required String currency,
+    int servingCount = 0,
+    int retiredCount = 0,
+    int soldCount = 0,
+    int dueSoonCount = 0,
+    int leakCount = 0,
+    int snapshotCount = 0,
+  }) async {
+    await updateHomeWidgetResult(
+      assetCount: assetCount,
+      wishCount: wishCount,
+      totalAssetValue: totalAssetValue,
+      averageDailyCost: averageDailyCost,
+      currency: currency,
+      servingCount: servingCount,
+      retiredCount: retiredCount,
+      soldCount: soldCount,
+      dueSoonCount: dueSoonCount,
+      leakCount: leakCount,
+      snapshotCount: snapshotCount,
+    );
+  }
 
-  static Future<String?> getInitialIntentInfo() =>
-      _call<String>('getInitialIntentInfo');
+  static Future<NativeBridgeResult<bool>> enqueueCloudBackupResult() =>
+      _callResult<bool>('enqueueCloudBackup');
+
+  static Future<bool> enqueueCloudBackup() async =>
+      (await enqueueCloudBackupResult()).value ?? false;
+
+  static Future<NativeBridgeResult<String>> getInitialIntentInfoResult() =>
+      _callResult<String>('getInitialIntentInfo');
+
+  static Future<String?> getInitialIntentInfo() async =>
+      (await getInitialIntentInfoResult()).value;
 
   static void listenIncomingIntents(ValueChanged<String> onInfo) {
     _channel.setMethodCallHandler((call) async {
@@ -178,14 +537,60 @@ class NativeBridge {
     });
   }
 
+  static Future<NativeBridgeResult<bool>>
+      requestNotificationPermissionResult() =>
+          _callResult<bool>('requestNotificationPermission');
+
   static Future<bool> requestNotificationPermission() async =>
-      await _call<bool>('requestNotificationPermission') ?? false;
+      (await requestNotificationPermissionResult()).value ?? false;
+
+  static Future<NativeBridgeResult<bool>> openNotificationSettingsResult() =>
+      _callResult<bool>('openNotificationSettings');
 
   static Future<bool> openNotificationSettings() async =>
-      await _call<bool>('openNotificationSettings') ?? false;
+      (await openNotificationSettingsResult()).value ?? false;
+
+  static Future<NativeBridgeResult<bool>> openAppSettingsResult() =>
+      _callResult<bool>('openAppSettings');
 
   static Future<bool> openAppSettings() async =>
-      await _call<bool>('openAppSettings') ?? false;
+      (await openAppSettingsResult()).value ?? false;
+}
+
+String nativeBridgeErrorText(NativeBridgeError? error) {
+  switch (error?.code) {
+    case NativeBridgeErrorCode.cancelled:
+      return tr('native.error.cancelled');
+    case NativeBridgeErrorCode.busy:
+      return tr('native.error.busy');
+    case NativeBridgeErrorCode.permissionDenied:
+      return tr('native.error.permissionDenied');
+    case NativeBridgeErrorCode.insufficientStorage:
+      return tr('native.error.insufficientStorage');
+    case NativeBridgeErrorCode.invalidFormat:
+      return tr('native.error.invalidFormat');
+    case NativeBridgeErrorCode.modelUnavailable:
+      return tr('native.error.modelUnavailable');
+    case NativeBridgeErrorCode.timeout:
+      return tr('native.error.timeout');
+    case NativeBridgeErrorCode.unavailable:
+      return tr('native.error.unavailable');
+    case NativeBridgeErrorCode.processingFailed:
+      return tr('native.error.processingFailed');
+    case NativeBridgeErrorCode.notImplemented:
+      return tr('native.error.notImplemented');
+    case NativeBridgeErrorCode.nativeFailure:
+    case NativeBridgeErrorCode.unknown:
+    case null:
+      return tr('native.error.unknown');
+  }
+}
+
+bool showNativeBridgeFailure(
+    BuildContext context, NativeBridgeResult<dynamic> result) {
+  if (!result.isFailure || !context.mounted) return false;
+  showNativeSnack(context, nativeBridgeErrorText(result.error));
+  return true;
 }
 
 String buildAssetsCsv(AppStore store) {
@@ -2573,9 +2978,11 @@ Future<String?> editFramedCover(BuildContext context, String sourceUri) async {
 }
 
 Future<String?> createFramedCoverFromPicker(BuildContext context) async {
-  final uri = await NativeBridge.pickImage();
-  if (uri == null || uri.trim().isEmpty) return null;
+  final result = await NativeBridge.pickImageResult();
   if (!context.mounted) return null;
+  if (showNativeBridgeFailure(context, result)) return null;
+  final uri = result.value;
+  if (result.isCancelled || uri == null || uri.trim().isEmpty) return null;
   return editFramedCover(context, uri);
 }
 
@@ -3001,9 +3408,11 @@ Future<String?> editManualTraceSticker(
 }
 
 Future<String?> createManualTraceStickerFromPicker(BuildContext context) async {
-  final uri = await NativeBridge.pickImage();
-  if (uri == null || uri.trim().isEmpty) return null;
+  final result = await NativeBridge.pickImageResult();
   if (!context.mounted) return null;
+  if (showNativeBridgeFailure(context, result)) return null;
+  final uri = result.value;
+  if (result.isCancelled || uri == null || uri.trim().isEmpty) return null;
   final traced = await editManualTraceSticker(context, uri);
   if (traced == null || traced.trim().isEmpty || !context.mounted)
     return traced;
@@ -3034,7 +3443,10 @@ Future<void> restoreJsonFromText(BuildContext context, String? text) async {
 
 Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
   final store = context.store;
-  final payload = await NativeBridge.importDataArchive();
+  final importResult = await NativeBridge.importDataArchiveResult();
+  if (!context.mounted) return;
+  if (showNativeBridgeFailure(context, importResult)) return;
+  final payload = importResult.value ?? <String, dynamic>{};
   if (payload.isEmpty) {
     if (context.mounted) showNativeSnack(context, tr('restore.noZip'));
     return;
@@ -3141,7 +3553,10 @@ Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
     return;
   }
 
-  final committed = await NativeBridge.commitDataArchive(stagingId);
+  final commitResult = await NativeBridge.commitDataArchiveResult(stagingId);
+  if (!context.mounted) return;
+  if (showNativeBridgeFailure(context, commitResult)) return;
+  final committed = commitResult.value ?? <String, dynamic>{};
   if (committed['ok'] != true) {
     warningHaptic();
     if (context.mounted) {
@@ -3164,9 +3579,9 @@ Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
   final restored = committedJson.trim().isNotEmpty &&
       await store.restoreFromJson(committedJson);
   if (!restored) {
-    await NativeBridge.rollbackDataArchive(stagingId);
+    await NativeBridge.rollbackDataArchiveResult(stagingId);
   } else {
-    await NativeBridge.finalizeDataArchive(stagingId);
+    await NativeBridge.finalizeDataArchiveResult(stagingId);
   }
   if (!context.mounted) return;
   if (restored) {
@@ -3222,7 +3637,7 @@ class NativeFeaturePanel extends StatelessWidget {
           description: tr('native.widgetRefreshDesc'),
           trailing: const ValuePill('D'),
           onTap: () async {
-            await NativeBridge.updateHomeWidget(
+            final result = await NativeBridge.updateHomeWidgetResult(
               assetCount: store.assets.length,
               wishCount: store.wishes.where((w) => !w.archived).length,
               totalAssetValue: store.getTotalAssetValue(),
@@ -3230,6 +3645,7 @@ class NativeFeaturePanel extends StatelessWidget {
               currency: store.settings.currencyUnit,
             );
             if (!context.mounted) return;
+            if (showNativeBridgeFailure(context, result)) return;
             showNativeSnack(context, tr('native.widgetRefreshed'));
           },
         ),
@@ -3259,14 +3675,15 @@ class NativeFeaturePanel extends StatelessWidget {
           description: tr('native.exportJsonDesc'),
           trailing: const ValuePill('F'),
           onTap: () async {
-            final uri = await NativeBridge.exportTextFile(
+            final result = await NativeBridge.exportTextFileResult(
                 fileName: 'zhipu_backup_${dateStamp()}.json',
                 text: store.exportJson(),
                 mimeType: 'application/json');
             if (!context.mounted) return;
+            if (showNativeBridgeFailure(context, result)) return;
             showNativeSnack(
                 context,
-                uri == null
+                result.isCancelled || result.value == null
                     ? tr('common.exportCancelled')
                     : tr('common.exportedToFile'));
           },
@@ -3286,10 +3703,11 @@ class NativeFeaturePanel extends StatelessWidget {
           description: tr('native.restoreJsonDesc'),
           trailing: const ValuePill('JSON'),
           onTap: () async {
-            final text =
-                await NativeBridge.importTextFile(mimeType: 'application/json');
+            final result = await NativeBridge.importTextFileResult(
+                mimeType: 'application/json');
             if (!context.mounted) return;
-            await restoreJsonFromText(context, text);
+            if (showNativeBridgeFailure(context, result)) return;
+            await restoreJsonFromText(context, result.value);
           },
         ),
         SettingRow(
@@ -3299,14 +3717,15 @@ class NativeFeaturePanel extends StatelessWidget {
           description: tr('native.exportCsvDesc'),
           trailing: const ValuePill('CSV'),
           onTap: () async {
-            final uri = await NativeBridge.exportTextFile(
+            final result = await NativeBridge.exportTextFileResult(
                 fileName: 'valora_assets_${dateStamp()}.csv',
                 text: buildAssetsCsv(store),
                 mimeType: 'text/csv');
             if (!context.mounted) return;
+            if (showNativeBridgeFailure(context, result)) return;
             showNativeSnack(
                 context,
-                uri == null
+                result.isCancelled || result.value == null
                     ? tr('common.exportCancelled')
                     : tr('common.csvExported'));
           },
@@ -3331,34 +3750,39 @@ void showNativeMediaSheet(BuildContext context) {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         FilledButton.icon(
             onPressed: () async {
-              final uri = await NativeBridge.pickImage();
-              if (context.mounted)
-                showNativeSnack(
-                    context,
-                    uri == null
-                        ? tr('media.noImage')
-                        : '${tr('media.savedCover')}$uri');
+              final result = await NativeBridge.pickImageResult();
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              showNativeSnack(
+                  context,
+                  result.isCancelled || result.value == null
+                      ? tr('media.noImage')
+                      : '${tr('media.savedCover')}${result.value}');
             },
             icon: const Icon(Icons.photo_library_rounded),
             label: Text(tr('media.openGallery'))),
         const SizedBox(height: 8),
         OutlinedButton.icon(
             onPressed: () async {
-              final uri = await NativeBridge.capturePhoto();
-              if (context.mounted)
-                showNativeSnack(
-                    context,
-                    uri == null
-                        ? tr('media.photoCancelled')
-                        : '${tr('media.photoSaved')}$uri');
+              final result = await NativeBridge.capturePhotoResult();
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              showNativeSnack(
+                  context,
+                  result.isCancelled || result.value == null
+                      ? tr('media.photoCancelled')
+                      : '${tr('media.photoSaved')}${result.value}');
             },
             icon: const Icon(Icons.photo_camera_rounded),
             label: Text(tr('media.takePhoto'))),
         const SizedBox(height: 8),
         OutlinedButton.icon(
             onPressed: () async {
-              final payload =
-                  await NativeBridge.cutoutImageFromPickerDetailed();
+              final result =
+                  await NativeBridge.cutoutImageFromPickerDetailedResult();
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              final payload = result.value ?? <String, dynamic>{};
               final uri = context.mounted
                   ? await chooseStickerCandidate(context, payload)
                   : null;
@@ -3374,29 +3798,32 @@ void showNativeMediaSheet(BuildContext context) {
         const SizedBox(height: 8),
         OutlinedButton.icon(
             onPressed: () async {
-              final data =
-                  nativeJsonMap(await NativeBridge.scanBarcodeFromImage());
-              if (context.mounted)
-                showNativeSnack(
-                    context,
-                    data['found'] == true
-                        ? "${tr('media.barcodeFound')}${data['rawValue']}"
-                        : tr('media.barcodeNotFound'));
+              final result = await NativeBridge.scanBarcodeFromImageResult();
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              final data = nativeJsonMap(result.value);
+              showNativeSnack(
+                  context,
+                  data['found'] == true
+                      ? "${tr('media.barcodeFound')}${data['rawValue']}"
+                      : tr('media.barcodeNotFound'));
             },
             icon: const Icon(Icons.qr_code_scanner_rounded),
             label: Text(tr('media.scanBarcode'))),
         const SizedBox(height: 8),
         OutlinedButton.icon(
             onPressed: () async {
-              final data =
-                  nativeJsonMap(await NativeBridge.recognizeReceiptFromImage());
+              final result =
+                  await NativeBridge.recognizeReceiptFromImageResult();
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              final data = nativeJsonMap(result.value);
               final price = data['priceCandidate']?.toString() ?? '';
-              if (context.mounted)
-                showNativeSnack(
-                    context,
-                    price.isEmpty
-                        ? tr('media.ocrNoPrice')
-                        : '${tr('media.ocrPrice')}$price');
+              showNativeSnack(
+                  context,
+                  price.isEmpty
+                      ? tr('media.ocrNoPrice')
+                      : '${tr('media.ocrPrice')}$price');
             },
             icon: const Icon(Icons.receipt_long_rounded),
             label: Text(tr('media.ocrReceipt'))),
@@ -3413,42 +3840,56 @@ void showNativeAutomationSheet(BuildContext context) {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         FilledButton.icon(
             onPressed: () async {
-              final ok = await NativeBridge.scheduleNotification(
+              final result = await NativeBridge.scheduleNotificationResult(
                   title: tr('auto.notifTitle'),
                   text: tr('auto.notifBody'),
                   delayMillis: 60000);
-              if (context.mounted)
-                showNativeSnack(context,
-                    ok ? tr('auto.testScheduled') : tr('auto.testFailed'));
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              showNativeSnack(
+                  context,
+                  result.value == true
+                      ? tr('auto.testScheduled')
+                      : tr('auto.testFailed'));
             },
             icon: const Icon(Icons.alarm_rounded),
             label: Text(tr('auto.testReminder'))),
         const SizedBox(height: 8),
         OutlinedButton.icon(
             onPressed: () async {
-              final ok = await NativeBridge.createShortcuts();
-              if (context.mounted)
-                showNativeSnack(
-                    context,
-                    ok
-                        ? tr('auto.shortcutCreated')
-                        : tr('auto.shortcutFailed'));
+              final result = await NativeBridge.createShortcutsResult();
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              showNativeSnack(
+                  context,
+                  result.value == true
+                      ? tr('auto.shortcutCreated')
+                      : tr('auto.shortcutFailed'));
             },
             icon: const Icon(Icons.add_to_home_screen_rounded),
             label: Text(tr('auto.createShortcut'))),
         const SizedBox(height: 8),
         OutlinedButton.icon(
             onPressed: () async {
-              final ok = await NativeBridge.requestNotificationPermission();
-              if (context.mounted)
-                showNativeSnack(context,
-                    ok ? tr('auto.permRequested') : tr('auto.permNotNeeded'));
+              final result =
+                  await NativeBridge.requestNotificationPermissionResult();
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              showNativeSnack(
+                  context,
+                  result.value == true
+                      ? tr('auto.permRequested')
+                      : tr('auto.permNotNeeded'));
             },
             icon: const Icon(Icons.verified_rounded),
             label: Text(tr('auto.requestPerm'))),
         const SizedBox(height: 8),
         OutlinedButton.icon(
-            onPressed: () async => NativeBridge.openNotificationSettings(),
+            onPressed: () async {
+              final result =
+                  await NativeBridge.openNotificationSettingsResult();
+              if (context.mounted) showNativeBridgeFailure(context, result);
+            },
             icon: const Icon(Icons.settings_rounded),
             label: Text(tr('auto.openNotifSettings'))),
       ]));
@@ -3461,10 +3902,12 @@ void showClipboardImportSheet(BuildContext context) {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         FilledButton.icon(
             onPressed: () async {
-              final text = await NativeBridge.readClipboard();
-              if (text == null || text.trim().isEmpty) {
-                if (context.mounted)
-                  showNativeSnack(context, tr('clipboard.empty'));
+              final result = await NativeBridge.readClipboardResult();
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              final text = result.value;
+              if (result.isCancelled || text == null || text.trim().isEmpty) {
+                showNativeSnack(context, tr('clipboard.empty'));
                 return;
               }
               if (text.trimLeft().startsWith('{')) {
@@ -3482,9 +3925,11 @@ void showClipboardImportSheet(BuildContext context) {
         const SizedBox(height: 8),
         OutlinedButton.icon(
             onPressed: () async {
-              await NativeBridge.writeClipboard(context.store.exportJson());
-              if (context.mounted)
-                showNativeSnack(context, tr('clipboard.copied'));
+              final result = await NativeBridge.writeClipboardResult(
+                  context.store.exportJson());
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              showNativeSnack(context, tr('clipboard.copied'));
             },
             icon: const Icon(Icons.copy_all_rounded),
             label: Text(tr('clipboard.copyJson'))),
@@ -3509,7 +3954,7 @@ List<String> collectLocalMediaPaths(AppStore store) {
 Future<void> shareCompleteDataArchive(BuildContext context) async {
   final store = context.store;
   final mediaPaths = collectLocalMediaPaths(store);
-  await NativeBridge.shareDataArchive(
+  final result = await NativeBridge.shareDataArchiveResult(
     title: tr('archive.title'),
     fileName: 'zhipu_complete_backup_${dateStamp()}.zip',
     json: store.exportJson(),
@@ -3517,13 +3962,13 @@ Future<void> shareCompleteDataArchive(BuildContext context) async {
     markdown: buildMarkdownReport(store),
     mediaPaths: mediaPaths,
   );
-  if (context.mounted) {
-    showNativeSnack(
-        context,
-        mediaPaths.isEmpty
-            ? tr('archive.generated')
-            : '${tr('archive.generatedWithMedia').replaceAll('{n}', '${mediaPaths.length}')}');
-  }
+  if (!context.mounted) return;
+  if (showNativeBridgeFailure(context, result)) return;
+  showNativeSnack(
+      context,
+      mediaPaths.isEmpty
+          ? tr('archive.generated')
+          : '${tr('archive.generatedWithMedia').replaceAll('{n}', '${mediaPaths.length}')}');
 }
 
 void showNativeSystemSheet(BuildContext context) {
@@ -3551,13 +3996,15 @@ void showNativeSystemSheet(BuildContext context) {
         const SizedBox(height: 8),
         OutlinedButton.icon(
             onPressed: () async {
-              final info = await NativeBridge.getInitialIntentInfo();
-              if (context.mounted)
-                showNativeSnack(
-                    context,
-                    info == null || info.isEmpty
-                        ? tr('system.noShareData')
-                        : info);
+              final result = await NativeBridge.getInitialIntentInfoResult();
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              final info = result.value;
+              showNativeSnack(
+                  context,
+                  info == null || info.isEmpty
+                      ? tr('system.noShareData')
+                      : info);
             },
             icon: const Icon(Icons.call_received_rounded),
             label: Text(tr('system.readIntent'))),
@@ -3577,16 +4024,17 @@ void showReportExportSheet(BuildContext context) {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         FilledButton.icon(
             onPressed: () async {
-              final uri = await NativeBridge.exportTextFile(
+              final result = await NativeBridge.exportTextFileResult(
                   fileName: 'valora_report_${dateStamp()}.md',
                   text: report,
                   mimeType: 'text/markdown');
-              if (context.mounted)
-                showNativeSnack(
-                    context,
-                    uri == null
-                        ? tr('common.exportCancelled')
-                        : tr('report.exported'));
+              if (!context.mounted) return;
+              if (showNativeBridgeFailure(context, result)) return;
+              showNativeSnack(
+                  context,
+                  result.isCancelled || result.value == null
+                      ? tr('common.exportCancelled')
+                      : tr('report.exported'));
             },
             icon: const Icon(Icons.save_alt_rounded),
             label: Text(tr('report.saveFile'))),

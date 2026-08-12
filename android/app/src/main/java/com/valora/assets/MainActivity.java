@@ -238,6 +238,7 @@ public class MainActivity extends FlutterActivity {
 
         nativeChannel = new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), NATIVE_CHANNEL);
         nativeChannel.setMethodCallHandler((call, result) -> {
+            result = NativeBridgeContract.wrap(result);
             switch (call.method) {
                 case "configureSystemUi":
                     configureSystemUi();
