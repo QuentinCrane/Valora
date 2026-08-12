@@ -90,4 +90,23 @@ void main() {
     expect(NativeBridgeErrorCodeX.fromWire('unknown_future_code'),
         NativeBridgeErrorCode.unknown);
   });
+
+  test('decodes subject segmentation readiness as a typed status map',
+      () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'getSubjectSegmentationStatus');
+      return {
+        'protocolVersion': 1,
+        'status': 'success',
+        'data': '{"status":"ready","detail":"ready","updatedAt":123}',
+      };
+    });
+
+    final result = await NativeBridge.getSubjectSegmentationStatusResult();
+
+    expect(result.isSuccess, isTrue);
+    expect(result.value?['status'], 'ready');
+    expect(result.value?['updatedAt'], 123);
+  });
 }

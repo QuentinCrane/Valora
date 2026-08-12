@@ -240,6 +240,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                   mode: next.stickerEngineMode.name, keepCandidates: v);
             },
           ),
+          const SubjectSegmentationStatusRow(),
         ]);
 
     switch (tab) {
@@ -1291,6 +1292,64 @@ class _ReminderStatusRowState extends State<ReminderStatusRow> {
                 )
               : ValuePill(
                   '${result.value?['scheduledCount'] ?? 0}',
+                ),
+        );
+      },
+    );
+  }
+}
+
+class SubjectSegmentationStatusRow extends StatefulWidget {
+  const SubjectSegmentationStatusRow({super.key});
+
+  @override
+  State<SubjectSegmentationStatusRow> createState() =>
+      _SubjectSegmentationStatusRowState();
+}
+
+class _SubjectSegmentationStatusRowState
+    extends State<SubjectSegmentationStatusRow> {
+  late Future<NativeBridgeResult<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = NativeBridge.getSubjectSegmentationStatusResult();
+  }
+
+  String _statusLabel(NativeBridgeResult<Map<String, dynamic>> result) {
+    if (result.isFailure) return tr('sticker.modelUnavailable');
+    switch (result.value?['status']?.toString()) {
+      case 'downloading':
+        return tr('sticker.modelDownloading');
+      case 'ready':
+        return tr('sticker.modelReady');
+      default:
+        return tr('sticker.modelUnavailable');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<NativeBridgeResult<Map<String, dynamic>>>(
+      future: _future,
+      builder: (context, snapshot) {
+        final result = snapshot.data;
+        return SettingRow(
+          icon: Icons.auto_fix_high_rounded,
+          iconBg: const Color(0xFFAEE6FF),
+          label: tr('sticker.modelStatus'),
+          description: result == null
+              ? tr('sticker.modelDownloading')
+              : _statusLabel(result),
+          trailing: result == null
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : ValuePill(
+                  result.value?['status']?.toString() ?? 'unavailable',
                 ),
         );
       },

@@ -14,6 +14,7 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.content.pm.PackageManager;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
 import android.graphics.Color;
@@ -32,7 +33,19 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.ActivityResultRegistry;
+import androidx.activity.result.ActivityResultRegistryOwner;
+import androidx.activity.result.contract.ActivityResultContract;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.app.ActivityOptionsCompat;
 import androidx.core.content.FileProvider;
+
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.LifecycleRegistry;
 
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions;
 
@@ -72,6 +85,8 @@ import android.graphics.Paint;
 import android.graphics.Canvas;
 import android.graphics.BitmapFactory;
 import android.graphics.BlurMaskFilter;
+import android.graphics.Matrix;
+import android.media.ExifInterface;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
@@ -115,7 +130,7 @@ import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.MethodChannel;
 
-public class MainActivity extends FlutterActivity {
+public class MainActivity extends FlutterActivity implements ActivityResultRegistryOwner, LifecycleOwner {
     private static final String STORE_CHANNEL = "valora/local_store";
     private static final String NATIVE_CHANNEL = "valora/native";
     private static final String PREFS_NAME = "valora_assets_store";
@@ -140,22 +155,143 @@ public class MainActivity extends FlutterActivity {
     private static final int REQ_CUTOUT_IMAGE = 4107;
     private static final int REQ_CUTOUT_IMAGE_DETAILED = 4108;
     private static final int REQ_OPEN_ARCHIVE = 4109;
+    private static final int REQ_CAMERA_PERMISSION = 7911;
+    private static final long MAX_MEDIA_BYTES = 256L * 1024L * 1024L;
+    private static final String MEDIA_CAPTURE_DIR = "valora_capture";
+    private static final String MEDIA_PREFS_NAME = "valora_media_operation";
+    private static final String MEDIA_PREF_PENDING_REQUEST = "pending_request";
+    private static final String MEDIA_PREF_OPERATION = "operation";
+    private static final String MEDIA_PREF_CAPTURE_PATH = "capture_path";
+    private static final String MEDIA_PREF_CAPTURE_URI = "capture_uri";
+    private static final String STATE_ACTIVITY_RESULT_REGISTRY = "valora.activity_result_registry";
+    private static final String STATE_PENDING_REQUEST = "valora.pending_request";
+    private static final String STATE_PENDING_OPERATION = "valora.pending_operation";
+    private static final String STATE_CAPTURE_PATH = "valora.capture_path";
+    private static final String STATE_CAPTURE_URI = "valora.capture_uri";
+    private static final String SEGMENTATION_PREFS_NAME = "valora_subject_segmentation";
+    private static final String SEGMENTATION_STATUS = "status";
+    private static final String SEGMENTATION_DETAIL = "detail";
+    private static final String SEGMENTATION_STATUS_DOWNLOADING = "downloading";
+    private static final String SEGMENTATION_STATUS_READY = "ready";
+    private static final String SEGMENTATION_STATUS_UNAVAILABLE = "unavailable";
 
     private LocalStoreDb storeDb;
     private MethodChannel nativeChannel;
     private MethodChannel.Result pendingResult;
+    private int pendingRequestCode;
+    private String pendingOperation;
+    private String pendingCapturePath;
+    private String pendingCaptureUri;
+    private Intent pendingLaunchIntent;
+    private boolean pendingLegacyImageFallback;
+    private boolean restoredMediaOperation;
+    private boolean segmentationInitInFlight;
     private String pendingSaveText;
     private String pendingSaveMimeType;
     private String lastIntentInfo = "";
     private String storageMigrationErrorCode;
     private String storageMigrationErrorMessage;
 
+    private final LifecycleRegistry lifecycleRegistry = new LifecycleRegistry(this);
+    private final ActivityResultRegistry activityResultRegistry = new ActivityResultRegistry() {
+        @Override
+        public <I, O> void onLaunch(int requestCode,
+                                    @NonNull ActivityResultContract<I, O> contract,
+                                    I input,
+                                    @Nullable ActivityOptionsCompat options) {
+            Intent intent = contract.createIntent(MainActivity.this, input);
+            if (options != null && Build.VERSION.SDK_INT >= 16) {
+                MainActivity.this.startActivityForResult(intent, requestCode, options.toBundle());
+            } else {
+                MainActivity.this.startActivityForResult(intent, requestCode);
+            }
+        }
+    };
+    private ActivityResultLauncher<Intent> nativeActivityLauncher;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         // Keep native Material dialogs on the same app theme instead of the launch theme.
         setTheme(R.style.NormalTheme);
         super.onCreate(savedInstanceState);
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE);
+        restoreMediaOperation(savedInstanceState);
+        nativeActivityLauncher = activityResultRegistry.register(
+                "valora.native.activity_result",
+                this,
+                new ActivityResultContracts.StartActivityForResult(),
+                this::handleActivityResult);
+        if (savedInstanceState != null) {
+            Bundle registryState = savedInstanceState.getBundle(STATE_ACTIVITY_RESULT_REGISTRY);
+            if (registryState != null) activityResultRegistry.onRestoreInstanceState(registryState);
+        }
+        cleanupStaleCaptureFiles();
         lastIntentInfo = intentToJson(getIntent());
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME);
+    }
+
+    @Override
+    public void onPostResume() {
+        super.onPostResume();
+        // A MethodChannel.Result cannot survive process death. If the activity was
+        // restored without a callback, surface a recoverable cancellation instead
+        // of leaving Dart's original operation waiting forever.
+        if (restoredMediaOperation && pendingResult == null && pendingRequestCode != 0
+                && nativeChannel != null) {
+            emitRecoveredOperation(pendingRequestCode, "abandoned_after_restart");
+            clearPendingOperation();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE);
+        super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP);
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY);
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        Bundle registryState = new Bundle();
+        activityResultRegistry.onSaveInstanceState(registryState);
+        outState.putBundle(STATE_ACTIVITY_RESULT_REGISTRY, registryState);
+        outState.putInt(STATE_PENDING_REQUEST, pendingRequestCode);
+        outState.putString(STATE_PENDING_OPERATION, pendingOperation);
+        outState.putString(STATE_CAPTURE_PATH, pendingCapturePath);
+        outState.putString(STATE_CAPTURE_URI, pendingCaptureUri);
+    }
+
+    @Override
+    public ActivityResultRegistry getActivityResultRegistry() {
+        return activityResultRegistry;
+    }
+
+    @Override
+    public Lifecycle getLifecycle() {
+        return lifecycleRegistry;
     }
 
     @Override
@@ -172,7 +308,17 @@ public class MainActivity extends FlutterActivity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions,
                                            int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 7901) ReminderScheduler.sync(this);
+        if (requestCode == 7901) {
+            ReminderScheduler.sync(this);
+        } else if (requestCode == REQ_CAMERA_PERMISSION
+                && pendingRequestCode == REQ_CAPTURE_PHOTO
+                && pendingResult != null) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                launchPendingActivity();
+            } else {
+                completePendingFailure("permission_denied", "Camera permission denied");
+            }
+        }
     }
 
     @Override
@@ -264,7 +410,7 @@ public class MainActivity extends FlutterActivity {
                     result.success(null);
                     break;
                 case "capturePhoto":
-                    startSingleResult(result, REQ_CAPTURE_PHOTO, new Intent(MediaStore.ACTION_IMAGE_CAPTURE));
+                    startCameraResult(result);
                     break;
                 case "scanBarcodeFromImage":
                     startSingleResult(result, REQ_SCAN_BARCODE, buildPickImageIntent());
@@ -284,6 +430,9 @@ public class MainActivity extends FlutterActivity {
                     break;
                 case "getStickerEngineConfig":
                     result.success(buildStickerEngineConfigJson(readStickerEngineConfig()));
+                    break;
+                case "getSubjectSegmentationStatus":
+                    result.success(getSubjectSegmentationStatusJson());
                     break;
                 case "persistImageUri":
                     try {
@@ -668,87 +817,224 @@ public class MainActivity extends FlutterActivity {
         } catch (Exception ignored) {}
     }
 
-    private void startSingleResult(MethodChannel.Result result, int requestCode, Intent intent) {
-        if (pendingResult != null) {
+    private void startCameraResult(MethodChannel.Result result) {
+        if (pendingResult != null || pendingRequestCode != 0) {
             result.error("busy", "Another native action is running", null);
             return;
         }
         try {
             pendingResult = result;
-            startActivityForResult(intent, requestCode);
+            pendingRequestCode = REQ_CAPTURE_PHOTO;
+            pendingOperation = "capturePhoto";
+            pendingLegacyImageFallback = false;
+            pendingLaunchIntent = buildCameraIntent();
+            persistMediaOperation();
+            launchPendingActivity();
         } catch (Exception e) {
-            if (isImagePickRequest(requestCode) && Build.VERSION.SDK_INT >= 33) {
-                try {
-                    startActivityForResult(buildLegacyImageDocumentIntent(), requestCode);
-                    return;
-                } catch (Exception ignored) {}
-            }
-            pendingResult = null;
-            result.error("native_intent_error", e.getMessage(), null);
+            completePendingFailure("native_intent_error", e.getMessage());
         }
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (pendingResult == null) return;
-        MethodChannel.Result result = pendingResult;
-        pendingResult = null;
+    private void startSingleResult(MethodChannel.Result result, int requestCode, Intent intent) {
+        if (pendingResult != null || pendingRequestCode != 0) {
+            result.error("busy", "Another native action is running", null);
+            return;
+        }
         try {
-            if (resultCode != Activity.RESULT_OK) {
-                result.success(null);
-                return;
-            }
-            if (requestCode == REQ_PICK_IMAGE) {
-                Uri uri = data == null ? null : data.getData();
-                if (uri != null) tryTakePersistableReadPermission(data, uri);
-                result.success(uri == null ? null : persistImageFromUri(uri));
-            } else if (requestCode == REQ_CAPTURE_PHOTO) {
-                result.success(saveCameraResult(data));
-            } else if (requestCode == REQ_SCAN_BARCODE) {
-                Uri uri = data == null ? null : data.getData();
-                if (uri == null) result.success(null); else scanBarcodeFromUri(uri, result);
-                return;
-            } else if (requestCode == REQ_OCR_IMAGE) {
-                Uri uri = data == null ? null : data.getData();
-                if (uri == null) result.success(null); else recognizeReceiptFromUri(uri, result);
-                return;
-            } else if (requestCode == REQ_CUTOUT_IMAGE) {
-                Uri uri = data == null ? null : data.getData();
-                if (uri == null) result.success(null); else cutoutImageFromUri(uri, result);
-                return;
-            } else if (requestCode == REQ_CUTOUT_IMAGE_DETAILED) {
-                Uri uri = data == null ? null : data.getData();
-                if (uri == null) result.success(null); else cutoutImageFromUriDetailed(uri, result);
-                return;
-            } else if (requestCode == REQ_OPEN_TEXT) {
-                Uri uri = data == null ? null : data.getData();
-                result.success(uri == null ? null : readTextFromUri(uri));
-            } else if (requestCode == REQ_OPEN_ARCHIVE) {
-                Uri uri = data == null ? null : data.getData();
-                if (uri == null) {
-                    result.success(null);
-                } else {
-                    try {
-                        final int flags = data == null ? 0 : data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                        getContentResolver().takePersistableUriPermission(uri, flags);
-                    } catch (Exception ignored) {}
-                    restoreDataArchiveFromUri(uri, result);
-                }
-                return;
-            } else if (requestCode == REQ_CREATE_TEXT) {
-                Uri uri = data == null ? null : data.getData();
-                if (uri != null) writeTextToUri(uri, pendingSaveText == null ? "" : pendingSaveText);
-                result.success(uri == null ? null : uri.toString());
-            } else {
-                result.success(null);
-            }
+            pendingResult = result;
+            pendingRequestCode = requestCode;
+            pendingOperation = operationName(requestCode);
+            pendingLegacyImageFallback = false;
+            pendingLaunchIntent = intent;
+            persistMediaOperation();
+            launchPendingActivity();
         } catch (Exception e) {
+            completePendingFailure("native_intent_error", e.getMessage());
+        }
+    }
+
+    private void launchPendingActivity() {
+        if (nativeActivityLauncher == null || pendingRequestCode == 0) {
+            completePendingFailure("native_intent_error", "Native activity result launcher is unavailable");
+            return;
+        }
+        if (pendingRequestCode == REQ_CAPTURE_PHOTO) {
+            if (Build.VERSION.SDK_INT >= 23
+                    && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_CAMERA_PERMISSION);
+                return;
+            }
+            try {
+                if (pendingLaunchIntent == null) pendingLaunchIntent = buildCameraIntent();
+            } catch (Exception e) {
+                completePendingFailure("native_intent_error", e.getMessage());
+                return;
+            }
+        }
+        try {
+            nativeActivityLauncher.launch(pendingLaunchIntent);
+        } catch (Exception e) {
+            if (isImagePickRequest(pendingRequestCode) && !pendingLegacyImageFallback) {
+                try {
+                    pendingLegacyImageFallback = true;
+                    pendingLaunchIntent = buildLegacyImageDocumentIntent();
+                    nativeActivityLauncher.launch(pendingLaunchIntent);
+                    return;
+                } catch (Exception ignored) {}
+            }
+            completePendingFailure("native_intent_error", e.getMessage());
+        }
+    }
+
+    private Intent buildCameraIntent() throws Exception {
+        File captureDir = new File(getFilesDir(), MEDIA_CAPTURE_DIR);
+        if (!captureDir.exists() && !captureDir.mkdirs()) {
+            throw new IOException("Could not create camera capture directory");
+        }
+        if (pendingCapturePath == null || pendingCapturePath.trim().isEmpty()) {
+            File capture = File.createTempFile("camera_", ".jpg", captureDir);
+            pendingCapturePath = capture.getAbsolutePath();
+            pendingCaptureUri = FileProvider.getUriForFile(
+                    this, getPackageName() + ".fileprovider", capture).toString();
+        }
+        File capture = new File(pendingCapturePath);
+        if (!capture.exists() && !capture.createNewFile()) {
+            throw new IOException("Could not create camera output file");
+        }
+        if (pendingCaptureUri == null || pendingCaptureUri.trim().isEmpty()) {
+            pendingCaptureUri = FileProvider.getUriForFile(
+                    this, getPackageName() + ".fileprovider", capture).toString();
+        }
+        Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (camera.resolveActivity(getPackageManager()) == null) {
+            throw new IOException("No camera application is available");
+        }
+        Uri output = Uri.parse(pendingCaptureUri);
+        camera.putExtra(MediaStore.EXTRA_OUTPUT, output);
+        camera.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        camera.setClipData(ClipData.newRawUri("output", output));
+        return camera;
+    }
+
+    private String operationName(int requestCode) {
+        switch (requestCode) {
+            case REQ_PICK_IMAGE: return "pickImage";
+            case REQ_CAPTURE_PHOTO: return "capturePhoto";
+            case REQ_SCAN_BARCODE: return "scanBarcodeFromImage";
+            case REQ_OCR_IMAGE: return "recognizeReceiptFromImage";
+            case REQ_CUTOUT_IMAGE: return "cutoutImageFromPicker";
+            case REQ_CUTOUT_IMAGE_DETAILED: return "cutoutImageFromPickerDetailed";
+            case REQ_OPEN_TEXT: return "importTextFile";
+            case REQ_CREATE_TEXT: return "exportTextFile";
+            case REQ_OPEN_ARCHIVE: return "importDataArchive";
+            default: return "nativeActivityResult";
+        }
+    }
+
+    private void handleActivityResult(ActivityResult activityResult) {
+        final int requestCode = pendingRequestCode;
+        final MethodChannel.Result result = pendingResult;
+        if (requestCode == 0) return;
+        pendingResult = null;
+        pendingLaunchIntent = null;
+        if (result == null) {
+            emitRecoveredOperation(requestCode, activityResult.getResultCode() == Activity.RESULT_OK
+                    ? "completed_without_caller" : "cancelled");
+            clearPendingOperation();
+            return;
+        }
+        try {
+            if (activityResult.getResultCode() != Activity.RESULT_OK) {
+                result.success(null);
+                clearPendingOperation();
+                return;
+            }
+            handleNativeActivityResult(requestCode, activityResult.getData(), result);
+        } catch (Exception e) {
+            clearPendingOperation();
             result.error("native_result_error", e.getMessage(), null);
         } finally {
             pendingSaveText = null;
             pendingSaveMimeType = null;
         }
+    }
+
+    private void handleNativeActivityResult(int requestCode, Intent data, MethodChannel.Result result) throws Exception {
+        if (requestCode == REQ_PICK_IMAGE) {
+            Uri uri = selectedImageUri(data);
+            if (uri != null) tryTakePersistableReadPermission(data, uri);
+            clearPendingOperation();
+            if (uri == null) {
+                result.error("invalid_format", "Image picker returned no URI", null);
+            } else {
+                result.success(persistImageFromUri(uri));
+            }
+        } else if (requestCode == REQ_CAPTURE_PHOTO) {
+            String persisted = saveCameraCapture();
+            clearPendingOperation();
+            result.success(persisted);
+        } else if (requestCode == REQ_SCAN_BARCODE
+                || requestCode == REQ_OCR_IMAGE
+                || requestCode == REQ_CUTOUT_IMAGE
+                || requestCode == REQ_CUTOUT_IMAGE_DETAILED) {
+            Uri uri = selectedImageUri(data);
+            if (uri == null) {
+                clearPendingOperation();
+                result.error("invalid_format", "Image operation returned no URI", null);
+                return;
+            }
+            String persisted = persistImageFromUri(uri);
+            clearPendingOperation();
+            Uri privateUri = Uri.parse(persisted);
+            if (requestCode == REQ_SCAN_BARCODE) {
+                scanBarcodeFromUri(privateUri, result);
+            } else if (requestCode == REQ_OCR_IMAGE) {
+                recognizeReceiptFromUri(privateUri, result);
+            } else if (requestCode == REQ_CUTOUT_IMAGE) {
+                cutoutImageFromUri(privateUri, result);
+            } else {
+                cutoutImageFromUriDetailed(privateUri, result);
+            }
+        } else if (requestCode == REQ_OPEN_TEXT) {
+            Uri uri = data == null ? null : data.getData();
+            clearPendingOperation();
+            result.success(uri == null ? null : readTextFromUri(uri));
+        } else if (requestCode == REQ_OPEN_ARCHIVE) {
+            Uri uri = data == null ? null : data.getData();
+            if (uri == null) {
+                clearPendingOperation();
+                result.success(null);
+            } else {
+                try {
+                    final int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    getContentResolver().takePersistableUriPermission(uri, flags);
+                } catch (Exception ignored) {}
+                clearPendingOperation();
+                restoreDataArchiveFromUri(uri, result);
+            }
+        } else if (requestCode == REQ_CREATE_TEXT) {
+            Uri uri = data == null ? null : data.getData();
+            if (uri != null) writeTextToUri(uri, pendingSaveText == null ? "" : pendingSaveText);
+            clearPendingOperation();
+            result.success(uri == null ? null : uri.toString());
+        } else {
+            clearPendingOperation();
+            result.success(null);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (activityResultRegistry.dispatchResult(requestCode, resultCode, data)) return;
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    private Uri selectedImageUri(Intent data) {
+        if (data == null) return null;
+        Uri direct = data.getData();
+        if (direct != null) return direct;
+        ClipData clip = data.getClipData();
+        return clip == null || clip.getItemCount() == 0 ? null : clip.getItemAt(0).getUri();
     }
 
 
@@ -761,37 +1047,111 @@ public class MainActivity extends FlutterActivity {
     private String persistImageFromUri(Uri uri) throws Exception {
         if (uri == null) return null;
         InputStream in = getContentResolver().openInputStream(uri);
-        if (in == null) return uri.toString();
-        String ext = imageExtensionFromMime(getContentResolver().getType(uri));
+        if (in == null) throw new IOException("Image input could not be opened");
         File dir = new File(getFilesDir(), "valora_media");
-        if (!dir.exists()) dir.mkdirs();
-        File file = new File(dir, "asset_" + System.currentTimeMillis() + ext);
-        FileOutputStream out = new FileOutputStream(file);
-        byte[] buf = new byte[8192];
-        int n;
-        while ((n = in.read(buf)) >= 0) out.write(buf, 0, n);
-        out.flush();
-        out.close();
-        in.close();
-        return "file://" + file.getAbsolutePath();
+        if (!dir.exists() && !dir.mkdirs()) throw new IOException("Could not create media directory");
+        String ext = imageExtensionFromMime(getContentResolver().getType(uri));
+        File temp = new File(dir, ".pending_" + UUID.randomUUID() + ext);
+        File file = new File(dir, "asset_" + UUID.randomUUID() + ext);
+        long total = 0;
+        try (InputStream source = in; FileOutputStream out = new FileOutputStream(temp)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = source.read(buf)) >= 0) {
+                if (n == 0) continue;
+                total += n;
+                if (total > MAX_MEDIA_BYTES) throw new IOException("Image exceeds the allowed size");
+                out.write(buf, 0, n);
+            }
+            out.flush();
+        } catch (Exception e) {
+            temp.delete();
+            throw e;
+        }
+        if (total <= 0 || !temp.renameTo(file)) {
+            temp.delete();
+            throw new IOException("Image could not be persisted");
+        }
+        return fileUri(file);
     }
 
-    private String saveCameraResult(Intent data) throws Exception {
-        if (data == null) return null;
-        Uri uri = data.getData();
-        if (uri != null) return persistImageFromUri(uri);
-        Object raw = data.getExtras() == null ? null : data.getExtras().get("data");
-        if (raw instanceof Bitmap) {
-            File dir = new File(getFilesDir(), "valora_media");
-            if (!dir.exists()) dir.mkdirs();
-            File file = new File(dir, "camera_" + System.currentTimeMillis() + ".jpg");
-            FileOutputStream out = new FileOutputStream(file);
-            ((Bitmap) raw).compress(Bitmap.CompressFormat.JPEG, 92, out);
-            out.flush();
-            out.close();
-            return "file://" + file.getAbsolutePath();
+    private String saveCameraCapture() throws Exception {
+        if (pendingCaptureUri == null || pendingCaptureUri.trim().isEmpty()) {
+            throw new IOException("Camera output URI is missing");
         }
-        return null;
+        File capture = pendingCapturePath == null ? null : new File(pendingCapturePath);
+        if (capture == null || !capture.exists() || capture.length() <= 0) {
+            throw new IOException("Camera returned no full-resolution output");
+        }
+        return persistImageFromUri(Uri.parse(pendingCaptureUri));
+    }
+
+    private void restoreMediaOperation(Bundle savedInstanceState) {
+        if (savedInstanceState != null && savedInstanceState.getInt(STATE_PENDING_REQUEST, 0) != 0) {
+            pendingRequestCode = savedInstanceState.getInt(STATE_PENDING_REQUEST, 0);
+            pendingOperation = savedInstanceState.getString(STATE_PENDING_OPERATION);
+            pendingCapturePath = savedInstanceState.getString(STATE_CAPTURE_PATH);
+            pendingCaptureUri = savedInstanceState.getString(STATE_CAPTURE_URI);
+            restoredMediaOperation = true;
+            return;
+        }
+        SharedPreferences prefs = getSharedPreferences(MEDIA_PREFS_NAME, Context.MODE_PRIVATE);
+        pendingRequestCode = prefs.getInt(MEDIA_PREF_PENDING_REQUEST, 0);
+        pendingOperation = prefs.getString(MEDIA_PREF_OPERATION, null);
+        pendingCapturePath = prefs.getString(MEDIA_PREF_CAPTURE_PATH, null);
+        pendingCaptureUri = prefs.getString(MEDIA_PREF_CAPTURE_URI, null);
+        restoredMediaOperation = pendingRequestCode != 0;
+    }
+
+    private void persistMediaOperation() {
+        getSharedPreferences(MEDIA_PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putInt(MEDIA_PREF_PENDING_REQUEST, pendingRequestCode)
+                .putString(MEDIA_PREF_OPERATION, pendingOperation)
+                .putString(MEDIA_PREF_CAPTURE_PATH, pendingCapturePath)
+                .putString(MEDIA_PREF_CAPTURE_URI, pendingCaptureUri)
+                .apply();
+    }
+
+    private void clearPendingOperation() {
+        if (pendingCapturePath != null && pendingCapturePath.trim().length() > 0) {
+            File capture = new File(pendingCapturePath);
+            if (capture.exists()) capture.delete();
+        }
+        pendingRequestCode = 0;
+        pendingOperation = null;
+        pendingCapturePath = null;
+        pendingCaptureUri = null;
+        pendingLaunchIntent = null;
+        pendingLegacyImageFallback = false;
+        restoredMediaOperation = false;
+        getSharedPreferences(MEDIA_PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply();
+    }
+
+    private void completePendingFailure(String code, String detail) {
+        MethodChannel.Result result = pendingResult;
+        pendingResult = null;
+        clearPendingOperation();
+        if (result != null) result.error(code, detail == null ? "Native operation failed" : detail, null);
+    }
+
+    private void emitRecoveredOperation(int requestCode, String status) {
+        if (nativeChannel == null) return;
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("operation", operationName(requestCode));
+        payload.put("status", status);
+        nativeChannel.invokeMethod("nativeOperationRecovered", payload);
+    }
+
+    private void cleanupStaleCaptureFiles() {
+        File captureDir = new File(getFilesDir(), MEDIA_CAPTURE_DIR);
+        File[] files = captureDir.listFiles();
+        if (files == null) return;
+        long cutoff = System.currentTimeMillis() - 24L * 60L * 60L * 1000L;
+        for (File file : files) {
+            if (file == null || file.getAbsolutePath().equals(pendingCapturePath)) continue;
+            if (file.lastModified() < cutoff) file.delete();
+        }
     }
 
     private String imageExtensionFromMime(String mime) {
@@ -855,6 +1215,59 @@ public class MainActivity extends FlutterActivity {
         return "{\"mode\":\"" + escape(config.mode) + "\",\"keepCandidates\":" + config.keepCandidates + ",\"decodeMaxSide\":" + config.decodeMaxSide + ",\"maxCandidates\":" + config.maxCandidates + "}";
     }
 
+    private String getSubjectSegmentationStatusJson() {
+        ensureSubjectSegmentationInitialization();
+        SharedPreferences prefs = getSharedPreferences(SEGMENTATION_PREFS_NAME, Context.MODE_PRIVATE);
+        String status = getSubjectSegmentationModelStatus();
+        String detail = prefs.getString(SEGMENTATION_DETAIL, "not_checked");
+        long updatedAt = prefs.getLong("updated_at", 0L);
+        return "{\"status\":\"" + escape(status) + "\",\"detail\":\""
+                + escape(detail) + "\",\"updatedAt\":" + updatedAt + "}";
+    }
+
+    private String getSubjectSegmentationModelStatus() {
+        return getSharedPreferences(SEGMENTATION_PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(SEGMENTATION_STATUS, SEGMENTATION_STATUS_UNAVAILABLE);
+    }
+
+    private void ensureSubjectSegmentationInitialization() {
+        SharedPreferences prefs = getSharedPreferences(SEGMENTATION_PREFS_NAME, Context.MODE_PRIVATE);
+        if (segmentationInitInFlight) return;
+        if (SEGMENTATION_STATUS_READY.equals(prefs.getString(SEGMENTATION_STATUS, ""))) return;
+        segmentationInitInFlight = true;
+        setSubjectSegmentationStatus(SEGMENTATION_STATUS_DOWNLOADING, "initializing");
+        try {
+            SubjectSegmenterOptions options = new SubjectSegmenterOptions.Builder()
+                    .enableForegroundBitmap()
+                    .enableForegroundConfidenceMask()
+                    .build();
+            SubjectSegmenter segmenter = SubjectSegmentation.getClient(options);
+            segmenter.getInitTask()
+                    .addOnSuccessListener(ignored -> {
+                        segmentationInitInFlight = false;
+                        setSubjectSegmentationStatus(SEGMENTATION_STATUS_READY, "ready");
+                        segmenter.close();
+                    })
+                    .addOnFailureListener(error -> {
+                        segmentationInitInFlight = false;
+                        setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, error.getClass().getSimpleName());
+                        segmenter.close();
+                    });
+        } catch (Throwable error) {
+            segmentationInitInFlight = false;
+            setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, error.getClass().getSimpleName());
+        }
+    }
+
+    private void setSubjectSegmentationStatus(String status, String detail) {
+        getSharedPreferences(SEGMENTATION_PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(SEGMENTATION_STATUS, status)
+                .putString(SEGMENTATION_DETAIL, detail == null ? "" : detail)
+                .putLong("updated_at", System.currentTimeMillis())
+                .apply();
+    }
+
     private static final class StickerCandidate {
         String uri;
         String label;
@@ -879,7 +1292,10 @@ public class MainActivity extends FlutterActivity {
             if (source == null) {
                 String persisted = persistImageFromUri(uri);
                 if (detailed) {
-                    result.success("{\"selectedUri\":\"" + escape(persisted) + "\",\"candidates\":[]}");
+                    result.success("{\"selectedUri\":\"" + escape(persisted)
+                            + "\",\"modelStatus\":\""
+                            + escape(getSubjectSegmentationModelStatus())
+                            + "\",\"candidates\":[]}");
                 } else {
                     result.success(persisted);
                 }
@@ -961,9 +1377,14 @@ public class MainActivity extends FlutterActivity {
                     .build();
             SubjectSegmenter segmenter = SubjectSegmentation.getClient(options);
             InputImage image = InputImage.fromBitmap(source, 0);
-            segmenter.process(image)
+            setSubjectSegmentationStatus(SEGMENTATION_STATUS_DOWNLOADING, "initializing");
+            segmenter.getInitTask()
+                    .addOnSuccessListener(ignored -> {
+                        setSubjectSegmentationStatus(SEGMENTATION_STATUS_READY, "ready");
+                        segmenter.process(image)
                     .addOnSuccessListener(segmentation -> {
                         try {
+                            setSubjectSegmentationStatus(SEGMENTATION_STATUS_READY, "ready");
                             candidates.addAll(generateMlKitCandidates(source, segmentation.getForegroundBitmap(), segmentation.getForegroundConfidenceMask(), config));
                             if (candidates.isEmpty()) {
                                 candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
@@ -972,12 +1393,26 @@ public class MainActivity extends FlutterActivity {
                             }
                             success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
                         } catch (Exception e) {
+                            setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, e.getClass().getSimpleName());
                             failure.accept(e);
                         } finally {
                             segmenter.close();
                         }
                     })
                     .addOnFailureListener(e -> {
+                        setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, e.getClass().getSimpleName());
+                        try {
+                            candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
+                            success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
+                        } catch (Exception inner) {
+                            failure.accept(inner);
+                        } finally {
+                            segmenter.close();
+                        }
+                    });
+                    })
+                    .addOnFailureListener(e -> {
+                        setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, e.getClass().getSimpleName());
                         try {
                             candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
                             success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
@@ -988,6 +1423,7 @@ public class MainActivity extends FlutterActivity {
                         }
                     });
         } catch (Throwable mlInitError) {
+            setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, mlInitError.getClass().getSimpleName());
             try {
                 candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
                 success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
@@ -1122,8 +1558,12 @@ public class MainActivity extends FlutterActivity {
     }
 
     private String buildStickerJson(String selectedUri, List<StickerCandidate> candidates) {
+        SharedPreferences prefs = getSharedPreferences(SEGMENTATION_PREFS_NAME, Context.MODE_PRIVATE);
+        String modelStatus = prefs.getString(SEGMENTATION_STATUS, SEGMENTATION_STATUS_UNAVAILABLE);
         StringBuilder sb = new StringBuilder();
-        sb.append("{\"selectedUri\":\"").append(escape(selectedUri)).append("\",\"candidates\":[");
+        sb.append("{\"selectedUri\":\"").append(escape(selectedUri))
+                .append("\",\"modelStatus\":\"").append(escape(modelStatus))
+                .append("\",\"candidates\":[");
         for (int i = 0; i < candidates.size(); i++) {
             StickerCandidate c = candidates.get(i);
             if (i > 0) sb.append(',');
@@ -1166,7 +1606,42 @@ public class MainActivity extends FlutterActivity {
         InputStream in = getContentResolver().openInputStream(uri);
         Bitmap decoded = BitmapFactory.decodeStream(in, null, opts);
         if (in != null) in.close();
-        return decoded;
+        return applyExifOrientation(uri, decoded);
+    }
+
+    private Bitmap applyExifOrientation(Uri uri, Bitmap decoded) {
+        if (decoded == null || uri == null) return decoded;
+        try (InputStream exifStream = getContentResolver().openInputStream(uri)) {
+            if (exifStream == null) return decoded;
+            int orientation = new ExifInterface(exifStream).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+            Matrix matrix = new Matrix();
+            switch (orientation) {
+                case ExifInterface.ORIENTATION_ROTATE_90:
+                    matrix.postRotate(90);
+                    break;
+                case ExifInterface.ORIENTATION_ROTATE_180:
+                    matrix.postRotate(180);
+                    break;
+                case ExifInterface.ORIENTATION_ROTATE_270:
+                    matrix.postRotate(270);
+                    break;
+                case ExifInterface.ORIENTATION_FLIP_HORIZONTAL:
+                    matrix.postScale(-1, 1);
+                    break;
+                case ExifInterface.ORIENTATION_FLIP_VERTICAL:
+                    matrix.postScale(1, -1);
+                    break;
+                default:
+                    return decoded;
+            }
+            Bitmap oriented = Bitmap.createBitmap(
+                    decoded, 0, 0, decoded.getWidth(), decoded.getHeight(), matrix, true);
+            if (oriented != decoded) decoded.recycle();
+            return oriented;
+        } catch (Exception ignored) {
+            return decoded;
+        }
     }
 
     private Bitmap createStickerFromMlKitResult(Bitmap source, Bitmap foregroundBitmap, FloatBuffer confidenceMask) {

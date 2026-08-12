@@ -294,6 +294,12 @@ class NativeBridge {
   static Future<Map<String, dynamic>> getStickerEngineConfig() async =>
       nativeJsonMap(await _call<String>('getStickerEngineConfig'));
 
+  static Future<NativeBridgeResult<Map<String, dynamic>>>
+      getSubjectSegmentationStatusResult() async {
+    final result = await _callResult<String>('getSubjectSegmentationStatus');
+    return _decodeJsonMapResult(result);
+  }
+
   static Future<NativeBridgeResult<String>> persistImageUriResult(String uri) =>
       _callResult<String>('persistImageUri',
           args: {'uri': uri}, nullMeansCancellation: true);
