@@ -1,0 +1,2 @@
+{"scenario":"cold_start","dataset":"small","metrics":{"wall_ms":{"count":1,"p50":120,"p95":120,"max":120},"ui_ms":[8,12,20]},"counters":{"missedFrameBudget":1}}
+{"scenario":"cold_start","dataset":"small","metrics":{"wall_ms":{"count":1,"p50":140,"p95":140,"max":140},"ui_ms":[10,11,18]},"counters":{"missedFrameBudget":1}}
