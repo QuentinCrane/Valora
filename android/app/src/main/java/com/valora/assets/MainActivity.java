@@ -118,6 +118,8 @@ public class MainActivity extends FlutterActivity {
     private String pendingSaveText;
     private String pendingSaveMimeType;
     private String lastIntentInfo = "";
+    private String storageMigrationErrorCode;
+    private String storageMigrationErrorMessage;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -147,15 +149,37 @@ public class MainActivity extends FlutterActivity {
                 .setMethodCallHandler((call, result) -> {
                     if ("loadJson".equals(call.method)) {
                         try {
-                            result.success(storeDb.loadJson());
+                            if (storageMigrationErrorCode != null) {
+                                migrateSharedPreferencesToSqlite();
+                            }
+                            if (storageMigrationErrorCode != null) {
+                                result.error(storageMigrationErrorCode, storageMigrationErrorMessage, null);
+                                return;
+                            }
+                            result.success(storeDb.loadResult());
                         } catch (Exception e) {
-                            result.error("load_json_error", e.getMessage(), null);
+                            result.error("storage_read_failed", e.getMessage(), null);
                         }
                     } else if ("saveJson".equals(call.method)) {
-                        String json = call.argument("json");
-                        result.success(storeDb.saveJson(json == null ? "" : json));
+                        try {
+                            String json = call.argument("json");
+                            result.success(storeDb.saveJson(json == null ? "" : json));
+                        } catch (Exception e) {
+                            result.error("storage_write_failed", e.getMessage(), null);
+                        }
+                    } else if ("markValidated".equals(call.method)) {
+                        try {
+                            String json = call.argument("json");
+                            result.success(storeDb.markValidated(json == null ? "" : json));
+                        } catch (Exception e) {
+                            result.error("storage_snapshot_failed", e.getMessage(), null);
+                        }
                     } else if ("clearJson".equals(call.method)) {
-                        result.success(storeDb.clearJson());
+                        try {
+                            result.success(storeDb.clearJson());
+                        } catch (Exception e) {
+                            result.error("storage_clear_failed", e.getMessage(), null);
+                        }
                     } else {
                         result.notImplemented();
                     }
@@ -293,15 +317,20 @@ public class MainActivity extends FlutterActivity {
 
 
     private void migrateSharedPreferencesToSqlite() {
+        storageMigrationErrorCode = null;
+        storageMigrationErrorMessage = null;
         try {
             if (storeDb == null || !storeDb.isEmpty()) return;
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String legacy = prefs.getString(KEY_JSON, "");
             if (legacy != null && legacy.trim().length() > 0) {
-                storeDb.saveJson(legacy);
+                if (!storeDb.saveJson(legacy)) {
+                    throw new IllegalStateException("Legacy Valora data was not saved");
+                }
             }
-        } catch (Exception ignored) {
-            // Do not block app launch. Empty/corrupted legacy data will fall back to a clean local database.
+        } catch (Exception e) {
+            storageMigrationErrorCode = "storage_migration_failed";
+            storageMigrationErrorMessage = e.getMessage();
         }
     }
 
@@ -310,6 +339,7 @@ public class MainActivity extends FlutterActivity {
         private static final int DB_VERSION = 1;
         private static final String TABLE = "kv_store";
         private static final String KEY = "app_payload_json";
+        private static final String KEY_LAST_VALIDATED = "last_validated_payload_json";
 
         LocalStoreDb(Context context) {
             super(context.getApplicationContext(), DB_NAME, null, DB_VERSION);
@@ -329,11 +359,27 @@ public class MainActivity extends FlutterActivity {
             return loadJson().trim().length() == 0;
         }
 
+        synchronized Map<String, Object> loadResult() {
+            String json = loadJson();
+            String lastValidated = loadValue(KEY_LAST_VALIDATED);
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", json.trim().length() == 0 ? "empty" : "success");
+            result.put("json", json);
+            if (lastValidated.trim().length() > 0) {
+                result.put("lastValidatedJson", lastValidated);
+            }
+            return result;
+        }
+
         synchronized String loadJson() {
+            return loadValue(KEY);
+        }
+
+        private String loadValue(String key) {
             SQLiteDatabase db = getReadableDatabase();
             Cursor cursor = null;
             try {
-                cursor = db.query(TABLE, new String[]{"v"}, "k=?", new String[]{KEY}, null, null, null, "1");
+                cursor = db.query(TABLE, new String[]{"v"}, "k=?", new String[]{key}, null, null, null, "1");
                 if (cursor.moveToFirst()) {
                     String value = cursor.getString(0);
                     return value == null ? "" : value;
@@ -347,30 +393,41 @@ public class MainActivity extends FlutterActivity {
         }
 
         synchronized boolean saveJson(String json) {
-            SQLiteDatabase db = getWritableDatabase();
-            db.beginTransaction();
+            return saveValue(KEY, json);
+        }
+
+        synchronized boolean markValidated(String json) {
+            return saveValue(KEY_LAST_VALIDATED, json);
+        }
+
+        private boolean saveValue(String key, String json) {
+            SQLiteDatabase db = null;
+            boolean transactionStarted = false;
             try {
+                db = getWritableDatabase();
+                db.beginTransaction();
+                transactionStarted = true;
                 ContentValues values = new ContentValues();
-                values.put("k", KEY);
+                values.put("k", key);
                 values.put("v", json == null ? "" : json);
                 values.put("updated_at", System.currentTimeMillis());
                 db.insertWithOnConflict(TABLE, null, values, SQLiteDatabase.CONFLICT_REPLACE);
                 db.setTransactionSuccessful();
                 return true;
             } catch (Exception e) {
-                return false;
+                throw new RuntimeException("Failed to write local Valora JSON", e);
             } finally {
-                db.endTransaction();
+                if (transactionStarted && db != null) db.endTransaction();
             }
         }
 
         synchronized boolean clearJson() {
             SQLiteDatabase db = getWritableDatabase();
             try {
-                db.delete(TABLE, "k=?", new String[]{KEY});
+                db.delete(TABLE, "k IN (?,?)", new String[]{KEY, KEY_LAST_VALIDATED});
                 return true;
             } catch (Exception e) {
-                return false;
+                throw new RuntimeException("Failed to clear local Valora JSON", e);
             }
         }
     }

@@ -17,7 +17,14 @@ void main() {
               (call.arguments as Map<Object?, Object?>)['json'] as String;
           return true;
         case 'loadJson':
-          return persistedJson;
+          return {
+            'status': persistedJson.trim().isEmpty ? 'empty' : 'success',
+            'json': persistedJson,
+            if (persistedJson.trim().isNotEmpty)
+              'lastValidatedJson': persistedJson,
+          };
+        case 'markValidated':
+          return true;
       }
       return null;
     });

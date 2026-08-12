@@ -78,18 +78,159 @@ class AnalyticsSnapshot {
   });
 }
 
+enum StorageLoadStatus {
+  empty,
+  success,
+  recoverableFailure,
+  fatalFailure,
+}
+
+class StorageLoadResult {
+  final StorageLoadStatus status;
+  final String? payload;
+  final String? lastValidatedPayload;
+  final String? errorCode;
+  final String? errorMessage;
+
+  const StorageLoadResult({
+    required this.status,
+    this.payload,
+    this.lastValidatedPayload,
+    this.errorCode,
+    this.errorMessage,
+  });
+
+  const StorageLoadResult.empty({String? lastValidatedPayload})
+      : this(
+          status: StorageLoadStatus.empty,
+          lastValidatedPayload: lastValidatedPayload,
+        );
+
+  const StorageLoadResult.success({
+    required String payload,
+    String? lastValidatedPayload,
+  }) : this(
+          status: StorageLoadStatus.success,
+          payload: payload,
+          lastValidatedPayload: lastValidatedPayload,
+        );
+
+  const StorageLoadResult.recoverableFailure({
+    required String errorCode,
+    String? errorMessage,
+    String? lastValidatedPayload,
+  }) : this(
+          status: StorageLoadStatus.recoverableFailure,
+          errorCode: errorCode,
+          errorMessage: errorMessage,
+          lastValidatedPayload: lastValidatedPayload,
+        );
+
+  const StorageLoadResult.fatalFailure({
+    required String errorCode,
+    String? errorMessage,
+    String? lastValidatedPayload,
+  }) : this(
+          status: StorageLoadStatus.fatalFailure,
+          errorCode: errorCode,
+          errorMessage: errorMessage,
+          lastValidatedPayload: lastValidatedPayload,
+        );
+
+  bool get isFailure =>
+      status == StorageLoadStatus.recoverableFailure ||
+      status == StorageLoadStatus.fatalFailure;
+
+  bool get hasValidatedSnapshot =>
+      lastValidatedPayload != null && lastValidatedPayload!.trim().isNotEmpty;
+}
+
 class LocalSqliteStorage {
   static const MethodChannel _channel = MethodChannel('valora/local_store');
   const LocalSqliteStorage();
 
-  Future<String> load() async {
-    return await _channel.invokeMethod<String>('loadJson') ?? '';
+  Future<StorageLoadResult> load() async {
+    try {
+      final response = await _channel.invokeMethod<Object?>('loadJson');
+      if (response is String) {
+        final payload = response;
+        return payload.trim().isEmpty
+            ? const StorageLoadResult.empty()
+            : StorageLoadResult.success(payload: payload);
+      }
+      if (response is! Map) {
+        return const StorageLoadResult.fatalFailure(
+          errorCode: 'storage_invalid_response',
+        );
+      }
+      final map = Map<Object?, Object?>.from(response);
+      final status = map['status']?.toString();
+      final payload = map['json']?.toString() ?? '';
+      final lastValidatedPayload = map['lastValidatedJson']?.toString();
+      switch (status) {
+        case 'empty':
+          return StorageLoadResult.empty(
+            lastValidatedPayload: lastValidatedPayload,
+          );
+        case 'success':
+          if (payload.trim().isEmpty) {
+            return StorageLoadResult.fatalFailure(
+              errorCode: 'storage_invalid_response',
+              lastValidatedPayload: lastValidatedPayload,
+            );
+          }
+          return StorageLoadResult.success(
+            payload: payload,
+            lastValidatedPayload: lastValidatedPayload,
+          );
+        default:
+          return StorageLoadResult.fatalFailure(
+            errorCode: 'storage_invalid_status',
+            lastValidatedPayload: lastValidatedPayload,
+          );
+      }
+    } on PlatformException catch (error) {
+      return StorageLoadResult.fatalFailure(
+        errorCode: error.code.isEmpty ? 'storage_read_failed' : error.code,
+        errorMessage: error.message,
+      );
+    } on MissingPluginException catch (error) {
+      return StorageLoadResult.fatalFailure(
+        errorCode: 'storage_channel_unavailable',
+        errorMessage: error.message,
+      );
+    } catch (error) {
+      return StorageLoadResult.fatalFailure(
+        errorCode: 'storage_read_failed',
+        errorMessage: error.toString(),
+      );
+    }
   }
 
   Future<void> save(String json) async {
-    final ok = await _channel.invokeMethod<bool>('saveJson', {'json': json});
-    if (ok != true) {
+    try {
+      final ok = await _channel.invokeMethod<bool>('saveJson', {'json': json});
+      if (ok != true) {
+        throw StateError(tr('store.localWriteFailed'));
+      }
+    } on PlatformException catch (error) {
+      throw StateError('${tr('store.localWriteFailed')} (${error.code})');
+    } on MissingPluginException {
       throw StateError(tr('store.localWriteFailed'));
+    }
+  }
+
+  Future<void> markValidated(String json) async {
+    try {
+      final ok =
+          await _channel.invokeMethod<bool>('markValidated', {'json': json});
+      if (ok != true) {
+        throw StateError(tr('store.localSnapshotFailed'));
+      }
+    } on PlatformException catch (error) {
+      throw StateError('${tr('store.localSnapshotFailed')} (${error.code})');
+    } on MissingPluginException {
+      throw StateError(tr('store.localSnapshotFailed'));
     }
   }
 }
@@ -261,6 +402,9 @@ class AppStore extends ChangeNotifier {
   final LocalSqliteStorage _storage = const LocalSqliteStorage();
   final CloudSyncService _cloud = const CloudSyncService();
 
+  StorageLoadResult _storageLoadResult = const StorageLoadResult.empty();
+  String? _lastValidatedSnapshot;
+
   AppSettings settings = const AppSettings();
   final List<Category> categories = [];
   final List<Tag> tags = [];
@@ -280,6 +424,10 @@ class AppStore extends ChangeNotifier {
 
   String? _analyticsSnapshotKey;
   AnalyticsSnapshot? _analyticsSnapshot;
+
+  StorageLoadResult get storageLoadResult => _storageLoadResult;
+  String? get lastValidatedSnapshot => _lastValidatedSnapshot;
+  bool get isStorageReadOnly => _storageLoadResult.isFailure;
 
   String _analyticsKey() {
     final buffer = StringBuffer()
@@ -377,17 +525,50 @@ class AppStore extends ChangeNotifier {
     }
   }
 
-  Future<void> load() async {
+  Future<StorageLoadResult> load() async {
+    final result = await _storage.load();
+    _storageLoadResult = result;
+    _lastValidatedSnapshot = result.lastValidatedPayload;
+    if (result.isFailure) {
+      _invalidateAnalytics();
+      notifyListeners();
+      return result;
+    }
+
     try {
-      final raw = await _storage.load();
-      if (raw.trim().isEmpty) {
+      final raw = result.payload ?? '';
+      if (result.status == StorageLoadStatus.empty) {
+        if (result.hasValidatedSnapshot) {
+          _storageLoadResult = StorageLoadResult.recoverableFailure(
+            errorCode: 'storage_payload_missing',
+            lastValidatedPayload: result.lastValidatedPayload,
+          );
+          _invalidateAnalytics();
+          notifyListeners();
+          return _storageLoadResult;
+        }
         initializeEmptyData();
         await save();
       } else {
         importMap(Map<String, dynamic>.from(jsonDecode(raw)));
+        if (result.lastValidatedPayload != raw) {
+          await _storage.markValidated(raw);
+        }
+        _lastValidatedSnapshot = raw;
+        _storageLoadResult = StorageLoadResult.success(
+          payload: raw,
+          lastValidatedPayload: raw,
+        );
       }
-    } catch (_) {
-      initializeEmptyData();
+    } catch (error) {
+      _storageLoadResult = StorageLoadResult.recoverableFailure(
+        errorCode: 'storage_payload_invalid',
+        errorMessage: error.toString(),
+        lastValidatedPayload: _lastValidatedSnapshot,
+      );
+      _invalidateAnalytics();
+      notifyListeners();
+      return _storageLoadResult;
     }
     viewMode = settings.defaultHomeViewMode;
     configureRuntimeSettings(settings);
@@ -398,6 +579,7 @@ class AppStore extends ChangeNotifier {
     }
     _invalidateAnalytics();
     notifyListeners();
+    return _storageLoadResult;
   }
 
   void importMap(Map<String, dynamic> data) {
@@ -464,13 +646,27 @@ class AppStore extends ChangeNotifier {
       const JsonEncoder.withIndent('  ')
           .convert(exportMap(includeSnapshots: includeSnapshots));
 
-  Future<void> save() async {
-    final snapshot = jsonEncode(exportMap());
+  Future<void> _persistValidatedSnapshot(String snapshot) async {
     await _storage.save(snapshot);
     final echoed = await _storage.load();
-    if (echoed != snapshot) {
+    if (echoed.status != StorageLoadStatus.success ||
+        echoed.payload != snapshot) {
       throw StateError(tr('store.sqliteVerifyFailed'));
     }
+    await _storage.markValidated(snapshot);
+    _lastValidatedSnapshot = snapshot;
+  }
+
+  Future<void> save() async {
+    if (isStorageReadOnly) {
+      throw StateError(tr('store.recovery.readOnly'));
+    }
+    final snapshot = jsonEncode(exportMap());
+    await _persistValidatedSnapshot(snapshot);
+    _storageLoadResult = StorageLoadResult.success(
+      payload: snapshot,
+      lastValidatedPayload: snapshot,
+    );
     NativeBridge.updateHomeWidget(
       assetCount: assets.length,
       wishCount: wishes.where((w) => !w.archived).length,
@@ -506,7 +702,12 @@ class AppStore extends ChangeNotifier {
     if (result.ok) {
       settings = settings.copyWith(
           cloudSync: settings.cloudSync.copyWith(lastUploadAt: DateTime.now()));
-      await _storage.save(jsonEncode(exportMap()));
+      final snapshot = jsonEncode(exportMap());
+      await _persistValidatedSnapshot(snapshot);
+      _storageLoadResult = StorageLoadResult.success(
+        payload: snapshot,
+        lastValidatedPayload: snapshot,
+      );
       _invalidateAnalytics();
       if (!silent) notifyListeners();
     }

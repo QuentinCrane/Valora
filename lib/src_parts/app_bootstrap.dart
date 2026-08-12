@@ -71,19 +71,28 @@ class ValoraApp extends StatefulWidget {
 
 class _ValoraAppState extends State<ValoraApp> {
   late final AppStore store;
-  late final Future<void> boot;
+  late Future<void> boot;
 
   @override
   void initState() {
     super.initState();
     store = AppStore();
-    boot = store.load().then((_) {
+    _startBoot();
+  }
+
+  void _startBoot() {
+    boot = store.load().then<void>((result) async {
+      if (result.isFailure) return;
       configureRuntimeSettings(store.settings);
-      return NativeBridge.setStickerEngineConfig(
+      await NativeBridge.setStickerEngineConfig(
         mode: store.settings.stickerEngineMode.name,
         keepCandidates: store.settings.keepStickerCandidates,
       );
     });
+  }
+
+  void _retryBoot() {
+    setState(_startBoot);
   }
 
   @override
@@ -91,6 +100,11 @@ class _ValoraAppState extends State<ValoraApp> {
     return FutureBuilder<void>(
       future: boot,
       builder: (context, snapshot) {
+        final loadResult = snapshot.hasError
+            ? const StorageLoadResult.fatalFailure(
+                errorCode: 'storage_boot_failed',
+              )
+            : store.storageLoadResult;
         return AppScope(
           store: store,
           child: AnimatedBuilder(
@@ -114,9 +128,14 @@ class _ValoraAppState extends State<ValoraApp> {
                   Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
                   Locale('en'),
                 ],
-                home: snapshot.connectionState == ConnectionState.done
-                    ? const ShellPage()
-                    : const BootPage(),
+                home: snapshot.connectionState != ConnectionState.done
+                    ? const BootPage()
+                    : loadResult.isFailure
+                        ? StorageRecoveryPage(
+                            result: loadResult,
+                            onRetry: _retryBoot,
+                          )
+                        : const ShellPage(),
               );
             },
           ),
@@ -414,6 +433,89 @@ class BootPage extends StatelessWidget {
             const SizedBox(height: 16),
             Text(tr('boot.loading')),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class StorageRecoveryPage extends StatelessWidget {
+  final StorageLoadResult result;
+  final VoidCallback onRetry;
+
+  const StorageRecoveryPage({
+    super.key,
+    required this.result,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fatal = result.status == StorageLoadStatus.fatalFailure;
+    return GradientScaffold(
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const LogoMark(size: 72),
+                  const SizedBox(height: 22),
+                  Text(
+                    tr(fatal
+                        ? 'store.recovery.fatalTitle'
+                        : 'store.recovery.title'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    tr('store.recovery.description'),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 18),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withOpacity(.72),
+                      borderRadius: BorderRadius.circular(kRadiusMd),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(tr('store.recovery.readOnly')),
+                        const SizedBox(height: 10),
+                        Text(
+                          '${tr('store.recovery.code')}: ${result.errorCode ?? 'storage_unknown'}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        if (result.hasValidatedSnapshot) ...[
+                          const SizedBox(height: 10),
+                          Text(tr('store.recovery.snapshot')),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  FilledButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: Text(tr('store.recovery.retry')),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
