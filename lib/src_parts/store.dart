@@ -145,6 +145,195 @@ class StorageLoadResult {
       lastValidatedPayload != null && lastValidatedPayload!.trim().isNotEmpty;
 }
 
+enum PersistenceSaveKind { crud, settings, system }
+
+enum PersistenceStatus { idle, saving, saved, failed }
+
+class PersistenceSaveState {
+  final PersistenceStatus status;
+  final int revision;
+  final int persistedRevision;
+  final int? activeRevision;
+  final int? failedRevision;
+  final String? error;
+
+  const PersistenceSaveState({
+    required this.status,
+    required this.revision,
+    required this.persistedRevision,
+    this.activeRevision,
+    this.failedRevision,
+    this.error,
+  });
+
+  const PersistenceSaveState.idle()
+      : this(
+          status: PersistenceStatus.idle,
+          revision: 0,
+          persistedRevision: 0,
+        );
+
+  bool get isSaving => status == PersistenceStatus.saving;
+  bool get isFailed => status == PersistenceStatus.failed;
+  bool get isSettled => status == PersistenceStatus.saved;
+}
+
+class PersistenceSaveTicket {
+  final int revision;
+  final Future<void> completion;
+
+  const PersistenceSaveTicket({
+    required this.revision,
+    required this.completion,
+  });
+}
+
+typedef PersistenceWriter = Future<void> Function(
+  int revision,
+  String snapshot,
+);
+
+class _PendingPersistenceSave {
+  final int revision;
+  final String snapshot;
+  final PersistenceSaveKind kind;
+  final List<Completer<void>> waiters;
+
+  const _PendingPersistenceSave({
+    required this.revision,
+    required this.snapshot,
+    required this.kind,
+    required this.waiters,
+  });
+}
+
+class SaveCoordinator {
+  final PersistenceWriter _writer;
+  final ValueChanged<PersistenceSaveState>? onStateChanged;
+  final List<_PendingPersistenceSave> _queue = [];
+
+  PersistenceSaveState _state = const PersistenceSaveState.idle();
+  _PendingPersistenceSave? _lastFailed;
+  int _revision = 0;
+  int _persistedRevision = 0;
+  int? _activeRevision;
+  bool _draining = false;
+
+  SaveCoordinator({required PersistenceWriter writer, this.onStateChanged})
+      : _writer = writer;
+
+  PersistenceSaveState get state => _state;
+  int get revision => _revision;
+  int get persistedRevision => _persistedRevision;
+
+  PersistenceSaveTicket enqueue(
+    String snapshot, {
+    PersistenceSaveKind kind = PersistenceSaveKind.crud,
+  }) {
+    final revision = ++_revision;
+    final waiter = Completer<void>();
+    final pending = _PendingPersistenceSave(
+      revision: revision,
+      snapshot: snapshot,
+      kind: kind,
+      waiters: [waiter],
+    );
+    if (kind == PersistenceSaveKind.settings &&
+        _queue.isNotEmpty &&
+        _queue.last.kind == PersistenceSaveKind.settings) {
+      final previous = _queue.removeLast();
+      _queue.add(
+        _PendingPersistenceSave(
+          revision: revision,
+          snapshot: snapshot,
+          kind: kind,
+          waiters: [...previous.waiters, waiter],
+        ),
+      );
+    } else {
+      _queue.add(pending);
+    }
+    _emit(
+      PersistenceStatus.saving,
+      activeRevision: _activeRevision ?? revision,
+    );
+    if (!_draining) unawaited(_drain());
+    return PersistenceSaveTicket(
+      revision: revision,
+      completion: waiter.future,
+    );
+  }
+
+  PersistenceSaveTicket? retryLastFailed() {
+    final failed = _lastFailed;
+    if (failed == null) return null;
+    _lastFailed = null;
+    return enqueue(failed.snapshot, kind: failed.kind);
+  }
+
+  Future<void> _drain() async {
+    if (_draining) return;
+    _draining = true;
+    try {
+      while (_queue.isNotEmpty) {
+        final pending = _queue.removeAt(0);
+        _activeRevision = pending.revision;
+        _emit(
+          PersistenceStatus.saving,
+          activeRevision: pending.revision,
+        );
+        try {
+          await _writer(pending.revision, pending.snapshot);
+          _persistedRevision = pending.revision;
+          if ((_lastFailed?.revision ?? 0) <= pending.revision) {
+            _lastFailed = null;
+          }
+          for (final waiter in pending.waiters) {
+            if (!waiter.isCompleted) waiter.complete();
+          }
+          _emit(
+            _queue.isEmpty ? PersistenceStatus.saved : PersistenceStatus.saving,
+            activeRevision: _queue.isEmpty ? null : pending.revision,
+          );
+        } catch (error, stackTrace) {
+          _lastFailed = pending;
+          for (final waiter in pending.waiters) {
+            if (!waiter.isCompleted) {
+              waiter.completeError(error, stackTrace);
+            }
+          }
+          _emit(
+            PersistenceStatus.failed,
+            failedRevision: pending.revision,
+            error: error.toString(),
+          );
+        } finally {
+          _activeRevision = null;
+        }
+      }
+    } finally {
+      _draining = false;
+    }
+  }
+
+  void _emit(
+    PersistenceStatus status, {
+    int? activeRevision,
+    int? failedRevision,
+    String? error,
+  }) {
+    _state = PersistenceSaveState(
+      status: status,
+      revision: _revision,
+      persistedRevision: _persistedRevision,
+      activeRevision: activeRevision,
+      failedRevision: failedRevision,
+      error: error,
+    );
+    onStateChanged?.call(_state);
+  }
+}
+
 class StoredCloudCredentials {
   final String username;
   final String password;
@@ -1034,9 +1223,21 @@ const Map<String, String> _categoryL10nKeys = {
 class AppStore extends ChangeNotifier {
   final LocalSqliteStorage _storage = const LocalSqliteStorage();
   final CloudSyncService _cloud = const CloudSyncService();
+  late final SaveCoordinator _saveCoordinator;
 
   StorageLoadResult _storageLoadResult = const StorageLoadResult.empty();
   String? _lastValidatedSnapshot;
+  PersistenceSaveState _persistenceState = const PersistenceSaveState.idle();
+
+  AppStore() {
+    _saveCoordinator = SaveCoordinator(
+      writer: _writeSnapshot,
+      onStateChanged: (state) {
+        _persistenceState = state;
+        notifyListeners();
+      },
+    );
+  }
 
   AppSettings settings = const AppSettings();
   final List<Category> categories = [];
@@ -1061,6 +1262,9 @@ class AppStore extends ChangeNotifier {
   StorageLoadResult get storageLoadResult => _storageLoadResult;
   String? get lastValidatedSnapshot => _lastValidatedSnapshot;
   bool get isStorageReadOnly => _storageLoadResult.isFailure;
+  PersistenceSaveState get persistenceState => _persistenceState;
+  int get persistenceRevision => _saveCoordinator.revision;
+  int get persistedRevision => _saveCoordinator.persistedRevision;
 
   Future<bool> _hydrateCloudCredentials() async {
     final localCloud = settings.cloudSync;
@@ -1334,6 +1538,9 @@ class AppStore extends ChangeNotifier {
       const JsonEncoder.withIndent('  ')
           .convert(exportMap(includeSnapshots: includeSnapshots));
 
+  Future<void> _writeSnapshot(int _, String snapshot) =>
+      _persistValidatedSnapshot(snapshot);
+
   Future<void> _persistValidatedSnapshot(String snapshot) async {
     await _storage.save(snapshot);
     final echoed = await _storage.load();
@@ -1345,34 +1552,53 @@ class AppStore extends ChangeNotifier {
     _lastValidatedSnapshot = snapshot;
   }
 
-  Future<void> save() async {
+  Future<bool> _enqueueSnapshot(
+    String snapshot, {
+    PersistenceSaveKind kind = PersistenceSaveKind.crud,
+  }) async {
     if (isStorageReadOnly) {
       throw StateError(tr('store.recovery.readOnly'));
     }
-    final snapshot = jsonEncode(exportMap());
-    await _persistValidatedSnapshot(snapshot);
-    _storageLoadResult = StorageLoadResult.success(
-      payload: snapshot,
-      lastValidatedPayload: snapshot,
-    );
-    NativeBridge.updateHomeWidget(
-      assetCount: assets.length,
-      wishCount: wishes.where((w) => !w.archived).length,
-      totalAssetValue: getTotalAssetValue(),
-      averageDailyCost: getAverageDailyCost(),
-      currency: settings.currencyUnit,
-      servingCount: statusCount(AssetStatus.serving),
-      retiredCount: statusCount(AssetStatus.retired),
-      soldCount: statusCount(AssetStatus.sold),
-      dueSoonCount: dueSoonAssets().length,
-      leakCount: walletLeaks(limit: 99).length,
-      snapshotCount: snapshots.length,
-    );
-    if (settings.cloudSync.autoUploadOnSave && settings.cloudSync.enabled) {
-      Future<void>(() async {
-        await uploadCloudBackup(silent: true);
-      });
+    final ticket = _saveCoordinator.enqueue(snapshot, kind: kind);
+    await ticket.completion;
+    final isLatestPersisted =
+        ticket.revision == _saveCoordinator.persistedRevision;
+    if (isLatestPersisted) {
+      _storageLoadResult = StorageLoadResult.success(
+        payload: snapshot,
+        lastValidatedPayload: snapshot,
+      );
+      NativeBridge.updateHomeWidget(
+        assetCount: assets.length,
+        wishCount: wishes.where((w) => !w.archived).length,
+        totalAssetValue: getTotalAssetValue(),
+        averageDailyCost: getAverageDailyCost(),
+        currency: settings.currencyUnit,
+        servingCount: statusCount(AssetStatus.serving),
+        retiredCount: statusCount(AssetStatus.retired),
+        soldCount: statusCount(AssetStatus.sold),
+        dueSoonCount: dueSoonAssets().length,
+        leakCount: walletLeaks(limit: 99).length,
+        snapshotCount: snapshots.length,
+      );
     }
+    return isLatestPersisted;
+  }
+
+  Future<void> save(
+      {PersistenceSaveKind kind = PersistenceSaveKind.crud}) async {
+    final isLatestPersisted =
+        await _enqueueSnapshot(jsonEncode(exportMap()), kind: kind);
+    if (isLatestPersisted &&
+        settings.cloudSync.autoUploadOnSave &&
+        settings.cloudSync.enabled) {
+      unawaited(uploadCloudBackup(silent: true));
+    }
+  }
+
+  Future<void> retryPersistence() async {
+    final snapshot = jsonEncode(exportMap());
+    await _enqueueSnapshot(snapshot);
   }
 
   Future<void> updateCloudSyncSettings(CloudSyncSettings value) async {
@@ -1385,7 +1611,7 @@ class AppStore extends ChangeNotifier {
       await _storage.clearCredentials();
     }
     settings = settings.copyWith(cloudSync: value);
-    await save();
+    await save(kind: PersistenceSaveKind.settings);
     _invalidateAnalytics();
     notifyListeners();
   }
@@ -1395,7 +1621,7 @@ class AppStore extends ChangeNotifier {
     settings = settings.copyWith(
       cloudSync: settings.cloudSync.copyWith(clearCredentials: true),
     );
-    await save();
+    await save(kind: PersistenceSaveKind.settings);
     _invalidateAnalytics();
     notifyListeners();
   }
@@ -1409,11 +1635,7 @@ class AppStore extends ChangeNotifier {
       settings = settings.copyWith(
           cloudSync: settings.cloudSync.copyWith(lastUploadAt: DateTime.now()));
       final snapshot = jsonEncode(exportMap());
-      await _persistValidatedSnapshot(snapshot);
-      _storageLoadResult = StorageLoadResult.success(
-        payload: snapshot,
-        lastValidatedPayload: snapshot,
-      );
+      await _enqueueSnapshot(snapshot, kind: PersistenceSaveKind.settings);
       _invalidateAnalytics();
       if (!silent) notifyListeners();
     }
@@ -1989,7 +2211,7 @@ class AppStore extends ChangeNotifier {
   Future<void> updateSettings(AppSettings next) async {
     settings = next;
     configureRuntimeSettings(settings);
-    await save();
+    await save(kind: PersistenceSaveKind.settings);
     _invalidateAnalytics();
     notifyListeners();
   }

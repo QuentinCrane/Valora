@@ -701,6 +701,14 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
                 ),
               );
             }),
+          if (context.store.persistenceState.isSaving ||
+              context.store.persistenceState.isFailed)
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: safe.bottom + 100,
+              child: const PersistenceStatusBanner(),
+            ),
         ],
       ),
     );
@@ -711,6 +719,70 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     mediumHaptic();
     Navigator.of(context).push(softRoute<void>(ComposePage(
         initialTab: tab, initialName: initialName, initialIcon: initialIcon)));
+  }
+}
+
+class PersistenceStatusBanner extends StatelessWidget {
+  const PersistenceStatusBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.store;
+    final state = store.persistenceState;
+    final failed = state.isFailed;
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      elevation: 4,
+      color: failed ? scheme.errorContainer : scheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(kRadiusMd),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+        child: Row(
+          children: [
+            failed
+                ? Icon(Icons.warning_amber_rounded,
+                    color: scheme.onErrorContainer)
+                : SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: scheme.primary,
+                    ),
+                  ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                tr(failed
+                    ? 'store.persistence.failed'
+                    : 'store.persistence.saving'),
+                style: TextStyle(
+                  color: failed ? scheme.onErrorContainer : scheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            if (failed)
+              TextButton(
+                onPressed: () async {
+                  try {
+                    await store.retryPersistence();
+                    if (!context.mounted) return;
+                    showNativeSnack(context, tr('store.persistence.retryDone'));
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    showNativeSnack(
+                        context, tr('store.persistence.retryFailed'));
+                  }
+                },
+                child: Text(tr('store.persistence.retry')),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
