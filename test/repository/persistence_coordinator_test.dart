@@ -120,4 +120,12 @@ void main() {
     expect(store.exportMap().containsKey('taggedOnly'), isFalse);
     expect(store.exportMap().containsKey('wishShowArchived'), isFalse);
   });
+
+  test('unchanged settings do not create a persistence request', () async {
+    final store = AppStore();
+
+    await store.updateSettings(store.settings);
+
+    expect(store.persistenceRevision, 0);
+  });
 }

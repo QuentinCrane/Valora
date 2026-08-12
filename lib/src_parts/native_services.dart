@@ -2,6 +2,32 @@ part of '../main.dart';
 
 enum NativeBridgeStatus { success, cancelled, failure }
 
+enum WidgetRefreshTarget {
+  total,
+  wish,
+  daily,
+  health,
+  quick,
+  due,
+  snapshot,
+  mini,
+}
+
+extension WidgetRefreshTargetX on WidgetRefreshTarget {
+  String get wireName => name;
+}
+
+const Set<WidgetRefreshTarget> kAllWidgetRefreshTargets = {
+  WidgetRefreshTarget.total,
+  WidgetRefreshTarget.wish,
+  WidgetRefreshTarget.daily,
+  WidgetRefreshTarget.health,
+  WidgetRefreshTarget.quick,
+  WidgetRefreshTarget.due,
+  WidgetRefreshTarget.snapshot,
+  WidgetRefreshTarget.mini,
+};
+
 enum NativeBridgeErrorCode {
   cancelled,
   busy,
@@ -501,8 +527,9 @@ class NativeBridge {
     int dueSoonCount = 0,
     int leakCount = 0,
     int snapshotCount = 0,
+    Set<WidgetRefreshTarget>? targets,
   }) {
-    return _callResult<Object>('updateHomeWidget', args: {
+    final args = <String, dynamic>{
       'assetCount': assetCount,
       'wishCount': wishCount,
       'totalAssetValue': totalAssetValue,
@@ -514,7 +541,11 @@ class NativeBridge {
       'dueSoonCount': dueSoonCount,
       'leakCount': leakCount,
       'snapshotCount': snapshotCount,
-    });
+    };
+    if (targets != null) {
+      args['targets'] = targets.map((target) => target.wireName).toList();
+    }
+    return _callResult<Object>('updateHomeWidget', args: args);
   }
 
   static Future<void> updateHomeWidget({
@@ -529,6 +560,7 @@ class NativeBridge {
     int dueSoonCount = 0,
     int leakCount = 0,
     int snapshotCount = 0,
+    Set<WidgetRefreshTarget>? targets,
   }) async {
     await updateHomeWidgetResult(
       assetCount: assetCount,
@@ -542,6 +574,7 @@ class NativeBridge {
       dueSoonCount: dueSoonCount,
       leakCount: leakCount,
       snapshotCount: snapshotCount,
+      targets: targets,
     );
   }
 

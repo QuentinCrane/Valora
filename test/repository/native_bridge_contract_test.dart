@@ -109,4 +109,35 @@ void main() {
     expect(result.value?['status'], 'ready');
     expect(result.value?['updatedAt'], 123);
   });
+
+  test('sends targeted widget refreshes instead of an implicit full refresh',
+      () async {
+    Map<Object?, Object?>? receivedArgs;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'updateHomeWidget');
+      receivedArgs = Map<Object?, Object?>.from(call.arguments as Map);
+      return {
+        'protocolVersion': 1,
+        'status': 'success',
+        'data': true,
+      };
+    });
+
+    final result = await NativeBridge.updateHomeWidgetResult(
+      assetCount: 1,
+      wishCount: 2,
+      totalAssetValue: 3,
+      averageDailyCost: 4,
+      currency: '¥',
+      targets: const {
+        WidgetRefreshTarget.total,
+        WidgetRefreshTarget.mini,
+      },
+    );
+
+    expect(result.isSuccess, isTrue);
+    expect(receivedArgs?['targets'], containsAll(<String>['total', 'mini']));
+    expect(receivedArgs?['targets'], hasLength(2));
+  });
 }

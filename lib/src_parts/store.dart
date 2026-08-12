@@ -1532,6 +1532,27 @@ const Map<String, String> _categoryL10nKeys = {
   'cat_service': 'store.catService',
 };
 
+Set<WidgetRefreshTarget> widgetRefreshTargetsForSettings(
+  AppSettings previous,
+  AppSettings next,
+) {
+  final targets = <WidgetRefreshTarget>{};
+  if (previous.currencyUnit != next.currencyUnit) {
+    targets.addAll(const {
+      WidgetRefreshTarget.total,
+      WidgetRefreshTarget.daily,
+      WidgetRefreshTarget.mini,
+    });
+  }
+  if (previous.includeRetiredInTotal != next.includeRetiredInTotal) {
+    targets.addAll(const {
+      WidgetRefreshTarget.total,
+      WidgetRefreshTarget.mini,
+    });
+  }
+  return targets;
+}
+
 class AppStore extends ChangeNotifier {
   final LocalSqliteStorage _storage = const LocalSqliteStorage();
   final CloudSyncService _cloud = const CloudSyncService();
@@ -1547,6 +1568,7 @@ class AppStore extends ChangeNotifier {
   bool _destructiveMutationInFlight = false;
   bool _restoreInFlight = false;
   bool _reminderSyncInFlight = false;
+  final Map<int, Set<WidgetRefreshTarget>> _widgetTargetsByRevision = {};
 
   AppStore() {
     _saveCoordinator = SaveCoordinator(
@@ -2031,15 +2053,35 @@ class AppStore extends ChangeNotifier {
     _lastValidatedSnapshot = snapshot;
   }
 
+  Future<void> _refreshHomeWidgets(Set<WidgetRefreshTarget> targets) {
+    return NativeBridge.updateHomeWidget(
+      assetCount: assets.length,
+      wishCount: wishes.where((w) => !w.archived).length,
+      totalAssetValue: getTotalAssetValue(),
+      averageDailyCost: getAverageDailyCost(),
+      currency: settings.currencyUnit,
+      servingCount: statusCount(AssetStatus.serving),
+      retiredCount: statusCount(AssetStatus.retired),
+      soldCount: statusCount(AssetStatus.sold),
+      dueSoonCount: dueSoonAssets().length,
+      leakCount: walletLeaks(limit: 99).length,
+      snapshotCount: snapshots.length,
+      targets: targets,
+    );
+  }
+
   Future<bool> _enqueueSnapshot(
     String snapshot, {
     PersistenceSaveKind kind = PersistenceSaveKind.crud,
     bool syncReminders = true,
+    Set<WidgetRefreshTarget>? widgetTargets,
   }) async {
     if (isStorageReadOnly) {
       throw StateError(tr('store.recovery.readOnly'));
     }
     final ticket = _saveCoordinator.enqueue(snapshot, kind: kind);
+    _widgetTargetsByRevision[ticket.revision] =
+        Set<WidgetRefreshTarget>.of(widgetTargets ?? const {});
     await ticket.completion;
     final isLatestPersisted =
         ticket.revision == _saveCoordinator.persistedRevision;
@@ -2048,28 +2090,28 @@ class AppStore extends ChangeNotifier {
         payload: snapshot,
         lastValidatedPayload: snapshot,
       );
-      NativeBridge.updateHomeWidget(
-        assetCount: assets.length,
-        wishCount: wishes.where((w) => !w.archived).length,
-        totalAssetValue: getTotalAssetValue(),
-        averageDailyCost: getAverageDailyCost(),
-        currency: settings.currencyUnit,
-        servingCount: statusCount(AssetStatus.serving),
-        retiredCount: statusCount(AssetStatus.retired),
-        soldCount: statusCount(AssetStatus.sold),
-        dueSoonCount: dueSoonAssets().length,
-        leakCount: walletLeaks(limit: 99).length,
-        snapshotCount: snapshots.length,
-      );
+      final targets = <WidgetRefreshTarget>{};
+      for (final entry in _widgetTargetsByRevision.entries) {
+        if (entry.key <= _saveCoordinator.persistedRevision) {
+          targets.addAll(entry.value);
+        }
+      }
+      _widgetTargetsByRevision.removeWhere(
+          (revision, _) => revision <= _saveCoordinator.persistedRevision);
+      if (kind == PersistenceSaveKind.crud && targets.isEmpty) {
+        targets.addAll(kAllWidgetRefreshTargets);
+      }
+      if (targets.isNotEmpty) unawaited(_refreshHomeWidgets(targets));
       if (syncReminders) await _synchronizeReminderSchedule();
     }
     return isLatestPersisted;
   }
 
   Future<void> save(
-      {PersistenceSaveKind kind = PersistenceSaveKind.crud}) async {
-    final isLatestPersisted =
-        await _enqueueSnapshot(jsonEncode(exportMap()), kind: kind);
+      {PersistenceSaveKind kind = PersistenceSaveKind.crud,
+      Set<WidgetRefreshTarget>? widgetTargets}) async {
+    final isLatestPersisted = await _enqueueSnapshot(jsonEncode(exportMap()),
+        kind: kind, widgetTargets: widgetTargets);
     if (isLatestPersisted) _clearUndo();
     if (isLatestPersisted &&
         settings.cloudSync.autoUploadOnSave &&
@@ -2817,11 +2859,16 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> updateSettings(AppSettings next) async {
+    final previous = settings;
+    if (jsonEncode(previous.toMap()) == jsonEncode(next.toMap())) return;
     settings = next;
     configureRuntimeSettings(settings);
-    await save(kind: PersistenceSaveKind.settings);
     _invalidateAnalytics();
     _notifyHomeChanged();
+    await save(
+      kind: PersistenceSaveKind.settings,
+      widgetTargets: widgetRefreshTargetsForSettings(previous, next),
+    );
   }
 
   void _validateDomain(DomainValidationResult result) {

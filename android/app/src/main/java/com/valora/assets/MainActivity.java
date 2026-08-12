@@ -3051,29 +3051,67 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     @SuppressWarnings("unchecked")
     private void updateHomeWidget(Object arguments) {
         Map<String, Object> args = arguments instanceof Map ? (Map<String, Object>) arguments : new HashMap<>();
+        Set<String> targets = widgetTargets(args.get("targets"));
+        boolean refreshTotal = shouldRefreshWidget(targets, "total");
+        boolean refreshWish = shouldRefreshWidget(targets, "wish");
+        boolean refreshDaily = shouldRefreshWidget(targets, "daily");
+        boolean refreshHealth = shouldRefreshWidget(targets, "health");
+        boolean refreshQuick = shouldRefreshWidget(targets, "quick");
+        boolean refreshDue = shouldRefreshWidget(targets, "due");
+        boolean refreshSnapshot = shouldRefreshWidget(targets, "snapshot");
+        boolean refreshMini = shouldRefreshWidget(targets, "mini");
         SharedPreferences prefs = getSharedPreferences("valora_widget", Context.MODE_PRIVATE);
-        prefs.edit()
-                .putInt("assetCount", intArg(args.get("assetCount"), 0))
-                .putInt("wishCount", intArg(args.get("wishCount"), 0))
-                .putInt("servingCount", intArg(args.get("servingCount"), 0))
-                .putInt("retiredCount", intArg(args.get("retiredCount"), 0))
-                .putInt("soldCount", intArg(args.get("soldCount"), 0))
-                .putInt("dueSoonCount", intArg(args.get("dueSoonCount"), 0))
-                .putInt("leakCount", intArg(args.get("leakCount"), 0))
-                .putInt("snapshotCount", intArg(args.get("snapshotCount"), 0))
-                .putString("currency", arg(args.get("currency"), "¥"))
-                .putString("totalAssetValue", String.format(java.util.Locale.US, "%.2f", doubleArg(args.get("totalAssetValue"), 0)))
-                .putString("averageDailyCost", String.format(java.util.Locale.US, "%.2f", doubleArg(args.get("averageDailyCost"), 0)))
-                .apply();
+        SharedPreferences.Editor editor = prefs.edit();
+        if (refreshTotal || refreshDue) {
+            editor.putInt("assetCount", intArg(args.get("assetCount"), 0));
+        }
+        if (refreshWish || refreshSnapshot) {
+            editor.putInt("wishCount", intArg(args.get("wishCount"), 0));
+            editor.putInt("snapshotCount", intArg(args.get("snapshotCount"), 0));
+        }
+        if (refreshTotal || refreshDaily) {
+            editor.putInt("servingCount", intArg(args.get("servingCount"), 0));
+        }
+        if (refreshHealth) {
+            editor.putInt("retiredCount", intArg(args.get("retiredCount"), 0));
+            editor.putInt("leakCount", intArg(args.get("leakCount"), 0));
+        }
+        if (refreshTotal) {
+            editor.putInt("soldCount", intArg(args.get("soldCount"), 0));
+        }
+        if (refreshHealth || refreshDue) {
+            editor.putInt("dueSoonCount", intArg(args.get("dueSoonCount"), 0));
+        }
+        if (refreshTotal || refreshDaily || refreshMini) {
+            editor.putString("currency", arg(args.get("currency"), "¥"));
+            editor.putString("averageDailyCost", String.format(java.util.Locale.US, "%.2f", doubleArg(args.get("averageDailyCost"), 0)));
+        }
+        if (refreshTotal || refreshMini) {
+            editor.putString("totalAssetValue", String.format(java.util.Locale.US, "%.2f", doubleArg(args.get("totalAssetValue"), 0)));
+        }
+        editor.apply();
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(this);
-        ValoraWidgetProvider.updateAll(this, appWidgetManager);
-        ValoraWishWidgetProvider.updateAll(this, appWidgetManager);
-        ValoraDailyWidgetProvider.updateAll(this, appWidgetManager);
-        ValoraHealthWidgetProvider.updateAll(this, appWidgetManager);
-        ValoraQuickWidgetProvider.updateAll(this, appWidgetManager);
-        ValoraDueWidgetProvider.updateAll(this, appWidgetManager);
-        ValoraSnapshotWidgetProvider.updateAll(this, appWidgetManager);
-        ValoraMiniWidgetProvider.updateAll(this, appWidgetManager);
+        if (refreshTotal) ValoraWidgetProvider.updateAll(this, appWidgetManager);
+        if (refreshWish) ValoraWishWidgetProvider.updateAll(this, appWidgetManager);
+        if (refreshDaily) ValoraDailyWidgetProvider.updateAll(this, appWidgetManager);
+        if (refreshHealth) ValoraHealthWidgetProvider.updateAll(this, appWidgetManager);
+        if (refreshQuick) ValoraQuickWidgetProvider.updateAll(this, appWidgetManager);
+        if (refreshDue) ValoraDueWidgetProvider.updateAll(this, appWidgetManager);
+        if (refreshSnapshot) ValoraSnapshotWidgetProvider.updateAll(this, appWidgetManager);
+        if (refreshMini) ValoraMiniWidgetProvider.updateAll(this, appWidgetManager);
+    }
+
+    private Set<String> widgetTargets(Object raw) {
+        if (!(raw instanceof List)) return null;
+        Set<String> targets = new LinkedHashSet<>();
+        for (Object value : (List<?>) raw) {
+            if (value != null) targets.add(String.valueOf(value));
+        }
+        return targets;
+    }
+
+    private boolean shouldRefreshWidget(Set<String> targets, String target) {
+        return targets == null || targets.contains("all") || targets.contains(target);
     }
 
     private boolean requestNotificationPermission() {

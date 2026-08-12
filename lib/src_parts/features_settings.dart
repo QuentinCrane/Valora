@@ -204,6 +204,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
         dueSoonCount: store.dueSoonAssets().length,
         leakCount: store.walletLeaks(limit: 99).length,
         snapshotCount: store.snapshots.length,
+        targets: kAllWidgetRefreshTargets,
       );
       if (context.mounted) showNativeSnack(context, tl('已刷新所有桌面小组件'));
     }
@@ -385,7 +386,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 value: store.settings.liquidGlassSoftness,
                 valueLabel:
                     glassSoftnessLabel(store.settings.liquidGlassSoftness),
-                onChanged: (value) => store.updateSettings(
+                onChangeEnd: (value) => store.updateSettings(
                     store.settings.copyWith(liquidGlassSoftness: value)),
               ),
             SettingRow(
@@ -1357,14 +1358,14 @@ class _SubjectSegmentationStatusRowState
   }
 }
 
-class SettingSliderRow extends StatelessWidget {
+class SettingSliderRow extends StatefulWidget {
   final IconData icon;
   final Color iconBg;
   final String label;
   final String description;
   final double value;
   final String valueLabel;
-  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onChangeEnd;
 
   const SettingSliderRow({
     super.key,
@@ -1374,8 +1375,30 @@ class SettingSliderRow extends StatelessWidget {
     required this.description,
     required this.value,
     required this.valueLabel,
-    required this.onChanged,
+    required this.onChangeEnd,
   });
+
+  @override
+  State<SettingSliderRow> createState() => _SettingSliderRowState();
+}
+
+class _SettingSliderRowState extends State<SettingSliderRow> {
+  late double _draftValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _draftValue = widget.value;
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingSliderRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value &&
+        (oldWidget.value - _draftValue).abs() < .005) {
+      _draftValue = widget.value;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1388,24 +1411,25 @@ class SettingSliderRow extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: iconBg.withOpacity(dark ? .18 : .35),
+              color: widget.iconBg.withOpacity(dark ? .18 : .35),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon,
-                size: 18, color: dark ? Colors.white.withOpacity(.86) : iconBg),
+            child: Icon(widget.icon,
+                size: 18,
+                color: dark ? Colors.white.withOpacity(.86) : widget.iconBg),
           ),
           const SizedBox(width: 12),
           Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label,
+              Text(widget.label,
                   style: TextStyle(
                       fontWeight: FontWeight.normal,
                       fontSize: 15,
                       letterSpacing: -.08,
                       color: dark ? Colors.white.withOpacity(.92) : kText)),
               const SizedBox(height: 2),
-              Text(description,
+              Text(widget.description,
                   style: const TextStyle(
                       color: kMuted,
                       fontSize: 12,
@@ -1413,14 +1437,21 @@ class SettingSliderRow extends StatelessWidget {
                       fontWeight: FontWeight.normal)),
             ]),
           ),
-          ValuePill(valueLabel),
+          ValuePill(((_draftValue - widget.value).abs() <= .005)
+              ? widget.valueLabel
+              : glassSoftnessLabel(_draftValue)),
         ]),
         Padding(
           padding: const EdgeInsets.only(left: 42, right: 2, top: 2),
           child: Slider(
-            value: value,
+            value: _draftValue,
             onChanged: (next) {
-              if ((next - value).abs() > .005) onChanged(next);
+              if ((next - _draftValue).abs() <= .005) return;
+              setState(() => _draftValue = next);
+            },
+            onChangeEnd: (next) {
+              _draftValue = next;
+              widget.onChangeEnd(next);
             },
           ),
         ),
