@@ -2723,18 +2723,34 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  Map<String, dynamic> prepareRestoreJson(String raw) {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      throw const PersistedDataException(
+        'data_invalid_object',
+        'Restore payload must be a JSON object',
+      );
+    }
+    return migratePersistedMap(Map<String, dynamic>.from(decoded));
+  }
+
   Future<bool> restoreFromJson(String raw) async {
     final previous = exportMap();
+    var imported = false;
     try {
-      importMap(Map<String, dynamic>.from(jsonDecode(raw)));
-      await save();
+      importMap(prepareRestoreJson(raw));
+      imported = true;
+      await _enqueueSnapshot(jsonEncode(exportMap()));
       _invalidateAnalytics();
       notifyListeners();
       return true;
     } catch (_) {
-      try {
-        importMap(previous);
-      } catch (_) {}
+      if (imported) {
+        try {
+          importMap(previous);
+          await _enqueueSnapshot(jsonEncode(previous));
+        } catch (_) {}
+      }
       return false;
     }
   }

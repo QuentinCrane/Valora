@@ -61,6 +61,8 @@ import java.util.regex.Matcher;
 import java.io.FileOutputStream;
 import java.io.FileInputStream;
 import java.io.FileWriter;
+import java.io.FilterInputStream;
+import java.io.IOException;
 
 import java.io.File;
 
@@ -81,6 +83,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.FloatBuffer;
 import java.security.KeyStore;
 import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -90,8 +93,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipInputStream;
@@ -120,6 +125,11 @@ public class MainActivity extends FlutterActivity {
     private static final String SECURE_IV = "iv";
     private static final String SECURE_CIPHERTEXT = "ciphertext";
     private static final String KEY_JSON = "payload_json";
+    private static final String ARCHIVE_STAGE_ROOT = "valora_archive_staging";
+    private static final long ARCHIVE_MAX_COMPRESSED_BYTES = 50L * 1024L * 1024L;
+    private static final long ARCHIVE_MAX_UNCOMPRESSED_BYTES = 250L * 1024L * 1024L;
+    private static final long ARCHIVE_MAX_ENTRY_BYTES = 100L * 1024L * 1024L;
+    private static final int ARCHIVE_MAX_ENTRIES = 2048;
 
     private static final int REQ_PICK_IMAGE = 4101;
     private static final int REQ_CAPTURE_PHOTO = 4102;
@@ -306,6 +316,18 @@ public class MainActivity extends FlutterActivity {
                     openArchive.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     openArchive.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
                     startSingleResult(result, REQ_OPEN_ARCHIVE, openArchive);
+                    break;
+                case "commitDataArchive":
+                    result.success(commitDataArchive(arg(call.argument("stagingId"), "")));
+                    break;
+                case "discardDataArchive":
+                    result.success(discardDataArchive(arg(call.argument("stagingId"), "")));
+                    break;
+                case "rollbackDataArchive":
+                    result.success(rollbackDataArchive(arg(call.argument("stagingId"), "")));
+                    break;
+                case "finalizeDataArchive":
+                    result.success(finalizeDataArchive(arg(call.argument("stagingId"), "")));
                     break;
                 case "readPrivateTextFile":
                     result.success(readPrivateTextFile(arg(call.argument("path"), "")));
@@ -1911,112 +1933,459 @@ public class MainActivity extends FlutterActivity {
         return false;
     }
 
+    private static final class ArchiveBudget {
+        long totalBytes = 0;
+        long entryBytes = 0;
+
+        void beginEntry() {
+            entryBytes = 0;
+        }
+
+        void consume(int count) throws IOException {
+            entryBytes += count;
+            totalBytes += count;
+            if (entryBytes > ARCHIVE_MAX_ENTRY_BYTES || totalBytes > ARCHIVE_MAX_UNCOMPRESSED_BYTES) {
+                throw new IOException("Archive exceeds the allowed uncompressed size");
+            }
+        }
+    }
+
+    private static final class CountingInputStream extends FilterInputStream {
+        private final long limit;
+        private long count = 0;
+
+        CountingInputStream(InputStream input, long limit) {
+            super(input);
+            this.limit = limit;
+        }
+
+        @Override
+        public int read() throws IOException {
+            final int value = super.read();
+            if (value >= 0) consume(1);
+            return value;
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            final int value = super.read(buffer, offset, length);
+            if (value > 0) consume(value);
+            return value;
+        }
+
+        private void consume(int amount) throws IOException {
+            count += amount;
+            if (count > limit) throw new IOException("Archive exceeds the allowed compressed size");
+        }
+    }
+
+    private String normalizeArchiveEntryName(String rawName) throws IOException {
+        if (rawName == null) throw new IOException("Archive entry has no name");
+        final String raw = rawName.replace('\\', '/');
+        if (raw.trim().isEmpty() || raw.startsWith("/") || raw.matches("^[A-Za-z]:.*")) {
+            throw new IOException("Archive contains an unsafe path");
+        }
+        final StringBuilder normalized = new StringBuilder();
+        for (String part : raw.split("/")) {
+            if (part.isEmpty() || ".".equals(part)) continue;
+            if ("..".equals(part) || part.contains(":")) {
+                throw new IOException("Archive contains an unsafe path");
+            }
+            if (normalized.length() > 0) normalized.append('/');
+            normalized.append(part);
+        }
+        if (normalized.length() == 0) throw new IOException("Archive entry has no usable path");
+        return normalized.toString();
+    }
+
+    private File canonicalChild(File root, String relative) throws IOException {
+        final File canonicalRoot = root.getCanonicalFile();
+        final File candidate = new File(root, relative).getCanonicalFile();
+        final String rootPath = canonicalRoot.getPath();
+        if (!candidate.equals(canonicalRoot) && !candidate.getPath().startsWith(rootPath + File.separator)) {
+            throw new IOException("Path escapes the archive staging directory");
+        }
+        return candidate;
+    }
+
+    private File archiveStageRoot() {
+        return new File(getFilesDir(), ARCHIVE_STAGE_ROOT);
+    }
+
+    private File archiveStageDirectory(String stagingId) throws IOException {
+        if (stagingId == null || !stagingId.matches("[A-Za-z0-9_-]{8,80}")) {
+            throw new IOException("Invalid archive staging id");
+        }
+        return canonicalChild(archiveStageRoot(), stagingId);
+    }
+
+    private byte[] readZipEntry(ZipInputStream zis, ArchiveBudget budget) throws IOException {
+        final ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        copyBounded(zis, bout, budget);
+        return bout.toByteArray();
+    }
+
+    private void copyBounded(InputStream input, OutputStream output, ArchiveBudget budget) throws IOException {
+        final byte[] buffer = new byte[8192];
+        int count;
+        budget.beginEntry();
+        while ((count = input.read(buffer)) >= 0) {
+            if (count == 0) continue;
+            budget.consume(count);
+            output.write(buffer, 0, count);
+        }
+    }
+
+    private String sha256File(File file) throws Exception {
+        final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        final FileInputStream input = new FileInputStream(file);
+        try {
+            final byte[] buffer = new byte[8192];
+            int count;
+            while ((count = input.read(buffer)) >= 0) {
+                if (count > 0) digest.update(buffer, 0, count);
+            }
+        } finally {
+            input.close();
+        }
+        final StringBuilder result = new StringBuilder();
+        for (byte value : digest.digest()) result.append(String.format(java.util.Locale.US, "%02x", value));
+        return result.toString();
+    }
+
+    private String readUtf8File(File file) throws Exception {
+        final FileInputStream input = new FileInputStream(file);
+        try {
+            final ByteArrayOutputStream output = new ByteArrayOutputStream();
+            final byte[] buffer = new byte[8192];
+            int count;
+            while ((count = input.read(buffer)) >= 0) {
+                if (count > 0) output.write(buffer, 0, count);
+            }
+            return output.toString("UTF-8");
+        } finally {
+            input.close();
+        }
+    }
+
+    private void writeUtf8File(File file, String text) throws Exception {
+        final File parent = file.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new IOException("Could not create archive staging directory");
+        }
+        final FileOutputStream output = new FileOutputStream(file, false);
+        try {
+            output.write((text == null ? "" : text).getBytes(StandardCharsets.UTF_8));
+            output.flush();
+        } finally {
+            output.close();
+        }
+    }
+
+    private void deleteRecursively(File target) {
+        if (target == null || !target.exists()) return;
+        if (target.isDirectory()) {
+            final File[] children = target.listFiles();
+            if (children != null) for (File child : children) deleteRecursively(child);
+        }
+        target.delete();
+    }
+
+    private String fileUri(File file) {
+        return "file://" + file.getAbsolutePath();
+    }
+
+    private boolean isLocalMediaReference(String value) {
+        return value != null && (value.startsWith("file://") || value.startsWith("/"));
+    }
+
+    private void validateArchiveMediaReferences(Object value, File stageDir) throws Exception {
+        if (value instanceof JSONObject) {
+            final JSONObject object = (JSONObject) value;
+            final Iterator<String> keys = object.keys();
+            while (keys.hasNext()) {
+                final String key = keys.next();
+                final Object child = object.opt(key);
+                if (("iconValue".equalsIgnoreCase(key) || "emoji".equalsIgnoreCase(key)) && child instanceof String && isLocalMediaReference((String) child)) {
+                    final String rawPath = ((String) child).startsWith("file://")
+                            ? Uri.parse((String) child).getPath()
+                            : (String) child;
+                    final File media = new File(rawPath).getCanonicalFile();
+                    final File stageMedia = canonicalChild(stageDir, "media");
+                    final String stagePath = stageMedia.getPath();
+                    if (!media.getPath().startsWith(stagePath + File.separator) || !media.isFile()) {
+                        throw new IOException("Archive references missing media");
+                    }
+                }
+                validateArchiveMediaReferences(child, stageDir);
+            }
+        } else if (value instanceof JSONArray) {
+            final JSONArray array = (JSONArray) value;
+            for (int i = 0; i < array.length(); i++) validateArchiveMediaReferences(array.opt(i), stageDir);
+        }
+    }
+
     private void restoreDataArchiveFromUri(Uri uri, MethodChannel.Result result) {
         ZipInputStream zis = null;
+        File stageDir = null;
         try {
-            InputStream raw = getContentResolver().openInputStream(uri);
+            final InputStream raw = getContentResolver().openInputStream(uri);
             if (raw == null) {
                 result.success("{\"ok\":false,\"message\":\"" + escape(getString(R.string.archive_restore_read_failed)) + "\"}");
                 return;
             }
-            zis = new ZipInputStream(raw);
-            File mediaDir = new File(getFilesDir(), "valora_media");
-            if (!mediaDir.exists()) mediaDir.mkdirs();
-            File restoreDir = new File(getFilesDir(), "valora_restore");
-            if (!restoreDir.exists()) restoreDir.mkdirs();
+            final File stageRoot = archiveStageRoot();
+            if (!stageRoot.exists() && !stageRoot.mkdirs()) throw new IOException("Could not create archive staging root");
+            final String stagingId = "archive_" + UUID.randomUUID().toString().replace("-", "");
+            stageDir = canonicalChild(stageRoot, stagingId);
+            final File stageMediaDir = canonicalChild(stageDir, "media");
+            if (!stageMediaDir.mkdirs()) throw new IOException("Could not create archive media staging directory");
 
+            final CountingInputStream counted = new CountingInputStream(raw, ARCHIVE_MAX_COMPRESSED_BYTES);
+            zis = new ZipInputStream(counted);
             String backupJson = "";
             String mediaManifest = "";
-            Map<String, String> mediaMap = new HashMap<>();
-            Map<String, String> mediaEntryMap = new HashMap<>();
+            final Map<String, String> mediaMap = new HashMap<>();
+            final Map<String, String> mediaEntryMap = new HashMap<>();
+            final Map<String, String> mediaHashes = new LinkedHashMap<>();
+            final Map<String, String> mediaOriginalNames = new LinkedHashMap<>();
+            final ArchiveBudget budget = new ArchiveBudget();
             int mediaCount = 0;
             int sqliteCount = 0;
             int totalEntries = 0;
-            byte[] buf = new byte[8192];
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                totalEntries++;
-                String entryName = entry.getName() == null ? "" : entry.getName().replace("\\", "/");
-                if (entry.isDirectory() || entryName.contains("..") || entryName.startsWith("/")) {
+                if (++totalEntries > ARCHIVE_MAX_ENTRIES) throw new IOException("Archive has too many entries");
+                final String entryName = normalizeArchiveEntryName(entry.getName());
+                if (entry.isDirectory()) {
                     zis.closeEntry();
                     continue;
                 }
-                String lower = entryName.toLowerCase(java.util.Locale.US);
+                final String lower = entryName.toLowerCase(java.util.Locale.US);
                 if (isCompatibleBackupJsonEntry(lower)) {
-                    ByteArrayOutputStream bout = new ByteArrayOutputStream();
-                    int n;
-                    while ((n = zis.read(buf)) >= 0) bout.write(buf, 0, n);
-                    backupJson = bout.toString("UTF-8");
+                    backupJson = new String(readZipEntry(zis, budget), StandardCharsets.UTF_8);
                 } else if (lower.equals("backup/media_manifest.tsv") || lower.endsWith("/media_manifest.tsv")) {
-                    ByteArrayOutputStream bout = new ByteArrayOutputStream();
-                    int n;
-                    while ((n = zis.read(buf)) >= 0) bout.write(buf, 0, n);
-                    mediaManifest = bout.toString("UTF-8");
+                    mediaManifest = new String(readZipEntry(zis, budget), StandardCharsets.UTF_8);
                 } else if (lower.startsWith("media/") || lower.contains("/media/")) {
-                    String rawName = entryName.substring(entryName.lastIndexOf('/') + 1);
-                    if (rawName.trim().length() == 0) {
-                        zis.closeEntry();
-                        continue;
+                    final String rawName = entryName.substring(entryName.lastIndexOf('/') + 1);
+                    final String originalName = rawName.replaceFirst("^\\d{3}_", "").replaceAll("[^a-zA-Z0-9._-]", "_");
+                    final String safeOriginalName = originalName.trim().isEmpty() ? "media_" + mediaCount : originalName;
+                    final String stagedName = String.format(java.util.Locale.US, "%04d_%s", mediaCount, safeOriginalName);
+                    final File stagedFile = canonicalChild(stageMediaDir, stagedName);
+                    final FileOutputStream output = new FileOutputStream(stagedFile, false);
+                    try {
+                        copyBounded(zis, output, budget);
+                    } finally {
+                        output.close();
                     }
-                    String originalName = rawName.replaceFirst("^\\d{3}_", "").replaceAll("[^a-zA-Z0-9._-]", "_");
-                    if (originalName.trim().length() == 0) originalName = "media_" + System.currentTimeMillis();
-                    String outName = "restored_" + System.currentTimeMillis() + "_" + mediaCount + "_" + originalName;
-                    File outFile = new File(mediaDir, outName);
-                    FileOutputStream out = new FileOutputStream(outFile);
-                    int n;
-                    while ((n = zis.read(buf)) >= 0) out.write(buf, 0, n);
-                    out.flush();
-                    out.close();
-                    String restoredUri = "file://" + outFile.getAbsolutePath();
-                    mediaEntryMap.put(entryName, restoredUri);
-                    mediaEntryMap.put(rawName, restoredUri);
-                    mediaMap.put(originalName, restoredUri);
-                    mediaMap.put(rawName, restoredUri);
-                    String unsanitizedGuess = rawName.replaceFirst("^\\d{3}_", "");
-                    mediaMap.put(unsanitizedGuess, restoredUri);
+                    final String stagedUri = fileUri(stagedFile);
+                    mediaEntryMap.put(entryName, stagedUri);
+                    mediaEntryMap.put(rawName, stagedUri);
+                    mediaMap.put(safeOriginalName, stagedUri);
+                    mediaMap.put(rawName, stagedUri);
+                    mediaMap.put(rawName.replaceFirst("^\\d{3}_", ""), stagedUri);
+                    mediaHashes.put(stagedName, sha256File(stagedFile));
+                    mediaOriginalNames.put(stagedName, safeOriginalName);
                     mediaCount++;
                 } else if (lower.startsWith("sqlite/") || lower.contains("/sqlite/")) {
                     sqliteCount++;
-                    while (zis.read(buf) >= 0) { /* drain entry */ }
+                    readZipEntry(zis, budget);
                 } else {
-                    while (zis.read(buf) >= 0) { /* drain entry */ }
+                    readZipEntry(zis, budget);
                 }
                 zis.closeEntry();
             }
             zis.close();
             zis = null;
-            if (backupJson.trim().length() == 0) {
-                result.success("{\"ok\":false,\"message\":\"" + escape(getString(R.string.archive_restore_no_json)) + "\"}");
-                return;
-            }
+            if (backupJson.trim().isEmpty()) throw new IOException(getString(R.string.archive_restore_no_json));
             applyMediaManifest(mediaManifest, mediaEntryMap, mediaMap);
-            String rewrittenJson = rewriteArchiveMediaPaths(backupJson, mediaMap);
-            File jsonFile = new File(restoreDir, "last_import_" + System.currentTimeMillis() + ".json");
-            FileWriter fw = new FileWriter(jsonFile, false);
-            fw.write(rewrittenJson);
-            fw.flush();
-            fw.close();
-            String jsonPath = "file://" + jsonFile.getAbsolutePath();
-            StringBuilder sb = new StringBuilder();
-            sb.append("{\"ok\":true");
-            sb.append(",\"message\":\"").append(escape(getString(R.string.archive_restore_read_ok))).append("\"");
-            sb.append(",\"mediaCount\":").append(mediaCount);
-            sb.append(",\"sqliteCount\":").append(sqliteCount);
-            sb.append(",\"entryCount\":").append(totalEntries);
-            sb.append(",\"jsonSize\":").append(rewrittenJson.length());
-            sb.append(",\"jsonPath\":\"").append(escape(jsonPath)).append("\"");
-            // 小型備份直接回傳，較大的備份讓 Flutter 從 jsonPath 讀取，避免 MethodChannel 大字串不穩定。
-            if (rewrittenJson.length() < 256000) {
-                sb.append(",\"json\":\"").append(escape(rewrittenJson)).append("\"");
+            final String rewrittenJson = rewriteArchiveMediaPaths(backupJson, mediaMap);
+            final JSONObject parsedJson = new JSONObject(rewrittenJson);
+            validateArchiveMediaReferences(parsedJson, stageDir);
+            writeUtf8File(canonicalChild(stageDir, "payload.json"), rewrittenJson);
+            final JSONObject metadata = new JSONObject();
+            metadata.put("stagingId", stagingId);
+            metadata.put("payloadFile", "payload.json");
+            final JSONArray media = new JSONArray();
+            for (Map.Entry<String, String> item : mediaHashes.entrySet()) {
+                final JSONObject mediaItem = new JSONObject();
+                mediaItem.put("name", item.getKey());
+                mediaItem.put("sha256", item.getValue());
+                mediaItem.put("originalName", mediaOriginalNames.get(item.getKey()));
+                media.put(mediaItem);
             }
-            sb.append("}");
-            result.success(sb.toString());
+            metadata.put("media", media);
+            writeUtf8File(canonicalChild(stageDir, "metadata.json"), metadata.toString());
+            final String jsonPath = fileUri(canonicalChild(stageDir, "payload.json"));
+            final StringBuilder response = new StringBuilder();
+            response.append("{\"ok\":true");
+            response.append(",\"message\":\"").append(escape(getString(R.string.archive_restore_read_ok))).append("\"");
+            response.append(",\"stagingId\":\"").append(escape(stagingId)).append("\"");
+            response.append(",\"mediaCount\":").append(mediaCount);
+            response.append(",\"sqliteCount\":").append(sqliteCount);
+            response.append(",\"entryCount\":").append(totalEntries);
+            response.append(",\"jsonSize\":").append(rewrittenJson.length());
+            response.append(",\"jsonPath\":\"").append(escape(jsonPath)).append("\"");
+            if (rewrittenJson.length() < 256000) response.append(",\"json\":\"").append(escape(rewrittenJson)).append("\"");
+            response.append("}");
+            result.success(response.toString());
         } catch (Exception e) {
+            if (stageDir != null) deleteRecursively(stageDir);
             result.success("{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}");
         } finally {
             if (zis != null) {
                 try { zis.close(); } catch (Exception ignored) {}
             }
+        }
+    }
+
+    private String commitDataArchive(String stagingId) {
+        final List<File> movedFiles = new ArrayList<>();
+        File stageDir = null;
+        File committedJson = null;
+        File rollbackManifest = null;
+        try {
+            stageDir = archiveStageDirectory(stagingId);
+            final JSONObject metadata = new JSONObject(readUtf8File(canonicalChild(stageDir, "metadata.json")));
+            final String payload = readUtf8File(canonicalChild(stageDir, metadata.optString("payloadFile", "payload.json")));
+            final JSONArray media = metadata.optJSONArray("media");
+            final File mediaDir = new File(getFilesDir(), "valora_media");
+            if (!mediaDir.exists() && !mediaDir.mkdirs()) throw new IOException("Could not create media directory");
+            final Map<String, String> replacements = new HashMap<>();
+            final StringBuilder rollbackPaths = new StringBuilder();
+            int index = 0;
+            if (media != null) {
+                for (int i = 0; i < media.length(); i++) {
+                    final JSONObject item = media.getJSONObject(i);
+                    final String stagedName = item.optString("name", "");
+                    final String expectedHash = item.optString("sha256", "");
+                    final String originalName = item.optString("originalName", "media_" + index);
+                    final File staged = canonicalChild(canonicalChild(stageDir, "media"), stagedName);
+                    if (!staged.isFile() || stagedName.trim().isEmpty() || !sha256File(staged).equalsIgnoreCase(expectedHash)) {
+                        throw new IOException("Archive media hash verification failed");
+                    }
+                    final String cleanName = originalName.replaceAll("[^a-zA-Z0-9._-]", "_");
+                    final String prefix = "restored_" + System.currentTimeMillis() + "_" + index + "_";
+                    final File target = canonicalChild(mediaDir, prefix + (cleanName.trim().isEmpty() ? "media_" + index : cleanName));
+                    moveArchiveFile(staged, target);
+                    movedFiles.add(target);
+                    replacements.put(fileUri(staged), fileUri(target));
+                    rollbackPaths.append(target.getCanonicalPath()).append('\n');
+                    index++;
+                }
+            }
+            String rewrittenJson = payload;
+            final List<Map.Entry<String, String>> entries = new ArrayList<>(replacements.entrySet());
+            Collections.sort(entries, (a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
+            for (Map.Entry<String, String> item : entries) rewrittenJson = rewrittenJson.replace(item.getKey(), item.getValue());
+            final JSONObject parsed = new JSONObject(rewrittenJson);
+            validateCommittedMediaReferences(parsed, mediaDir);
+            final File restoreDir = new File(getFilesDir(), "valora_restore");
+            if (!restoreDir.exists() && !restoreDir.mkdirs()) throw new IOException("Could not create restore directory");
+            committedJson = canonicalChild(restoreDir, "committed_" + stagingId + ".json");
+            rollbackManifest = canonicalChild(restoreDir, "rollback_" + stagingId + ".txt");
+            writeUtf8File(committedJson, rewrittenJson);
+            writeUtf8File(rollbackManifest, rollbackPaths.toString());
+            deleteRecursively(stageDir);
+            final String jsonPath = fileUri(committedJson);
+            final StringBuilder response = new StringBuilder();
+            response.append("{\"ok\":true,\"stagingId\":\"").append(escape(stagingId)).append("\"");
+            response.append(",\"jsonPath\":\"").append(escape(jsonPath)).append("\"");
+            if (rewrittenJson.length() < 256000) response.append(",\"json\":\"").append(escape(rewrittenJson)).append("\"");
+            response.append("}");
+            return response.toString();
+        } catch (Exception e) {
+            for (File file : movedFiles) if (file != null) file.delete();
+            if (committedJson != null) committedJson.delete();
+            if (rollbackManifest != null) rollbackManifest.delete();
+            if (stageDir != null) deleteRecursively(stageDir);
+            return "{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}";
+        }
+    }
+
+    private void validateCommittedMediaReferences(Object value, File mediaDir) throws Exception {
+        if (value instanceof JSONObject) {
+            final JSONObject object = (JSONObject) value;
+            final Iterator<String> keys = object.keys();
+            while (keys.hasNext()) {
+                final String key = keys.next();
+                final Object child = object.opt(key);
+                if (("iconValue".equalsIgnoreCase(key) || "emoji".equalsIgnoreCase(key)) && child instanceof String && isLocalMediaReference((String) child)) {
+                    final String rawPath = ((String) child).startsWith("file://")
+                            ? Uri.parse((String) child).getPath()
+                            : (String) child;
+                    final File media = new File(rawPath).getCanonicalFile();
+                    final String root = mediaDir.getCanonicalPath();
+                    if (!media.getPath().startsWith(root + File.separator) || !media.isFile()) {
+                        throw new IOException("Committed archive references missing media");
+                    }
+                }
+                validateCommittedMediaReferences(child, mediaDir);
+            }
+        } else if (value instanceof JSONArray) {
+            final JSONArray array = (JSONArray) value;
+            for (int i = 0; i < array.length(); i++) validateCommittedMediaReferences(array.opt(i), mediaDir);
+        }
+    }
+
+    private void moveArchiveFile(File source, File target) throws Exception {
+        final File parent = target.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) throw new IOException("Could not create media directory");
+        if (source.renameTo(target)) return;
+        final FileInputStream input = new FileInputStream(source);
+        final FileOutputStream output = new FileOutputStream(target, false);
+        try {
+            final byte[] buffer = new byte[8192];
+            int count;
+            while ((count = input.read(buffer)) >= 0) if (count > 0) output.write(buffer, 0, count);
+            output.flush();
+        } finally {
+            input.close();
+            output.close();
+        }
+        if (!source.delete()) throw new IOException("Could not finalize staged media file");
+    }
+
+    private String discardDataArchive(String stagingId) {
+        try {
+            deleteRecursively(archiveStageDirectory(stagingId));
+            return "{\"ok\":true}";
+        } catch (Exception e) {
+            return "{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}";
+        }
+    }
+
+    private String rollbackDataArchive(String stagingId) {
+        try {
+            final File restoreDir = new File(getFilesDir(), "valora_restore");
+            final File manifest = canonicalChild(restoreDir, "rollback_" + stagingId + ".txt");
+            final File mediaDir = new File(getFilesDir(), "valora_media");
+            if (manifest.isFile()) {
+                final String root = mediaDir.getCanonicalPath();
+                for (String line : readUtf8File(manifest).split("\\r?\\n")) {
+                    if (line.trim().isEmpty()) continue;
+                    final File target = new File(line).getCanonicalFile();
+                    if (target.getPath().startsWith(root + File.separator)) target.delete();
+                }
+            }
+            manifest.delete();
+            canonicalChild(restoreDir, "committed_" + stagingId + ".json").delete();
+            deleteRecursively(archiveStageDirectory(stagingId));
+            return "{\"ok\":true}";
+        } catch (Exception e) {
+            return "{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}";
+        }
+    }
+
+    private String finalizeDataArchive(String stagingId) {
+        try {
+            final File restoreDir = new File(getFilesDir(), "valora_restore");
+            canonicalChild(restoreDir, "rollback_" + stagingId + ".txt").delete();
+            canonicalChild(restoreDir, "committed_" + stagingId + ".json").delete();
+            deleteRecursively(archiveStageDirectory(stagingId));
+            return "{\"ok\":true}";
+        } catch (Exception e) {
+            return "{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}";
         }
     }
 

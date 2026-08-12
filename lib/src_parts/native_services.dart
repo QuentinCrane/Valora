@@ -99,6 +99,26 @@ class NativeBridge {
   static Future<Map<String, dynamic>> importDataArchive() async =>
       nativeJsonMap(await _call<String>('importDataArchive'));
 
+  static Future<Map<String, dynamic>> commitDataArchive(
+          String stagingId) async =>
+      nativeJsonMap(
+          await _call<String>('commitDataArchive', {'stagingId': stagingId}));
+
+  static Future<Map<String, dynamic>> discardDataArchive(
+          String stagingId) async =>
+      nativeJsonMap(
+          await _call<String>('discardDataArchive', {'stagingId': stagingId}));
+
+  static Future<Map<String, dynamic>> rollbackDataArchive(
+          String stagingId) async =>
+      nativeJsonMap(
+          await _call<String>('rollbackDataArchive', {'stagingId': stagingId}));
+
+  static Future<Map<String, dynamic>> finalizeDataArchive(
+          String stagingId) async =>
+      nativeJsonMap(
+          await _call<String>('finalizeDataArchive', {'stagingId': stagingId}));
+
   static Future<String?> readPrivateTextFile(String path) =>
       _call<String>('readPrivateTextFile', {'path': path});
 
@@ -166,7 +186,12 @@ class NativeBridge {
 }
 
 String buildAssetsCsv(AppStore store) {
-  String cell(String value) => '"${value.replaceAll('"', '""')}"';
+  String cell(String value) {
+    var safe = value.replaceAll('"', '""');
+    if (RegExp(r'^\s*[=+\-@]').hasMatch(safe)) safe = "'$safe";
+    return '"$safe"';
+  }
+
   final rows = <List<String>>[
     [
       tr('csv.name'),
@@ -196,6 +221,17 @@ String buildAssetsCsv(AppStore store) {
   return rows.map((r) => r.map(cell).join(',')).join('\n');
 }
 
+String markdownInlineText(String value) => value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('|', '\\|')
+    .replaceAll('`', '\\`')
+    .replaceAll('*', '\\*')
+    .replaceAll('_', '\\_')
+    .replaceAll('[', '\\[')
+    .replaceAll(']', '\\]')
+    .replaceAll('\r', ' ')
+    .replaceAll('\n', ' ');
+
 String buildMarkdownReport(AppStore store) {
   final buffer = StringBuffer();
   buffer.writeln('# ${tr('report.title')}');
@@ -220,7 +256,7 @@ String buildMarkdownReport(AppStore store) {
     buffer.writeln('|---|---|---|---:|---:|');
     for (final a in store.assets) {
       buffer.writeln(
-          '| ${a.iconValue} ${a.name} | ${store.categoryName(a.categoryId)} | ${a.status.localizedLabel} | ${a.isPriceless ? '∞' : money(a.assetValue, store.settings)} | ${a.isPriceless ? tr('common.noDailyCost') : money(a.dailyCost, store.settings)} |');
+          '| ${markdownInlineText(a.iconValue)} ${markdownInlineText(a.name)} | ${markdownInlineText(store.categoryName(a.categoryId))} | ${markdownInlineText(a.status.localizedLabel)} | ${a.isPriceless ? '∞' : money(a.assetValue, store.settings)} | ${a.isPriceless ? tr('common.noDailyCost') : money(a.dailyCost, store.settings)} |');
     }
   }
   buffer.writeln();
@@ -231,7 +267,7 @@ String buildMarkdownReport(AppStore store) {
   } else {
     for (final item in leaks) {
       buffer.writeln(
-          '- **${item.asset.name}**：${item.reason}。${item.suggestion}');
+          '- **${markdownInlineText(item.asset.name)}**：${markdownInlineText(item.reason)}。${markdownInlineText(item.suggestion)}');
     }
   }
   return buffer.toString();
@@ -2828,18 +2864,28 @@ Future<void> restoreJsonFromText(BuildContext context, String? text) async {
 Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
   final store = context.store;
   final payload = await NativeBridge.importDataArchive();
-  if (!context.mounted) return;
   if (payload.isEmpty) {
-    showNativeSnack(context, tr('restore.noZip'));
+    if (context.mounted) showNativeSnack(context, tr('restore.noZip'));
     return;
   }
   final ok = payload['ok'] == true;
   final message = (payload['message'] ?? '').toString();
+  final stagingId = (payload['stagingId'] ?? '').toString();
+  Future<void> discardStaging() async {
+    if (stagingId.trim().isNotEmpty)
+      await NativeBridge.discardDataArchive(stagingId);
+  }
+
   if (!ok) {
     warningHaptic();
     if (context.mounted)
       showNativeSnack(
           context, message.isEmpty ? tr('restore.zipReadFailed') : message);
+    return;
+  }
+  if (stagingId.trim().isEmpty) {
+    warningHaptic();
+    if (context.mounted) showNativeSnack(context, tr('restore.zipReadFailed'));
     return;
   }
   var jsonText = (payload['json'] ?? '').toString();
@@ -2852,15 +2898,23 @@ Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
     }
   }
   if (jsonText.trim().isEmpty) {
+    await discardStaging();
     warningHaptic();
     if (context.mounted) showNativeSnack(context, tr('restore.zipNoJson'));
     return;
   }
+  Map<String, dynamic> prepared;
+  try {
+    prepared = store.prepareRestoreJson(jsonText);
+  } catch (_) {
+    await discardStaging();
+    warningHaptic();
+    if (context.mounted) showNativeSnack(context, tr('restore.zipJsonFailed'));
+    return;
+  }
   int countList(String key) {
-    try {
-      final raw = jsonDecode(jsonText);
-      if (raw is Map && raw[key] is List) return (raw[key] as List).length;
-    } catch (_) {}
+    final value = prepared[key];
+    if (value is List) return value.length;
     return 0;
   }
 
@@ -2876,7 +2930,10 @@ Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
   final categoryCount = countList('categories');
   final tagCount = countList('tags');
 
-  if (!context.mounted) return;
+  if (!context.mounted) {
+    await discardStaging();
+    return;
+  }
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -2899,13 +2956,47 @@ Future<void> restoreDataArchiveFromPicker(BuildContext context) async {
       ],
     ),
   );
-  if (confirmed != true || !context.mounted) return;
+  if (confirmed != true || !context.mounted) {
+    await discardStaging();
+    return;
+  }
 
   try {
     await store.createSnapshot('${tr('restore.autoSnapshot')} ${dateStamp()}');
-  } catch (_) {}
+  } catch (_) {
+    await discardStaging();
+    warningHaptic();
+    if (context.mounted) showNativeSnack(context, tr('restore.zipJsonFailed'));
+    return;
+  }
 
-  final restored = await store.restoreFromJson(jsonText);
+  final committed = await NativeBridge.commitDataArchive(stagingId);
+  if (committed['ok'] != true) {
+    warningHaptic();
+    if (context.mounted) {
+      showNativeSnack(context,
+          (committed['message'] ?? tr('restore.zipReadFailed')).toString());
+    }
+    return;
+  }
+  var committedJson = (committed['json'] ?? '').toString();
+  final committedPath = (committed['jsonPath'] ?? '').toString();
+  if (committedJson.trim().isEmpty && committedPath.trim().isNotEmpty) {
+    try {
+      committedJson =
+          await File(filePathFromUriText(committedPath)).readAsString();
+    } catch (_) {
+      committedJson =
+          await NativeBridge.readPrivateTextFile(committedPath) ?? '';
+    }
+  }
+  final restored = committedJson.trim().isNotEmpty &&
+      await store.restoreFromJson(committedJson);
+  if (!restored) {
+    await NativeBridge.rollbackDataArchive(stagingId);
+  } else {
+    await NativeBridge.finalizeDataArchive(stagingId);
+  }
   if (!context.mounted) return;
   if (restored) {
     successHaptic();
