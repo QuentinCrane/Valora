@@ -14,19 +14,21 @@ jobs:
   verify:
     name: Format, test, analyze, and debug build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
         with:
           flutter-version: "3.44.8"
           channel: stable
@@ -34,6 +36,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Check dependency notices and generate Pub SBOM
+        run: dart run tooling/check_supply_chain.dart
 
       - name: Check Dart formatting
         run: dart run tooling/format_check.dart
@@ -46,3 +51,15 @@ jobs:
 
       - name: Build debug APK
         run: flutter build apk --debug --no-pub
+
+  dependency-review:
+    name: Review dependency changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@ce3cf9537a52e8119d91fd484ab5b8a807627bf8

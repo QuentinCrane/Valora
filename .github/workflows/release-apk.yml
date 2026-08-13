@@ -5,6 +5,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   quality-gates:
     uses: ./.github/workflows/quality-gates.yml
@@ -15,21 +18,24 @@ jobs:
     needs: quality-gates
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
         with:
+          flutter-version: "3.44.8"
           channel: stable
           cache: true
 
@@ -39,17 +45,110 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Check dependency notices and generate Pub SBOM
+        run: dart run tooling/check_supply_chain.dart
 
-      - name: Upload release APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: valora-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+      - name: Require release signing secrets
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.VALORA_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.VALORA_RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.VALORA_RELEASE_KEY_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.VALORA_RELEASE_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_KEYSTORE_BASE64" || { echo "VALORA_RELEASE_KEYSTORE_BASE64 is required" >&2; exit 1; }
+          test -n "$RELEASE_STORE_PASSWORD" || { echo "VALORA_RELEASE_STORE_PASSWORD is required" >&2; exit 1; }
+          test -n "$RELEASE_KEY_PASSWORD" || { echo "VALORA_RELEASE_KEY_PASSWORD is required" >&2; exit 1; }
+          test -n "$RELEASE_KEY_ALIAS" || { echo "VALORA_RELEASE_KEY_ALIAS is required" >&2; exit 1; }
 
-      - name: Attach APK to GitHub Release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+      - name: Configure release signing
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.VALORA_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.VALORA_RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.VALORA_RELEASE_KEY_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.VALORA_RELEASE_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/valora-release-key.p12
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=app/valora-release-key.p12\n' "$RELEASE_STORE_PASSWORD" "$RELEASE_KEY_PASSWORD" "$RELEASE_KEY_ALIAS" > android/key.properties
+
+      - name: Build signed release APK
+        run: flutter build apk --release --no-pub --target-platform android-arm64
+
+      - name: Build signed release AAB
+        run: flutter build appbundle --release --no-pub --target-platform android-arm64
+
+      - name: Verify signatures and capture certificate fingerprints
+        id: signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-release.apk"
+          aab="build/app/outputs/bundle/release/app-release.aab"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$apksigner"
+          "$apksigner" verify --verbose --print-certs "$apk" | tee apk-signature.txt
+          jarsigner -verify -certs "$aab" >/dev/null
+          apk_cert="$(sed -n 's/.*Signer #1 certificate SHA-256 digest: //p' apk-signature.txt | head -n 1 | tr -d '[:space:]')"
+          aab_cert="$(keytool -printcert -jarfile "$aab" | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1 | tr -d '[:space:]:')"
+          test -n "$apk_cert"
+          test -n "$aab_cert"
+          test "$apk_cert" = "$aab_cert"
+          printf 'apk_cert=%s\n' "$apk_cert" >> "$GITHUB_OUTPUT"
+          printf 'aab_cert=%s\n' "$aab_cert" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release manifest
+        env:
+          APK_CERT_SHA256: ${{ steps.signatures.outputs.apk_cert }}
+          AAB_CERT_SHA256: ${{ steps.signatures.outputs.aab_cert }}
+        run: dart run tooling/generate_release_manifest.dart --apk build/app/outputs/flutter-apk/app-release.apk --aab build/app/outputs/bundle/release/app-release.aab --apk-cert "$APK_CERT_SHA256" --aab-cert "$AAB_CERT_SHA256" --output build/release/valora-release-manifest.json
+
+      - name: Assemble verified release artifact directory
+        run: |
+          set -euo pipefail
+          mkdir -p build/release-artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk build/release-artifacts/app-release.apk
+          cp build/app/outputs/bundle/release/app-release.aab build/release-artifacts/app-release.aab
+          cp build/release/valora-release-manifest.json build/release-artifacts/valora-release-manifest.json
+          cp build/release/valora-pub-sbom.json build/release-artifacts/valora-pub-sbom.json
+
+      - name: Upload verified release bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          files: build/app/outputs/flutter-apk/app-release.apk
+          name: valora-release-bundle
+          if-no-files-found: error
+          path: build/release-artifacts
+
+      - name: Attest release provenance
+        uses: actions/attest-build-provenance@bd77c077858b8d561b7a36cbe48ef4cc642ca39d
+        with:
+          subject-path: |
+            build/release-artifacts/app-release.apk
+            build/release-artifacts/app-release.aab
+            build/release-artifacts/valora-release-manifest.json
+            build/release-artifacts/valora-pub-sbom.json
+
+  publish-release:
+    name: Publish verified release assets
+    if: github.event_name == 'release'
+    needs: build-release-apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download verified release bundle
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: valora-release-bundle
+          path: release-artifacts
+
+      - name: Attach verified assets to GitHub Release
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
+        with:
+          files: |
+            release-artifacts/app-release.apk
+            release-artifacts/app-release.aab
+            release-artifacts/valora-release-manifest.json
+            release-artifacts/valora-pub-sbom.json

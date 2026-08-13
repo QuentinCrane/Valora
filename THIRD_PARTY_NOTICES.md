@@ -41,3 +41,62 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## crypto
+
+- Package: `crypto`
+- Version used by Valora: `3.0.7`
+- Package page: https://pub.dev/packages/crypto
+- Purpose in Valora: SHA-256 hashing for archive integrity, release manifests,
+  and provenance metadata.
+- License: BSD 3-Clause
+- Copyright notice from the package license: Copyright 2015, the Dart project
+  authors.
+
+## intl
+
+- Package: `intl`
+- Version used by Valora: `0.20.2`
+- Package page: https://pub.dev/packages/intl
+- Purpose in Valora: locale-aware date, number, and currency formatting.
+- License: BSD 3-Clause
+- Copyright notice from the package license: Copyright 2013, the Dart project
+  authors.
+
+## flutter_lints
+
+- Package: `flutter_lints`
+- Version used by Valora: `6.0.0`
+- Package page: https://pub.dev/packages/flutter_lints
+- Purpose in Valora: Flutter's recommended static-analysis rules for
+  development and CI.
+- License: BSD 3-Clause
+- Copyright notice from the package license: Copyright 2013 The Flutter
+  Authors. All rights reserved.
+
+### BSD 3-Clause License Text for `crypto`, `intl`, and `flutter_lints`
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. Neither the name of Google LLC, Google Inc., nor the names of its
+   contributors may be used to endorse or promote products derived from this
+   software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

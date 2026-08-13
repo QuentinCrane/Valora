@@ -9,6 +9,13 @@ def keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
+def requiredSigningProperties = ["storePassword", "keyPassword", "keyAlias", "storeFile"]
+def releaseSigningConfigured = keystorePropertiesFile.exists()
+        && requiredSigningProperties.every { key ->
+            def value = keystoreProperties.getProperty(key)
+            value != null && !value.trim().isEmpty() && !value.startsWith("replace-with")
+        }
+        && rootProject.file(keystoreProperties.getProperty("storeFile", "")).isFile()
 
 android {
     namespace "com.valora.assets"
@@ -54,7 +61,7 @@ android {
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        if (releaseSigningConfigured) {
             release {
                 keyAlias keystoreProperties["keyAlias"]
                 keyPassword keystoreProperties["keyPassword"]
@@ -68,13 +75,23 @@ android {
 
     buildTypes {
         release {
-            signingConfig keystorePropertiesFile.exists()
+            signingConfig releaseSigningConfigured
                     ? signingConfigs.release
-                    : signingConfigs.debug
+                    : null
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def releasePackagingRequested = taskGraph.allTasks.any { task ->
+        task.name in ["assembleRelease", "bundleRelease", "packageRelease", "signReleaseBundle"]
+    }
+    if (releasePackagingRequested && !releaseSigningConfigured) {
+        throw new GradleException(
+                "Release signing is required. Configure android/key.properties and a real keystore before building a release artifact.")
     }
 }
 
