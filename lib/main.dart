@@ -13,6 +13,8 @@ import 'package:crypto/crypto.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart' as lge;
 
 import 'domain/validators.dart';
+import 'l10n/generated/valora_message_catalog.dart';
+import 'l10n/generated/valora_localizations.dart';
 import 'platform/native_bridge_contract.dart';
 
 export 'domain/validators.dart';

@@ -125,12 +125,14 @@ class _ValoraAppState extends State<ValoraApp> {
                   ThemeSetting.light => ThemeMode.light,
                 },
                 localizationsDelegates: const [
+                  ValoraLocalizations.delegate,
                   AppLocalizationsDelegate(),
                   GlobalMaterialLocalizations.delegate,
                   GlobalWidgetsLocalizations.delegate,
                   GlobalCupertinoLocalizations.delegate,
                 ],
                 supportedLocales: const [
+                  Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
                   Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
                   Locale('en'),
                 ],

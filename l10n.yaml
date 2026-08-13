@@ -1,0 +1,14 @@
+arb-dir: lib/l10n
+template-arb-file: app_zh_Hans.arb
+output-dir: lib/l10n/generated
+output-localization-file: valora_localizations.dart
+output-class: ValoraLocalizations
+untranslated-messages-file: lib/l10n/generated/untranslated_messages.json
+preferred-supported-locales:
+  - zh_Hans
+  - zh_Hant
+  - en
+nullable-getter: false
+required-resource-attributes: false
+use-named-parameters: true
+format: true
