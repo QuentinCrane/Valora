@@ -440,6 +440,12 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
 
   void _setDockMagicActive(bool active) {
     if (_dockMagicActive == active || !mounted) return;
+    if (valoraMotionTier(context) == ValoraMotionTier.off) return;
+    final duration = valoraMotionDuration(
+        context, const Duration(milliseconds: 460),
+        reduced: const Duration(milliseconds: 270));
+    _dockGlassController.duration = duration;
+    _dockGlassController.reverseDuration = duration;
     setState(() => _dockMagicActive = active);
     if (active) {
       _dockGlassController.forward();
@@ -450,6 +456,12 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
 
   void _setAddMagicActive(bool active) {
     if (_addMagicActive == active || !mounted) return;
+    if (valoraMotionTier(context) == ValoraMotionTier.off) return;
+    final duration = valoraMotionDuration(
+        context, const Duration(milliseconds: 360),
+        reduced: const Duration(milliseconds: 210));
+    _addGlassController.duration = duration;
+    _addGlassController.reverseDuration = duration;
     setState(() => _addMagicActive = active);
     if (active) {
       _addGlassController.forward();
@@ -558,22 +570,26 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     required double dockHeight,
     required double addSize,
   }) {
-    return AnimatedBuilder(
-      animation: Listenable.merge(
-          <Listenable>[_dockGlassController, _addGlassController]),
-      builder: (context, _) => lge.LiquidGlassView(
-        realTimeCapture: true,
-        useSync: true,
-        refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
-        pixelRatio: liquidGlassCapturePixelRatio(context,
-            duringInteraction: _dockMagicActive || _addMagicActive),
-        backgroundWidget: ValoraGlassSceneBackground(
-            child: RepaintBoundary(child: shellBackground)),
-        children: [
-          _buildDockLiquidGlass(
-              context, dock, safe, dark, dockWidth, dockHeight),
-          _buildAddLiquidGlass(context, addButton, safe, dark, addSize),
-        ],
+    final background = ValoraGlassSceneBackground(
+        child: RepaintBoundary(child: shellBackground));
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge(
+            <Listenable>[_dockGlassController, _addGlassController]),
+        child: background,
+        builder: (context, child) => lge.LiquidGlassView(
+          realTimeCapture: valoraLiquidGlassRealtimeCapture(context),
+          useSync: valoraLiquidGlassUseSync(context),
+          refreshRate: valoraLiquidGlassRefreshRate(context),
+          pixelRatio: liquidGlassCapturePixelRatio(context,
+              duringInteraction: _dockMagicActive || _addMagicActive),
+          backgroundWidget: child!,
+          children: [
+            _buildDockLiquidGlass(
+                context, dock, safe, dark, dockWidth, dockHeight),
+            _buildAddLiquidGlass(context, addButton, safe, dark, addSize),
+          ],
+        ),
       ),
     );
   }
@@ -634,8 +650,7 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
       ],
     );
 
-    final useLiquidGlass =
-        store.settings.glassEffectMode == GlassEffectMode.liquid;
+    final useLiquidGlass = valoraUseSceneLiquidGlass(context);
     final dock = LiquidDock(
       index: index,
       onChanged: _goToTab,
@@ -668,7 +683,9 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
       shellLayer = Stack(children: [
         shellBackground,
         AnimatedPositioned(
-          duration: const Duration(milliseconds: 420),
+          duration: valoraMotionDuration(
+              context, const Duration(milliseconds: 420),
+              reduced: const Duration(milliseconds: 240)),
           curve: Curves.easeOutCubic,
           left: dockGlassLeft,
           bottom: dockGlassBottom,
@@ -683,7 +700,9 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
           ),
         ),
         AnimatedPositioned(
-          duration: const Duration(milliseconds: 360),
+          duration: valoraMotionDuration(
+              context, const Duration(milliseconds: 360),
+              reduced: const Duration(milliseconds: 210)),
           curve: Curves.easeOutCubic,
           right: 24 - (addGlassSize - addSize) / 2,
           bottom: 19 + safe.bottom - (addGlassSize - addSize) / 2,
@@ -985,12 +1004,16 @@ class _LiquidDockState extends State<LiquidDock> {
     return TutorialTargetAnchor(
       id: 'shell.dock',
       child: AnimatedSlide(
-        duration: const Duration(milliseconds: 360),
+        duration: valoraMotionDuration(
+            context, const Duration(milliseconds: 360),
+            reduced: const Duration(milliseconds: 210)),
         curve:
             _fingerDown || _dragging ? Curves.easeOutBack : Curves.easeOutCubic,
         offset: Offset(0, _dockLift() / 76),
         child: AnimatedScale(
-          duration: const Duration(milliseconds: 360),
+          duration: valoraMotionDuration(
+              context, const Duration(milliseconds: 360),
+              reduced: const Duration(milliseconds: 210)),
           curve: _fingerDown || _dragging
               ? Curves.easeOutBack
               : Curves.easeOutCubic,
@@ -1024,7 +1047,9 @@ class _LiquidDockState extends State<LiquidDock> {
                       AnimatedPositioned(
                         duration: (_fingerDown || _dragging)
                             ? Duration.zero
-                            : const Duration(milliseconds: 460),
+                            : valoraMotionDuration(
+                                context, const Duration(milliseconds: 460),
+                                reduced: const Duration(milliseconds: 260)),
                         curve: Curves.easeOutBack,
                         left: (thumbLeft - thumbW * .20)
                             .clamp(0.0, math.max(0.0, w - thumbW * 1.40))
@@ -1039,7 +1064,9 @@ class _LiquidDockState extends State<LiquidDock> {
                       AnimatedPositioned(
                         duration: (_fingerDown || _dragging)
                             ? Duration.zero
-                            : const Duration(milliseconds: 430),
+                            : valoraMotionDuration(
+                                context, const Duration(milliseconds: 430),
+                                reduced: const Duration(milliseconds: 250)),
                         curve: Curves.easeOutBack,
                         left: thumbLeft,
                         top: 3,
@@ -1065,8 +1092,14 @@ class _LiquidDockState extends State<LiquidDock> {
                               },
                               child: AnimatedScale(
                                 duration: (_fingerDown || _dragging)
-                                    ? const Duration(milliseconds: 90)
-                                    : const Duration(milliseconds: 330),
+                                    ? valoraMotionDuration(context,
+                                        const Duration(milliseconds: 90),
+                                        reduced:
+                                            const Duration(milliseconds: 60))
+                                    : valoraMotionDuration(context,
+                                        const Duration(milliseconds: 330),
+                                        reduced:
+                                            const Duration(milliseconds: 190)),
                                 curve: (_fingerDown || _dragging)
                                     ? Curves.easeOutCubic
                                     : Curves.easeOutBack,
@@ -1137,7 +1170,9 @@ class _DockLiquidHalo extends StatelessWidget {
     final dark = context.isDark;
     return IgnorePointer(
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 260),
+        duration: valoraMotionDuration(
+            context, const Duration(milliseconds: 260),
+            reduced: const Duration(milliseconds: 150)),
         curve: Curves.easeOutCubic,
         opacity: active ? .22 : .06,
         child: CustomPaint(
@@ -1275,7 +1310,8 @@ class _DockLiquidThumb extends StatelessWidget {
       );
     }
     return AnimatedOpacity(
-      duration: const Duration(milliseconds: 220),
+      duration: valoraMotionDuration(context, const Duration(milliseconds: 220),
+          reduced: const Duration(milliseconds: 130)),
       opacity: dragging ? .42 : .24,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(999),
@@ -1436,7 +1472,9 @@ class _GlassAddButtonState extends State<GlassAddButton> {
       },
       onTap: widget.onTap,
       child: AnimatedScale(
-        duration: Duration(milliseconds: down ? 260 : 340),
+        duration: valoraMotionDuration(
+            context, Duration(milliseconds: down ? 260 : 340),
+            reduced: Duration(milliseconds: down ? 150 : 200)),
         curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
         scale: down ? 1.075 : 1,
         child: SizedBox(

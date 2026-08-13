@@ -554,8 +554,7 @@ class _ComposePageState extends State<ComposePage> {
       ),
     );
 
-    final useLiquidGlass =
-        context.store.settings.glassEffectMode == GlassEffectMode.liquid;
+    final useLiquidGlass = valoraUseSceneLiquidGlass(context);
     final cancelContent = ValoraGlassSaveContent(
       label: tr('common.cancel'),
       icon: Icons.close_rounded,
@@ -616,9 +615,9 @@ class _ComposePageState extends State<ComposePage> {
 
     return GradientScaffold(
       child: lge.LiquidGlassView(
-        realTimeCapture: true,
-        useSync: true,
-        refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
+        realTimeCapture: valoraLiquidGlassRealtimeCapture(context),
+        useSync: valoraLiquidGlassUseSync(context),
+        refreshRate: valoraLiquidGlassRefreshRate(context),
         pixelRatio: liquidGlassCapturePixelRatio(context,
             duringInteraction: _savePressed),
         backgroundWidget:
@@ -1687,8 +1686,7 @@ class _WishEditorPageState extends State<WishEditorPage> {
           GlobalBackButton(onTap: () => Navigator.pop(context)),
         ]));
 
-    final useLiquidGlass =
-        context.store.settings.glassEffectMode == GlassEffectMode.liquid;
+    final useLiquidGlass = valoraUseSceneLiquidGlass(context);
     final saveContent = ValoraGlassSaveContent(
       label: tr('wish.save'),
       icon: Icons.check_rounded,
@@ -1722,9 +1720,9 @@ class _WishEditorPageState extends State<WishEditorPage> {
 
     return GradientScaffold(
       child: lge.LiquidGlassView(
-        realTimeCapture: true,
-        useSync: true,
-        refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
+        realTimeCapture: valoraLiquidGlassRealtimeCapture(context),
+        useSync: valoraLiquidGlassUseSync(context),
+        refreshRate: valoraLiquidGlassRefreshRate(context),
         pixelRatio: liquidGlassCapturePixelRatio(context,
             duringInteraction: _wishSavePressed),
         backgroundWidget:

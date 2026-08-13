@@ -22,6 +22,7 @@ class ValoraRightSlideFadePageTransitionsBuilder
       Animation<double> animation,
       Animation<double> secondaryAnimation,
       Widget child) {
+    if (valoraMotionTier(context) == ValoraMotionTier.off) return child;
     return AnimatedBuilder(
       animation: animation,
       child: child,
@@ -32,8 +33,12 @@ class ValoraRightSlideFadePageTransitionsBuilder
         // Pop / predictive back: the same route animation runs backward, so the
         // page only slides horizontally to the right and fades out. No scale,
         // no center shrink, no clipping layer.
-        final dx = 86.0 * (1.0 - curve);
-        final opacity = (.28 + .72 * curve).clamp(0.0, 1.0).toDouble();
+        final reduced = valoraMotionTier(context) == ValoraMotionTier.reduced;
+        final dx = (reduced ? 54.0 : 86.0) * (1.0 - curve);
+        final opacity = ((reduced ? .44 : .28) +
+                (reduced ? .56 : .72) * curve)
+            .clamp(0.0, 1.0)
+            .toDouble();
         return Transform.translate(
           offset: Offset(dx, 0),
           child: Opacity(opacity: opacity, child: child),
@@ -472,7 +477,9 @@ class _GlassBackButtonState extends State<GlassBackButton> {
         widget.onTap();
       },
       child: AnimatedScale(
-        duration: const Duration(milliseconds: 320),
+        duration: valoraMotionDuration(context,
+            const Duration(milliseconds: 320),
+            reduced: const Duration(milliseconds: 180)),
         curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
         scale: down ? 1.065 : 1,
         child: ValoraLiquidGlassSurface(
@@ -560,6 +567,64 @@ double liquidGlassCapturePixelRatio(BuildContext context,
   final ratio =
       lerpDouble(.955, 1.0, context.store.settings.liquidGlassSoftness)!;
   return (ratio - (duringInteraction ? .025 : 0.0)).clamp(.92, 1.0).toDouble();
+}
+
+enum ValoraMotionTier { full, reduced, off }
+
+ValoraMotionTier resolveValoraMotionTier(
+  MotionMode mode, {
+  required bool systemDisableAnimations,
+}) {
+  if (systemDisableAnimations || mode == MotionMode.off) {
+    return ValoraMotionTier.off;
+  }
+  if (mode == MotionMode.reduced) return ValoraMotionTier.reduced;
+  return ValoraMotionTier.full;
+}
+
+ValoraMotionTier valoraMotionTier(BuildContext context) {
+  final media = MediaQuery.maybeOf(context);
+  return resolveValoraMotionTier(
+    context.store.settings.motionMode,
+    systemDisableAnimations: media?.disableAnimations ?? false,
+  );
+}
+
+Duration valoraMotionDuration(
+  BuildContext context,
+  Duration full, {
+  Duration? reduced,
+}) {
+  switch (valoraMotionTier(context)) {
+    case ValoraMotionTier.full:
+      return full;
+    case ValoraMotionTier.reduced:
+      return reduced ??
+          Duration(
+              microseconds: (full.inMicroseconds * .60)
+                  .round()
+                  .clamp(0, 1 << 31)
+                  .toInt());
+    case ValoraMotionTier.off:
+      return Duration.zero;
+  }
+}
+
+bool valoraUseSceneLiquidGlass(BuildContext context) {
+  return context.store.settings.glassEffectMode == GlassEffectMode.liquid &&
+      valoraMotionTier(context) != ValoraMotionTier.off;
+}
+
+bool valoraLiquidGlassRealtimeCapture(BuildContext context) =>
+    valoraMotionTier(context) != ValoraMotionTier.off;
+
+bool valoraLiquidGlassUseSync(BuildContext context) =>
+    valoraMotionTier(context) == ValoraMotionTier.full;
+
+lge.LiquidGlassRefreshRate valoraLiquidGlassRefreshRate(BuildContext context) {
+  return valoraMotionTier(context) == ValoraMotionTier.full
+      ? lge.LiquidGlassRefreshRate.deviceRefreshRate
+      : lge.LiquidGlassRefreshRate.medium;
 }
 
 class ValoraLiquidGlassSurface extends StatelessWidget {
@@ -836,7 +901,9 @@ class _ValoraGlassIconButtonState extends State<ValoraGlassIconButton> {
         widget.onTap();
       },
       child: AnimatedScale(
-        duration: const Duration(milliseconds: 300),
+        duration: valoraMotionDuration(context,
+            const Duration(milliseconds: 300),
+            reduced: const Duration(milliseconds: 170)),
         curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
         scale: down ? 1.08 : 1,
         child: ValoraLiquidGlassSurface(
@@ -2847,7 +2914,9 @@ class _ValoraDatePickerSheetState extends State<_ValoraDatePickerSheet> {
             onNext: () => shiftMonth(1),
           ),
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
+            duration: valoraMotionDuration(context,
+                const Duration(milliseconds: 220),
+                reduced: const Duration(milliseconds: 130)),
             switchInCurve: Curves.easeOutCubic,
             switchOutCurve: Curves.easeInCubic,
             child: wheelMode
@@ -3163,7 +3232,9 @@ class _ValoraGlassSaveContentState extends State<ValoraGlassSaveContent> {
       },
       onTap: widget.onPressed,
       child: AnimatedScale(
-        duration: const Duration(milliseconds: 320),
+        duration: valoraMotionDuration(context,
+            const Duration(milliseconds: 320),
+            reduced: const Duration(milliseconds: 180)),
         curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
         scale: down ? 1.055 : 1,
         child: Center(
@@ -3221,7 +3292,9 @@ class _LiquidSaveButtonState extends State<LiquidSaveButton> {
       onTapUp: (_) => setState(() => down = false),
       onTap: widget.onPressed,
       child: AnimatedScale(
-        duration: const Duration(milliseconds: 320),
+        duration: valoraMotionDuration(context,
+            const Duration(milliseconds: 320),
+            reduced: const Duration(milliseconds: 180)),
         curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
         scale: down ? 1.055 : 1,
         child: ValoraLiquidGlassSurface(

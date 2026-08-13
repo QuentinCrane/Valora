@@ -11,8 +11,7 @@ class AssetDetailPage extends StatelessWidget {
         store.assets.where((a) => a.id == assetId).cast<Asset?>().firstOrNull;
     if (asset == null) return MissingPage(title: tr('detail.assetNotFound'));
     final category = store.categoryById(asset.categoryId);
-    final useLiquidGlass =
-        store.settings.glassEffectMode == GlassEffectMode.liquid;
+    final useLiquidGlass = valoraUseSceneLiquidGlass(context);
 
     final content = SafeArea(
       bottom: false,
@@ -350,9 +349,9 @@ class AssetDetailPage extends StatelessWidget {
 
     return GradientScaffold(
       child: lge.LiquidGlassView(
-        realTimeCapture: true,
-        useSync: true,
-        refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
+        realTimeCapture: valoraLiquidGlassRealtimeCapture(context),
+        useSync: valoraLiquidGlassUseSync(context),
+        refreshRate: valoraLiquidGlassRefreshRate(context),
         pixelRatio: liquidGlassCapturePixelRatio(context),
         backgroundWidget:
             ValoraGlassSceneBackground(child: RepaintBoundary(child: content)),

@@ -134,6 +134,17 @@ class _ValoraAppState extends State<ValoraApp> {
                   Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
                   Locale('en'),
                 ],
+                builder: (context, child) {
+                  final media = MediaQuery.maybeOf(context);
+                  if (media == null) return child ?? const SizedBox.shrink();
+                  return MediaQuery(
+                    data: media.copyWith(
+                      disableAnimations: media.disableAnimations ||
+                          settings.motionMode == MotionMode.off,
+                    ),
+                    child: child ?? const SizedBox.shrink(),
+                  );
+                },
                 home: snapshot.connectionState != ConnectionState.done
                     ? const BootPage()
                     : loadResult.isFailure
@@ -1090,6 +1101,8 @@ enum StickerEngineMode { compact, balanced, quality, hqExperimental }
 
 enum GlassEffectMode { classic, liquid }
 
+enum MotionMode { full, reduced, off }
+
 enum SortMode { dailyCost, price, days, recent }
 
 extension AssetStatusX on AssetStatus {
@@ -1247,6 +1260,29 @@ extension GlassEffectModeX on GlassEffectMode {
     return GlassEffectMode.values.firstWhere(
         (e) => e.name == value || e.label == value,
         orElse: () => GlassEffectMode.liquid);
+  }
+}
+
+extension MotionModeX on MotionMode {
+  String get label {
+    switch (this) {
+      case MotionMode.full:
+        return '完整动效';
+      case MotionMode.reduced:
+        return '减少动效';
+      case MotionMode.off:
+        return '关闭动效';
+    }
+  }
+
+  String get localizedLabel => tr('MotionMode.$name');
+
+  String get localizedDescription => tr('MotionMode.$name.desc');
+
+  static MotionMode fromValue(String? value) {
+    return MotionMode.values.firstWhere(
+        (e) => e.name == value || e.label == value,
+        orElse: () => MotionMode.full);
   }
 }
 

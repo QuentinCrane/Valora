@@ -958,6 +958,7 @@ class AppSettings {
   final StickerEngineMode stickerEngineMode;
   final GlassEffectMode glassEffectMode;
   final double liquidGlassSoftness;
+  final MotionMode motionMode;
   final bool keepStickerCandidates;
   final double homeMetaFontScale;
   final bool onboardingCompleted;
@@ -979,6 +980,7 @@ class AppSettings {
     this.stickerEngineMode = StickerEngineMode.balanced,
     this.glassEffectMode = GlassEffectMode.liquid,
     this.liquidGlassSoftness = .5,
+    this.motionMode = MotionMode.full,
     this.keepStickerCandidates = false,
     this.homeMetaFontScale = 1.0,
     this.onboardingCompleted = false,
@@ -1001,6 +1003,7 @@ class AppSettings {
           StickerEngineMode? stickerEngineMode,
           GlassEffectMode? glassEffectMode,
           double? liquidGlassSoftness,
+          MotionMode? motionMode,
           bool? keepStickerCandidates,
           double? homeMetaFontScale,
           bool? onboardingCompleted,
@@ -1023,6 +1026,7 @@ class AppSettings {
         stickerEngineMode: stickerEngineMode ?? this.stickerEngineMode,
         glassEffectMode: glassEffectMode ?? this.glassEffectMode,
         liquidGlassSoftness: liquidGlassSoftness ?? this.liquidGlassSoftness,
+        motionMode: motionMode ?? this.motionMode,
         keepStickerCandidates:
             keepStickerCandidates ?? this.keepStickerCandidates,
         homeMetaFontScale: homeMetaFontScale ?? this.homeMetaFontScale,
@@ -1046,6 +1050,7 @@ class AppSettings {
         'stickerEngineMode': stickerEngineMode.name,
         'glassEffectMode': glassEffectMode.name,
         'liquidGlassSoftness': liquidGlassSoftness,
+        'motionMode': motionMode.name,
         'keepStickerCandidates': keepStickerCandidates,
         'homeMetaFontScale': homeMetaFontScale,
         'onboardingCompleted': onboardingCompleted,
@@ -1082,6 +1087,7 @@ class AppSettings {
         liquidGlassSoftness: asDouble(map['liquidGlassSoftness'], fallback: .5)
             .clamp(0.0, 1.0)
             .toDouble(),
+        motionMode: MotionModeX.fromValue(map['motionMode']?.toString()),
         keepStickerCandidates: map['keepStickerCandidates'] == true,
         homeMetaFontScale: (asDouble(map['homeMetaFontScale'], fallback: 1.0))
             .clamp(0.82, 1.12)

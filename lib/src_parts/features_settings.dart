@@ -390,6 +390,19 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                     store.settings.copyWith(liquidGlassSoftness: value)),
               ),
             SettingRow(
+              icon: Icons.animation_rounded,
+              iconBg: const Color(0xFFD8E7FF),
+              label: tr('settings.motionMode'),
+              description: store.settings.motionMode.localizedDescription,
+              trailing: MiniChoiceBar<MotionMode>(
+                value: store.settings.motionMode,
+                values: MotionMode.values,
+                labelOf: (v) => v.localizedLabel,
+                onChanged: (v) => store.updateSettings(
+                    store.settings.copyWith(motionMode: v)),
+              ),
+            ),
+            SettingRow(
                 icon: Icons.view_carousel_rounded,
                 iconBg: const Color(0xFFC8EBFF),
                 label: tr('settings.homeStyle'),

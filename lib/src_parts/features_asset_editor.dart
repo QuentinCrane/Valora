@@ -471,8 +471,7 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
       ]),
     );
 
-    final useLiquidGlass =
-        context.store.settings.glassEffectMode == GlassEffectMode.liquid;
+    final useLiquidGlass = valoraUseSceneLiquidGlass(context);
     final saveContent = ValoraGlassSaveContent(
       label: editing ? tr('editor.saveChanges') : tr('editor.addToAssets'),
       icon: Icons.check_rounded,
@@ -506,9 +505,9 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
 
     return GradientScaffold(
       child: lge.LiquidGlassView(
-        realTimeCapture: true,
-        useSync: true,
-        refreshRate: lge.LiquidGlassRefreshRate.deviceRefreshRate,
+        realTimeCapture: valoraLiquidGlassRealtimeCapture(context),
+        useSync: valoraLiquidGlassUseSync(context),
+        refreshRate: valoraLiquidGlassRefreshRate(context),
         pixelRatio: liquidGlassCapturePixelRatio(context,
             duringInteraction: _savePressed),
         backgroundWidget:

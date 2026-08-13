@@ -1094,7 +1094,13 @@ class _StickerBrushStroke {
 class _StickerStrokePainter extends CustomPainter {
   final List<_StickerBrushStroke> strokes;
   final _StickerBrushStroke? activeStroke;
-  const _StickerStrokePainter({required this.strokes, this.activeStroke});
+  final int _strokesSignature;
+  final int _activeStrokeSignature;
+
+  _StickerStrokePainter({required this.strokes, this.activeStroke})
+      : _strokesSignature =
+            Object.hashAll(strokes.map(_stickerStrokeSignature)),
+        _activeStrokeSignature = _stickerStrokeSignature(activeStroke);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1132,7 +1138,15 @@ class _StickerStrokePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _StickerStrokePainter oldDelegate) => true;
+  bool shouldRepaint(covariant _StickerStrokePainter oldDelegate) =>
+      oldDelegate._strokesSignature != _strokesSignature ||
+      oldDelegate._activeStrokeSignature != _activeStrokeSignature;
+}
+
+int _stickerStrokeSignature(_StickerBrushStroke? stroke) {
+  if (stroke == null) return 0;
+  return Object.hash(
+      stroke.mode, stroke.radiusFactor, Object.hashAll(stroke.points));
 }
 
 Future<dynamic> _imageFromRgba(Uint8List pixels, int width, int height) {
@@ -1830,10 +1844,11 @@ class _StickerAdjustPreviewState extends State<_StickerAdjustPreview> {
                   ),
                 Positioned.fill(
                   child: IgnorePointer(
-                      child: CustomPaint(
-                          painter: _StickerStrokePainter(
-                              strokes: widget.strokes,
-                              activeStroke: widget.activeStroke))),
+                      child: RepaintBoundary(
+                          child: CustomPaint(
+                              painter: _StickerStrokePainter(
+                                  strokes: List.unmodifiable(widget.strokes),
+                                  activeStroke: widget.activeStroke)))),
                 ),
                 Positioned(
                   right: 10,
