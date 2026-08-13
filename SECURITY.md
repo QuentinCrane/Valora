@@ -13,6 +13,7 @@ For now, use a private GitHub security advisory after the repository is publishe
 Please pay extra attention to changes touching:
 
 - Backup export, restore and ZIP handling.
+- Credential redaction, Android Keystore storage, backup exclusion rules and WebDAV ETag conflict handling.
 - SQLite migrations or local data deletion.
 - WebDAV / Nextcloud / Jianguoyun configuration.
 - Android file sharing, `FileProvider`, camera, OCR, notifications and widgets.
@@ -20,4 +21,4 @@ Please pay extra attention to changes touching:
 
 ## Supported Versions
 
-Until the first public release is tagged, security fixes target the latest `main` branch only.
+The current source version is `0.80.1+81`. Until a matching public release tag is published, security fixes target the latest `main` branch; published artifacts must be checked against the release manifest and GitHub attestation.

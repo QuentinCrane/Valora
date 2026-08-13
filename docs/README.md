@@ -10,6 +10,9 @@
 - [开源发布检查清单](guides/OPEN_SOURCE_RELEASE.md)
 - [第三方开源声明](../THIRD_PARTY_NOTICES.md)
 - [v0.80 GitHub Release 文案](v80_github_release_notes.md)
+- [B25 无障碍与窗口自适应验证](product/VALORA_B25无障碍与窗口自适应验证.md)
+- [B26 CI、签名与供应链加固验证](product/VALORA_B26%20CI签名与供应链加固验证.md)
+- [B27 文档与版本事实收口](product/VALORA_B27文档与版本事实收口.md)
 - [发布历史](../CHANGELOG.md)
 
 ## 目录说明
@@ -22,6 +25,8 @@
 - `assets/screenshots/`：README 和发布页可引用的脱敏截图目录。
 
 版本变更以根目录的 `CHANGELOG.md` 和 GitHub Releases 为准。详细的迭代过程报告不再占用默认分支的文档树，仍可通过 Git 历史追溯。
+
+`v80_github_release_notes.md` 是 `0.80.0` 的历史发布文案；当前源码版本以根目录 `pubspec.yaml`、Android `versionCode/versionName` 和 README 的 `0.80.1+81` 为准。B00–B26 验收报告保留历史执行证据，不替代当前实现文档。
 
 ## 开源维护建议
 

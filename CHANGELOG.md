@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.80.1
+
+This maintenance release closes the core reliability, performance, accessibility, localization, and release-provenance work tracked in the implementation plan.
+
+- Hardened SQLite persistence, schema migration, backup/restore validation, WebDAV conflict handling, credentials, reminders, media flows, and wish conversion.
+- Added generated Simplified Chinese, Traditional Chinese, and English localization resources with explicit locale routing.
+- Added reproducible performance checks, lazy list surfaces, bounded glass effects, analytics caching, modular boundaries, and adaptive/accessible interactions.
+- Hardened signed arm64 APK/AAB release provenance with pinned Actions, Dependabot, dependency notices, Pub SBOM, hashes, certificate fingerprints, and artifact attestation.
+- Updated current documentation to distinguish implemented SQLite/ML Kit/Widget behavior from historical design notes.
+
 ## 0.80
 
 This is the first experience-polish update after the v0.79 public release.

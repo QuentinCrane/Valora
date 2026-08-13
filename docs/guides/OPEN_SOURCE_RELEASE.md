@@ -1,10 +1,10 @@
 # Valora 开源发布检查清单
 
-这份清单用于把当前本地项目整理成一个适合公开放到 GitHub 的仓库。
+这份清单用于把当前项目整理成一个适合公开放到 GitHub 的仓库。当前版本为 `0.80.1+81`；旧版 `v0.80.0` 发布文案保留在 `docs/v80_github_release_notes.md`，仅作为历史记录。
 
 ## 推荐仓库根目录
 
-建议把 `valora_app/` 的内容作为 GitHub 仓库根目录。不要在远端仓库里再套一层 `valora_app/`，这样 `.github/workflows/flutter.yml` 才会直接生效。
+建议把 `valora_app/` 的内容作为 GitHub 仓库根目录。不要在远端仓库里再套一层 `valora_app/`，这样 `.github/workflows/quality-gates.yml` 和 `release-apk.yml` 才会直接生效。
 
 不要把外层工作区一起推上去，尤其是：
 
@@ -18,13 +18,15 @@
 - `README.md`：项目介绍、功能、结构、构建入口和发布建议。
 - `LICENSE`：默认 Apache License 2.0。
 - `NOTICE`：项目归属和补充声明。
-- `THIRD_PARTY_NOTICES.md`：第三方组件声明，当前包含 `liquid_glass_easy` 的用途、来源、版权声明和完整 MIT 许可文本。
+- `THIRD_PARTY_NOTICES.md`：第三方组件声明，当前包含 `liquid_glass_easy`、`crypto`、`intl`、`flutter_lints` 的用途、来源、版权声明和许可文本。
 - `CONTRIBUTING.md`：贡献流程、检查命令和隐私要求。
 - `SECURITY.md`：安全报告方式和敏感区域。
 - `CHANGELOG.md`：公开版本变更记录入口。
 - `.github/ISSUE_TEMPLATE/`：Bug 与功能请求模板。
 - `.github/pull_request_template.md`：PR 描述模板。
-- `.github/workflows/flutter.yml`：GitHub Actions 检查。
+- `.github/workflows/quality-gates.yml`：Push、PR 和 reusable workflow 质量门禁。
+- `.github/workflows/release-apk.yml`：正式签名 APK/AAB 构建、清单、SBOM、attestation 和 Release 附件发布。
+- `.github/dependabot.yml`：GitHub Actions、Pub 和 Gradle 依赖更新。
 - `.editorconfig` / `.gitattributes`：跨平台文本和换行规范。
 
 ## 发布前必查
@@ -33,15 +35,17 @@
 
 ```bash
 flutter pub get
-dart format .
-flutter analyze
-flutter build apk --debug
+dart run tooling/check_supply_chain.dart
+dart run tooling/format_check.dart
+flutter test --no-pub
+flutter analyze --no-pub --fatal-warnings --no-fatal-infos
+flutter build apk --debug --no-pub
 ```
 
 确认第三方声明已同步：
 
 - README / Release notes 中保留第三方组件致谢。
-- `THIRD_PARTY_NOTICES.md` 中列出 `liquid_glass_easy`，并保留 `Copyright (c) 2025 Ahmed Gamil` 与完整 MIT 许可文本。
+- `THIRD_PARTY_NOTICES.md` 中列出 `liquid_glass_easy`、`crypto`、`intl` 和 `flutter_lints`，并保留对应版权与许可文本；`dart run tooling/check_supply_chain.dart` 会检查直接 hosted 依赖。
 - 如果后续要补 App 内声明页，可在设置页增加“第三方开源声明”入口；当前发布整理不改动源码。
 
 确认不要提交：
@@ -60,8 +64,10 @@ flutter build apk --debug
 APK 安装包不提交到源码仓库。需要公开下载时，在 GitHub Releases 中上传附件，建议命名为：
 
 ```text
-Valora-v0.80-android.apk
+Valora-v0.80.1-android-arm64.apk
 ```
+
+正式 Release 需要配置 `VALORA_RELEASE_KEYSTORE_BASE64`、`VALORA_RELEASE_STORE_PASSWORD`、`VALORA_RELEASE_KEY_PASSWORD`、`VALORA_RELEASE_KEY_ALIAS` 四个 Secrets。没有签名 Secrets 的发布 job 必须失败；本地 release 也不会回退到 debug 签名。
 
 ## 展示素材建议
 
@@ -112,4 +118,4 @@ git push -u origin main
 - 是否继续使用 Apache License 2.0，还是改为 MIT / GPL-3.0 / 其他协议。
 - 是否公开历史报告和 AI 协作提示词。
 - 是否在发布前补充脱敏截图。
-- 是否添加 `v0.80.0` Git tag 和 Release notes，并把 APK 上传到对应 Release。
+- 是否为当前 `0.80.1+81` 创建 Git tag，并在 GitHub 页面确认 artifact attestation 可查询。

@@ -10,13 +10,13 @@
 - Gradle Wrapper：`8.14`
 - AndroidX：Core、Activity 等基础能力。
 - Google ML Kit：条码扫描、文字识别、中文文字识别、主体分割。
-- TensorFlow Lite：本地智能能力预留与辅助处理。
+- 贴纸主体分割：Google ML Kit Subject Segmentation；`android/app/src/main/assets/models/` 仅保留未来离线 TFLite 模型的预留位置，当前没有随 APK 发布的本地 TFLite 模型。
 
 当前仓库重点面向 Android APK 构建。README 中提到的多端方向是产品扩展方向；本仓库目前已提交的是 Android 构建壳和 Android 原生能力。
 
 ## 项目信息
 
-- 当前版本：`0.80`
+- 当前版本：`0.80.1+81`
 - Flutter 包名：`valora_assets`
 - Android applicationId：`com.valora.assets`
 - Android 最低版本：`minSdk 24`
@@ -97,7 +97,7 @@ build/app/outputs/flutter-apk/app-debug.apk
 Release APK：
 
 ```bash
-flutter build apk --release
+flutter build apk --release --no-pub --target-platform android-arm64
 ```
 
 输出位置：
@@ -106,7 +106,15 @@ flutter build apk --release
 build/app/outputs/flutter-apk/app-release.apk
 ```
 
-仓库也提供了两个辅助脚本：
+AAB：
+
+```bash
+flutter build appbundle --release --no-pub --target-platform android-arm64
+```
+
+输出位置：`build/app/outputs/bundle/release/app-release.aab`
+
+仓库也提供了两个 Debug 辅助脚本：
 
 ```bash
 # Windows
@@ -116,7 +124,7 @@ build_windows.bat
 ./build_android.sh
 ```
 
-注意：当前 `android/app/build.gradle` 的 release 配置仍使用 debug 签名，便于本地测试。正式发布前请创建自己的 release keystore，并通过本地 `key.properties` 或 CI Secret 配置签名信息，不要把签名证书和密码提交到仓库。
+Release 不再使用 debug 签名兜底。正式构建必须提供未提交的 `android/key.properties` 和真实 keystore；缺少其中任一项时 `assembleRelease`/`bundleRelease` 会失败。CI 发布工作流要求 `VALORA_RELEASE_KEYSTORE_BASE64`、`VALORA_RELEASE_STORE_PASSWORD`、`VALORA_RELEASE_KEY_PASSWORD`、`VALORA_RELEASE_KEY_ALIAS`，并生成 APK/AAB 哈希、证书指纹、版本清单和 provenance attestation。详见 [B26 验证报告](../product/VALORA_B26%20CI签名与供应链加固验证.md)。
 
 ## 目录结构
 
@@ -159,10 +167,14 @@ build_windows.bat
 ## 数据与隐私说明
 
 - 默认情况下，资产和心愿数据保存在应用私有目录中的 SQLite 数据库内。
+- Flutter 导出的 canonical JSON 当前为 `storageSchemaVersion: 1`、`exportSchemaVersion: 3`；数据库使用 `kv_store` 保存 payload 和最后一次验证快照，导入前会迁移、校验，写入后回读确认。
 - 封面、贴纸抠图和导出资料包会写入应用私有目录或由系统文件选择器保存到用户指定位置。
 - 相机、OCR、条码扫描和主体分割仅在用户主动使用相关功能时触发。
-- WebDAV / Nextcloud / 坚果云同步为可选功能，只有在用户填写并启用云端配置后才会访问网络。
+- WebDAV / Nextcloud / 坚果云同步为可选功能，只有在用户填写并启用云端配置后才会访问网络；正式服务要求 HTTPS，测试只允许 loopback HTTP，上传使用 ETag/`If-Match` 或首次创建的 `If-None-Match: *`，冲突交给用户选择，不自动覆盖。
+- 自动上传使用唯一 WorkManager 任务并带联网约束；启动拉取发现本机与远端哈希不一致时进入冲突状态。
+- 完整 ZIP 备份在应用私有 staging 目录预检，包含脱敏 JSON、CSV/Markdown、SQLite 副本和媒体 SHA-256 清单；确认后原子提交，失败会回滚。
 - 桌面小组件会通过本地 SharedPreferences 读取摘要数据，用于展示总资产、心愿数量、日均成本等概览。
+- 当前 Manifest 声明 8 类 AppWidgetProvider：总览、心愿、日均、体检、快捷记录、到期、快照和轻量卡片；Flutter 保存时按目标集合刷新，手动刷新才使用全量集合。
 
 ## 权限说明
 
@@ -173,15 +185,24 @@ AndroidManifest 中声明的主要权限如下：
 - `VIBRATE`：用于保存、切换、提醒等交互反馈。
 - `POST_NOTIFICATIONS`：用于 Android 13+ 上的到期提醒通知。
 - `RECEIVE_BOOT_COMPLETED`：用于设备重启后恢复已设置的提醒。
+- 未声明外部存储权限；图片优先使用 Android Photo Picker/系统文件选择器，拍照通过受限 FileProvider 路径交给应用私有目录。
+- `android:usesCleartextTraffic="false"`：禁止普通 HTTP；仅测试代码可放行 loopback HTTP。
 
 ## 常用检查命令
 
 提交代码前建议执行：
 
 ```bash
-dart format .
-flutter analyze
-flutter build apk --debug
+dart run tooling/format_check.dart
+flutter test --no-pub
+flutter analyze --no-pub --fatal-warnings --no-fatal-infos
+flutter build apk --debug --no-pub
+```
+
+供应链检查：
+
+```bash
+dart run tooling/check_supply_chain.dart
 ```
 
 如果 Android 构建壳或 Gradle Wrapper 缺失，构建脚本会停止而不会覆盖本地原生修改。在 Git 检出中运行以下命令恢复受版本控制的 Android 文件：
@@ -197,6 +218,7 @@ git restore --source=HEAD --worktree -- android
 - 不提交 `android/local.properties`、`.env`、`key.properties`、`*.jks`、`*.keystore` 等本机路径或签名密钥。
 - 不提交 `build/`、`.dart_tool/`、`.gradle/`、APK/AAB、临时日志和个人备份 ZIP。
 - 对外分发的 APK 放到 GitHub Releases，不提交到源码仓库。
+- 正式发布由 `.github/workflows/release-apk.yml` 触发；它只接受正式签名 Secrets，构建后上传 APK、AAB、版本/哈希清单和 Pub SBOM，并创建 provenance attestation。
 - Flutter App 建议提交 `pubspec.lock`，这样其他人能复现当前依赖解析结果。
 - 保留或替换当前 `LICENSE` 文件。本仓库默认采用 Apache License 2.0，并提供 `NOTICE` 项目归属说明。
 - 如果 README 或文档中展示截图，先确认截图不包含个人资产、账号、WebDAV 地址或其他隐私信息。

@@ -1,4 +1,6 @@
-# Valora（Valora-cleanroom）交接说明
+# Valora（Valora-cleanroom）交接说明（历史设计输入）
+
+> 本文档记录早期 Vue/学习版设想，不描述当前 Flutter Android 实现。文中“没有云同步”“SharedPreferences JSON”“单体页面”等表述可能已经过时；当前事实请查看 `README.md`、`docs/guides/TECHNICAL_GUIDE.md` 和 `docs/product/DATABASE_UPGRADE_PLAN.md`。
 
 这份文档用于让另一个 Codex/开发者快速接手 `youshu_cleanroom_app`，理解当前实现、功能范围、页面结构、交互路径、关键文件和后续可做的优化点。
 

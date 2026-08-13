@@ -1,4 +1,6 @@
-# Valora学习版：参考实现映射
+# Valora 学习版参考实现映射（历史文档）
+
+> 这是早期 clean-room 参考映射，不是当前实现规范。当前代码已经使用 SQLite、可选 WebDAV/Nextcloud/坚果云同步、原生小组件、通知和 ML Kit 主体分割；请以 `docs/guides/TECHNICAL_GUIDE.md`、`README.md` 和 `lib/src_parts/` 为准。
 
 > 目标：学习同类“个人资产生命周期管理”App 的产品结构与开发方法，采用 clean-room 方式重新实现。本文档不包含第三方商业 App 的源码、素材、接口、品牌或像素级布局。
 
@@ -31,7 +33,7 @@
 | 分类统计 | categoryValues + PieChartLite | 按分类聚合当前估值 |
 | 愿望清单 | WishItem + WishesPage | 想买物品进入冷静期，避免冲动消费 |
 | 备份恢复 | exportJson / importJson | 复制 JSON 备份与恢复 |
-| 隐私与本地优先 | Android SharedPreferences | 当前学习版不联网，数据保存在本地 |
+| 隐私与本地优先 | Flutter `LocalSqliteStorage` + Android Keystore | 默认本地保存；云同步按需启用，凭据不进入普通 JSON |
 
 ## 3. 当前工程结构
 
@@ -44,7 +46,7 @@ README.md                             # 运行说明
 docs/                                 # 开发说明与 Codex 任务
 ```
 
-为了降低学习门槛，当前版本故意保持“单文件 Flutter 主体”。当你确认功能可跑通之后，再让 Codex 拆分成 feature-first 架构。
+为了降低学习门槛，本文件保留了早期“单文件主体”的建议；当前工程已经按 `lib/src_parts/` 做了渐进拆分，后续改动应以现有模块边界和测试为准。
 
 ## 4. 推荐后续拆分结构
 
@@ -95,4 +97,3 @@ lib/
 8. 增加隐私锁：PIN / 生物识别。
 9. 增加提醒：保修到期、会员续费、闲置检查。
 10. 增加原创图标和启动页。
-

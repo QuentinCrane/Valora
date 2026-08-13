@@ -22,9 +22,16 @@ flutter pub get
 提交 Pull Request 前，请尽量运行：
 
 ```bash
-dart format .
-flutter analyze
-flutter build apk --debug
+dart run tooling/format_check.dart
+flutter test --no-pub
+flutter analyze --no-pub --fatal-warnings --no-fatal-infos
+flutter build apk --debug --no-pub
+```
+
+如果改动依赖、GitHub Actions 或第三方声明，还请运行：
+
+```bash
+dart run tooling/check_supply_chain.dart
 ```
 
 如果修改了 Android 原生桥接、小组件、备份恢复、数据库或权限，请在 PR 描述中写清：

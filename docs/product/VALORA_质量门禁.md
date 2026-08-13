@@ -26,7 +26,8 @@ C:\Flutter\bin\flutter.bat build apk --debug --no-pub
 ## CI 入口
 
 - `.github/workflows/quality-gates.yml` 在 `main` push、Pull Request 和可复用调用时运行
-- 发布工作流先等待同一份质量门禁成功，再执行 Release APK 构建
+- 发布工作流先等待同一份质量门禁成功，再执行正式签名的 arm64 APK/AAB 构建；发布链和权限边界见 [B26 CI、签名与供应链加固验证](VALORA_B26%20CI签名与供应链加固验证.md)
+- 质量门禁会生成 Pub SBOM 并检查直接 hosted 依赖是否有 `THIRD_PARTY_NOTICES.md` 声明；PR 额外执行 dependency review
 - 故意引入格式错误、让测试断言失败或制造分析 warning/error 时，分别会在对应门禁命令处失败
 
 ## B01 实测结果

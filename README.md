@@ -150,10 +150,11 @@ flutter run
 
 ```bash
 # Debug
-flutter build apk --debug
+flutter build apk --debug --no-pub
 
 # Release
-flutter build apk --release
+flutter build apk --release --no-pub --target-platform android-arm64
+flutter build appbundle --release --no-pub --target-platform android-arm64
 ```
 
 输出位置：
@@ -161,9 +162,10 @@ flutter build apk --release
 ```text
 build/app/outputs/flutter-apk/app-debug.apk
 build/app/outputs/flutter-apk/app-release.apk
+build/app/outputs/bundle/release/app-release.aab
 ```
 
-release 配置用于本地测试。正式发布前，请创建自己的签名密钥，并通过本地 `key.properties` 或 CI Secret 管理；不要将证书、密码或 `android/local.properties` 提交到仓库
+Release 构建必须使用正式签名配置；没有真实 keystore 时 Gradle 会失败，不会回退到 debug 签名。本地使用未提交的 `android/key.properties`，CI 使用发布工作流要求的四个签名 Secrets；不要将证书、密码或 `android/local.properties` 提交到仓库。完整流程见[技术与构建指南](docs/guides/TECHNICAL_GUIDE.md)和[B26 CI/签名验证](docs/product/VALORA_B26%20CI签名与供应链加固验证.md)
 
 ## 项目结构
 
@@ -188,21 +190,23 @@ docs/                          # 使用、构建、产品与发布文档
 | 环境、构建、目录和权限 | [技术与构建指南](docs/guides/TECHNICAL_GUIDE.md) |
 | Release 构建常见问题 | [Flutter Release APK 编译流程](docs/guides/BUILD_PROCESS.md) |
 | 开源发布前检查 | [开源发布检查清单](docs/guides/OPEN_SOURCE_RELEASE.md) |
-| 当前版本更新内容 | [v0.80 Release Notes](docs/v80_github_release_notes.md) |
+| 当前版本更新内容 | [CHANGELOG.md](CHANGELOG.md) |
+| 历史 v0.80 发布文案 | [v0.80 Release Notes](docs/v80_github_release_notes.md) |
 | 全部文档 | [docs/README.md](docs/README.md) |
 
 ## 第三方声明
 
-液态玻璃效果使用 [`liquid_glass_easy`](https://pub.dev/packages/liquid_glass_easy) `2.0.1`。该依赖采用 MIT License；其完整版权声明和许可文本保留在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+运行时的液态玻璃效果使用 [`liquid_glass_easy`](https://pub.dev/packages/liquid_glass_easy) `2.0.1`；日期/数字格式和哈希能力分别使用 `intl` 与 `crypto`。开发门禁还使用 `flutter_lints`。版权和许可文本保留在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，可用 `dart run tooling/check_supply_chain.dart` 检查直接依赖声明是否同步
 
 ## 参与贡献
 
 欢迎提交 Issue 或 Pull Request。提交前请尽量完成以下检查：
 
 ```bash
-dart format .
-flutter analyze
-flutter build apk --debug
+dart run tooling/format_check.dart
+flutter test --no-pub
+flutter analyze --no-pub --fatal-warnings --no-fatal-infos
+flutter build apk --debug --no-pub
 ```
 
 贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)
