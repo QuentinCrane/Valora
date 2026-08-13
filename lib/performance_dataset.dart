@@ -63,7 +63,7 @@ class ValoraPerformanceDataset {
         'storageSchemaVersion': 1,
         'exportSchemaVersion': 3,
         'version': 3,
-        'appVersion': '0.80.1+81',
+        'appVersion': '0.80.2+82',
         'generatedBy': 'valora-performance-benchmark',
         'settings': {
           'onboardingCompleted': true,

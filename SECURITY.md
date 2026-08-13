@@ -21,4 +21,4 @@ Please pay extra attention to changes touching:
 
 ## Supported Versions
 
-The current source version is `0.80.1+81`. Until a matching public release tag is published, security fixes target the latest `main` branch; published artifacts must be checked against the release manifest and GitHub attestation.
+The current source version is `0.80.2+82`. Until a matching public release tag is published, security fixes target the latest `main` branch; published artifacts must be checked against the release manifest and GitHub attestation.

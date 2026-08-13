@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.80.2
+
+- Added local boot repair for legacy assets, wishes, and recovery records that reference removed categories, tags, or assets.
+- Preserved affected records and removed only dangling relationships so a signed update can open the existing local database safely.
+- Added regression coverage for the `data_invalid_reference` recovery path.
+
 ## 0.80.1
 
 This maintenance release closes the core reliability, performance, accessibility, localization, and release-provenance work tracked in the implementation plan.

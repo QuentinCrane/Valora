@@ -1,6 +1,6 @@
 # Valora 开源发布检查清单
 
-这份清单用于把当前项目整理成一个适合公开放到 GitHub 的仓库。当前版本为 `0.80.1+81`；旧版 `v0.80.0` 发布文案保留在 `docs/v80_github_release_notes.md`，仅作为历史记录。
+这份清单用于把当前项目整理成一个适合公开放到 GitHub 的仓库。当前版本为 `0.80.2+82`；旧版 `v0.80.0` 发布文案保留在 `docs/v80_github_release_notes.md`，仅作为历史记录。
 
 ## 推荐仓库根目录
 
@@ -64,7 +64,7 @@ flutter build apk --debug --no-pub
 APK 安装包不提交到源码仓库。需要公开下载时，在 GitHub Releases 中上传附件，建议命名为：
 
 ```text
-Valora-v0.80.1-android-arm64.apk
+Valora-v0.80.2-android-arm64.apk
 ```
 
 正式 Release 需要配置 `VALORA_RELEASE_KEYSTORE_BASE64`、`VALORA_RELEASE_STORE_PASSWORD`、`VALORA_RELEASE_KEY_PASSWORD`、`VALORA_RELEASE_KEY_ALIAS` 四个 Secrets。没有签名 Secrets 的发布 job 必须失败；本地 release 也不会回退到 debug 签名。
@@ -118,4 +118,4 @@ git push -u origin main
 - 是否继续使用 Apache License 2.0，还是改为 MIT / GPL-3.0 / 其他协议。
 - 是否公开历史报告和 AI 协作提示词。
 - 是否在发布前补充脱敏截图。
-- 是否为当前 `0.80.1+81` 创建 Git tag，并在 GitHub 页面确认 artifact attestation 可查询。
+- 是否为当前 `0.80.2+82` 创建 Git tag，并在 GitHub 页面确认 artifact attestation 可查询。

@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:valora_assets/main.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   Map<String, dynamic> fixture(String name) {
     final file = File('test/fixtures/persisted/$name.json');
     return Map<String, dynamic>.from(jsonDecode(file.readAsStringSync()));
@@ -73,5 +75,49 @@ void main() {
     final unknownEnum = fixture('v2');
     ((unknownEnum['assets'] as List).first as Map)['status'] = 'lost';
     expectDataError(unknownEnum, 'data_invalid_enum');
+  });
+
+  test('local boot repair preserves records while dropping dangling links', () {
+    final legacy = fixture('v2');
+    final assets = legacy['assets'] as List;
+    final firstAsset = assets.first as Map;
+    firstAsset['categoryId'] = 'missing-category';
+    firstAsset['tagIds'] = <Object?>['missing-tag'];
+    (legacy['wishes'] as List).add({
+      'id': 'wish_desk',
+      'name': 'Desk',
+      'expectedPrice': 80,
+      'categoryId': 'missing-category',
+      'tagIds': <Object?>['missing-tag'],
+      'addons': <Object?>[],
+      'note': '',
+      'archived': false,
+      'convertedAssetId': 'missing-asset',
+      'createdAt': '2026-08-01T09:00:00',
+      'updatedAt': '2026-08-01T09:00:00',
+    });
+    (legacy['recoveryRecords'] as List).add({
+      'id': 'recovery_missing',
+      'amount': 20,
+      'date': '2026-08-02',
+      'assetIds': <Object?>['missing-asset'],
+      'note': '',
+      'createdAt': '2026-08-02T09:00:00',
+      'updatedAt': '2026-08-02T09:00:00',
+    });
+
+    final store = AppStore();
+    store.importMap(legacy, repairDanglingReferences: true);
+
+    expect(store.assets, hasLength(2));
+    expect(store.assets.first.categoryId, isNull);
+    expect(store.assets.first.tagIds, isEmpty);
+    expect(store.wishes, hasLength(1));
+    expect(store.wishes.single.categoryId, isNull);
+    expect(store.wishes.single.tagIds, isEmpty);
+    expect(store.wishes.single.convertedAssetId, isNull);
+    expect(store.recoveryRecords, hasLength(1));
+    expect(store.recoveryRecords.single.assetIds, isEmpty);
+    expect(() => migratePersistedMap(store.exportMap()), returnsNormally);
   });
 }

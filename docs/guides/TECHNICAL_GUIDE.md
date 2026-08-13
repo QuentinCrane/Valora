@@ -16,7 +16,7 @@
 
 ## 项目信息
 
-- 当前版本：`0.80.1+81`
+- 当前版本：`0.80.2+82`
 - Flutter 包名：`valora_assets`
 - Android applicationId：`com.valora.assets`
 - Android 最低版本：`minSdk 24`

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:valora_assets/main.dart';
@@ -113,5 +116,24 @@ void main() {
     expect(store.isStorageReadOnly, isTrue);
     expect(saveCount, 0);
     expect(markValidatedCount, 0);
+  });
+
+  test('local boot repairs dangling references without replacing records',
+      () async {
+    final data = Map<String, dynamic>.from(
+        jsonDecode(File('test/fixtures/persisted/v2.json').readAsStringSync()));
+    final firstAsset = (data['assets'] as List).first as Map;
+    firstAsset['categoryId'] = 'missing-category';
+    firstAsset['tagIds'] = <Object?>['missing-tag'];
+    persistedJson = jsonEncode(data);
+
+    final store = AppStore();
+    final result = await store.load();
+
+    expect(result.status, StorageLoadStatus.success);
+    expect(store.assets, hasLength(2));
+    expect(store.assets.first.categoryId, isNull);
+    expect(store.assets.first.tagIds, isEmpty);
+    expect(store.storageLoadResult.isFailure, isFalse);
   });
 }

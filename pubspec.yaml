@@ -1,5 +1,5 @@
 name: valora_assets
-version: 0.80.1+81
+version: 0.80.2+82
 publish_to: 'none'
 description: Release-candidate polished clean-room Flutter Android app for Valora personal asset lifecycle management.
 

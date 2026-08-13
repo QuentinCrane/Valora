@@ -25,8 +25,8 @@ android {
         applicationId "com.valora.assets"
         minSdk 24
         targetSdk flutter.targetSdkVersion
-        versionCode 81
-        versionName "0.80.1"
+        versionCode 82
+        versionName "0.80.2"
 
         // Release APK size: publish an arm64 package by default instead of a universal APK.
         // Flutter's --split-per-abi diagnostic build supplies its own ABI filters,

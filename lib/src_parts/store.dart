@@ -418,7 +418,7 @@ class SecureCredentialLoadResult {
 
 const int kCurrentStorageSchemaVersion = 1;
 const int kCurrentExportSchemaVersion = 3;
-const String kValoraAppVersion = '0.80.1+81';
+const String kValoraAppVersion = '0.80.2+82';
 
 class PersistedDataException implements Exception {
   final String code;
@@ -430,7 +430,10 @@ class PersistedDataException implements Exception {
   String toString() => '$code: $message';
 }
 
-Map<String, dynamic> migratePersistedMap(Map<String, dynamic> input) {
+Map<String, dynamic> migratePersistedMap(
+  Map<String, dynamic> input, {
+  bool repairDanglingReferences = false,
+}) {
   final data = _deepCopyPersistedMap(input);
   final storageVersion = _readSchemaVersion(
     data['storageSchemaVersion'],
@@ -468,6 +471,7 @@ Map<String, dynamic> migratePersistedMap(Map<String, dynamic> input) {
   _ensurePersistedCollections(data);
   _ensurePersistedSettings(data);
   _canonicalizePersistedDates(data);
+  if (repairDanglingReferences) _repairDanglingReferences(data);
 
   data['storageSchemaVersion'] = kCurrentStorageSchemaVersion;
   data['exportSchemaVersion'] = kCurrentExportSchemaVersion;
@@ -633,6 +637,77 @@ void _canonicalizePersistedDates(Map<String, dynamic> data) {
     _normalizeDateTimeField(cloudMap, 'remoteLastModifiedAt', 'cloudSync');
     settings['cloudSync'] = cloudMap;
   }
+}
+
+Set<String> _repairReferenceIds(Object? raw) {
+  if (raw is! List) return <String>{};
+  return raw
+      .whereType<Map>()
+      .map((record) => record['id'])
+      .whereType<String>()
+      .where((id) => id.trim().isNotEmpty)
+      .toSet();
+}
+
+void _repairOptionalReference(
+    Map<String, dynamic> record, String field, Set<String> ids) {
+  final raw = record[field];
+  if (raw == null) return;
+  if (raw is! String || raw.trim().isEmpty || !ids.contains(raw)) {
+    record[field] = null;
+  }
+}
+
+void _repairReferenceList(
+    Map<String, dynamic> record, String field, Set<String> ids) {
+  final raw = record[field];
+  if (raw == null) return;
+  if (raw is! List) {
+    record[field] = <String>[];
+    return;
+  }
+  record[field] = raw
+      .whereType<String>()
+      .where((id) => ids.contains(id))
+      .toList(growable: false);
+}
+
+void _repairRecords(
+  Map<String, dynamic> data,
+  String collection,
+  void Function(Map<String, dynamic>) repair,
+) {
+  final raw = data[collection];
+  if (raw is! List) return;
+  for (var index = 0; index < raw.length; index++) {
+    final value = raw[index];
+    if (value is! Map) continue;
+    final record = Map<String, dynamic>.from(value);
+    repair(record);
+    raw[index] = record;
+  }
+}
+
+/// Repairs only relationship fields in a payload that was written by an
+/// earlier Valora version. Records themselves are deliberately preserved so a
+/// stricter current validator cannot turn a legacy payload into an empty app.
+void _repairDanglingReferences(Map<String, dynamic> data) {
+  final categoryIds = _repairReferenceIds(data['categories']);
+  final tagIds = _repairReferenceIds(data['tags']);
+  final assetIds = _repairReferenceIds(data['assets']);
+
+  _repairRecords(data, 'assets', (record) {
+    _repairOptionalReference(record, 'categoryId', categoryIds);
+    _repairReferenceList(record, 'tagIds', tagIds);
+  });
+  _repairRecords(data, 'wishes', (record) {
+    _repairOptionalReference(record, 'categoryId', categoryIds);
+    _repairReferenceList(record, 'tagIds', tagIds);
+    _repairOptionalReference(record, 'convertedAssetId', assetIds);
+  });
+  _repairRecords(data, 'recoveryRecords', (record) {
+    _repairReferenceList(record, 'assetIds', assetIds);
+  });
 }
 
 void _normalizeRecordDates(
@@ -1740,6 +1815,7 @@ class AppStore extends ChangeNotifier {
     }
 
     var reminderSyncHandled = false;
+    var repairedLocalReferences = false;
     try {
       final raw = result.payload ?? '';
       if (result.status == StorageLoadStatus.empty) {
@@ -1756,19 +1832,38 @@ class AppStore extends ChangeNotifier {
         await save();
         reminderSyncHandled = true;
       } else {
-        importMap(Map<String, dynamic>.from(jsonDecode(raw)));
+        final decoded = Map<String, dynamic>.from(jsonDecode(raw));
+        try {
+          importMap(decoded);
+        } on PersistedDataException catch (error) {
+          if (error.code != 'data_invalid_reference') rethrow;
+          importMap(decoded, repairDanglingReferences: true);
+          repairedLocalReferences = true;
+        }
         final migratedLegacyCredentials = await _hydrateCloudCredentials();
         if (migratedLegacyCredentials) {
           await save();
           reminderSyncHandled = true;
+        } else if (repairedLocalReferences) {
+          // Keep the repaired state available for an immediate backup. The
+          // original payload remains untouched until the next explicit save.
+          final repairedPayload = jsonEncode(exportMap());
+          reminderSyncHandled = true;
+          _lastValidatedSnapshot = repairedPayload;
+          _storageLoadResult = StorageLoadResult.success(
+            payload: repairedPayload,
+            lastValidatedPayload: repairedPayload,
+          );
         } else if (result.lastValidatedPayload != raw) {
           await _storage.markValidated(raw);
         }
-        _lastValidatedSnapshot = raw;
-        _storageLoadResult = StorageLoadResult.success(
-          payload: raw,
-          lastValidatedPayload: raw,
-        );
+        if (!repairedLocalReferences) {
+          _lastValidatedSnapshot = raw;
+          _storageLoadResult = StorageLoadResult.success(
+            payload: raw,
+            lastValidatedPayload: raw,
+          );
+        }
       }
     } on PersistedDataException catch (error) {
       _storageLoadResult = StorageLoadResult.recoverableFailure(
@@ -1792,7 +1887,9 @@ class AppStore extends ChangeNotifier {
     viewMode = settings.defaultHomeViewMode;
     configureRuntimeSettings(settings);
     if (!reminderSyncHandled) await _synchronizeReminderSchedule();
-    if (settings.cloudSync.syncOnLaunch && settings.cloudSync.enabled) {
+    if (!repairedLocalReferences &&
+        settings.cloudSync.syncOnLaunch &&
+        settings.cloudSync.enabled) {
       Future<void>(() async {
         await downloadCloudBackup(silent: true);
       });
@@ -1802,8 +1899,14 @@ class AppStore extends ChangeNotifier {
     return _storageLoadResult;
   }
 
-  void importMap(Map<String, dynamic> data) {
-    final normalized = migratePersistedMap(data);
+  void importMap(
+    Map<String, dynamic> data, {
+    bool repairDanglingReferences = false,
+  }) {
+    final normalized = migratePersistedMap(
+      data,
+      repairDanglingReferences: repairDanglingReferences,
+    );
     final importedSettings = AppSettings.fromMap(
         Map<String, dynamic>.from(normalized['settings'] ?? normalized));
     final importedCloud = importedSettings.cloudSync;

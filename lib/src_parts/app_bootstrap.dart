@@ -583,6 +583,14 @@ class StorageRecoveryPage extends StatelessWidget {
                           '${tr('store.recovery.code')}: ${result.errorCode ?? 'storage_unknown'}',
                           style: const TextStyle(fontSize: 12),
                         ),
+                        if (result.errorMessage?.trim().isNotEmpty ??
+                            false) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            result.errorMessage!,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
                         if (result.hasValidatedSnapshot) ...[
                           const SizedBox(height: 10),
                           Text(tr('store.recovery.snapshot')),
