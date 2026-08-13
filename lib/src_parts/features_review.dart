@@ -361,15 +361,37 @@ void showValueQuadrantDetail(BuildContext context, AppStore store) {
       ]));
 }
 
-class SnapshotCompareCard extends StatelessWidget {
+class SnapshotCompareCard extends StatefulWidget {
   final AppStore store;
   const SnapshotCompareCard({super.key, required this.store});
 
   @override
+  State<SnapshotCompareCard> createState() => _SnapshotCompareCardState();
+}
+
+class _SnapshotCompareCardState extends State<SnapshotCompareCard> {
+  SnapshotRecord? _cachedSnapshot;
+  _PortfolioSummary? _cachedSummary;
+
+  _PortfolioSummary? _summaryForSnapshot(SnapshotRecord? latest) {
+    if (latest == null) {
+      _cachedSnapshot = null;
+      _cachedSummary = null;
+      return null;
+    }
+    if (identical(_cachedSnapshot, latest)) {
+      return _cachedSummary;
+    }
+    _cachedSnapshot = latest;
+    _cachedSummary = _snapshotSummary(latest.payload);
+    return _cachedSummary;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final store = widget.store;
     final latest = store.snapshots.isEmpty ? null : store.snapshots.first;
-    final latestSummary =
-        latest == null ? null : _snapshotSummary(latest.payload);
+    final latestSummary = _summaryForSnapshot(latest);
     final current = _PortfolioSummary(
       assetCount: store.assets.length,
       wishCount: store.wishes.where((w) => !w.archived).length,

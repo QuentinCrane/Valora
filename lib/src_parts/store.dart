@@ -1599,7 +1599,9 @@ class AppStore extends ChangeNotifier {
   bool wishShowArchived = false;
   int _homeRevision = 0;
 
-  String? _analyticsSnapshotKey;
+  int _analyticsRevision = 0;
+  int _analyticsSnapshotRevision = -1;
+  int _analyticsSnapshotDay = -1;
   AnalyticsSnapshot? _analyticsSnapshot;
 
   StorageLoadResult get storageLoadResult => _storageLoadResult;
@@ -1612,6 +1614,7 @@ class AppStore extends ChangeNotifier {
   bool get canUndo => _undoPayload != null && !_undoInFlight;
   String? get undoLabel => _undoLabel;
   int get homeRevision => _homeRevision;
+  int get analyticsRevision => _analyticsRevision;
 
   void _notifyHomeChanged() {
     _homeRevision++;
@@ -1672,65 +1675,22 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _analyticsKey() {
-    final buffer = StringBuffer()
-      ..write('day:')
-      ..write(dateEpochDay(DateTime.now()))
-      ..write('|')
-      ..write(settings.includeRetiredInTotal)
-      ..write('|')
-      ..write(settings.durationMode.name)
-      ..write('|')
-      ..write(settings.currencyUnit)
-      ..write('|')
-      ..write(settings.decimalPlaces)
-      ..write('|a:')
-      ..write(assets.length)
-      ..write('|w:')
-      ..write(wishes.length)
-      ..write('|r:')
-      ..write(recoveryRecords.length);
-    for (final asset in assets) {
-      buffer
-        ..write('|')
-        ..write(asset.id)
-        ..write(':')
-        ..write(asset.updatedAt.millisecondsSinceEpoch)
-        ..write(':')
-        ..write(asset.status.name)
-        ..write(':')
-        ..write(asset.addons.length)
-        ..write(':')
-        ..write(asset.tagIds.length);
-    }
-    for (final wish in wishes) {
-      buffer
-        ..write('|')
-        ..write(wish.id)
-        ..write(':')
-        ..write(wish.updatedAt.millisecondsSinceEpoch)
-        ..write(':')
-        ..write(wish.archived);
-    }
-    for (final item in recoveryRecords) {
-      buffer
-        ..write('|')
-        ..write(item.id)
-        ..write(':')
-        ..write(item.updatedAt.millisecondsSinceEpoch);
-    }
-    return buffer.toString();
-  }
-
   void _invalidateAnalytics() {
-    _analyticsSnapshotKey = null;
+    _analyticsRevision++;
+    _analyticsSnapshotRevision = -1;
+    _analyticsSnapshotDay = -1;
     _analyticsSnapshot = null;
   }
 
   AnalyticsSnapshot get analyticsSnapshot {
-    final key = _analyticsKey();
+    final revision = _analyticsRevision;
+    final day = dateEpochDay(DateTime.now());
     final cached = _analyticsSnapshot;
-    if (cached != null && _analyticsSnapshotKey == key) return cached;
+    if (cached != null &&
+        _analyticsSnapshotRevision == revision &&
+        _analyticsSnapshotDay == day) {
+      return cached;
+    }
     final topDaily = assets
         .where((a) => !a.isPriceless && a.includeInDailyCost)
         .toList()
@@ -1752,7 +1712,8 @@ class AppStore extends ChangeNotifier {
       dailyCostTrend: List<AssetTrendPoint>.unmodifiable(dailyCostTrend()),
       insights: List<AssetInsight>.unmodifiable(assetInsights()),
     );
-    _analyticsSnapshotKey = key;
+    _analyticsSnapshotRevision = revision;
+    _analyticsSnapshotDay = day;
     _analyticsSnapshot = snapshot;
     return snapshot;
   }
