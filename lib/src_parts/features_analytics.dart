@@ -93,6 +93,8 @@ class AnalyticsHomePage extends StatelessWidget {
                 title: tr('analytics.valueTrend'),
                 subtitle: tr('analytics.valueTrendDesc'),
                 onTap: () => showValueTrendDetail(context, store),
+                semanticLabel: _trendChartSemantics(tr('analytics.valueTrend'),
+                    analytics.valueTrend, store.settings),
                 child: SizedBox(
                     height: 190,
                     child: ValueTrendChart(points: analytics.valueTrend)))),
@@ -101,6 +103,8 @@ class AnalyticsHomePage extends StatelessWidget {
             title: tr('analytics.dailyCostTrend'),
             subtitle: tr('analytics.dailyCostTrendDesc'),
             onTap: () => showDailyCostTrendDetail(context, store),
+            semanticLabel: _trendChartSemantics(tr('analytics.dailyCostTrend'),
+                analytics.dailyCostTrend, store.settings),
             child: SizedBox(
                 height: 190,
                 child: ValueTrendChart(points: analytics.dailyCostTrend))),
@@ -164,6 +168,9 @@ class AnalyticsHomePage extends StatelessWidget {
             title: tr('analytics.categoryValuation'),
             subtitle: tr('analytics.categoryValuationDesc'),
             onTap: () => showCategoryDistributionDetail(context, store),
+            semanticLabel: category.isEmpty
+                ? '${tr('analytics.categoryValuation')}: ${tr('analytics.noData')}'
+                : '${tr('analytics.categoryValuation')}: ${category.entries.map((entry) => '${store.categoryDistributionLabel(entry.key)} ${money(entry.value, store.settings)}').join('，')}',
             child: category.isEmpty
                 ? SizedBox(
                     height: 120,
@@ -191,6 +198,9 @@ class AnalyticsHomePage extends StatelessWidget {
             title: tr('analytics.tagDistribution'),
             subtitle: tr('analytics.tagDistributionDesc'),
             onTap: () => showTagDistributionDetail(context, store),
+            semanticLabel: tags.isEmpty
+                ? '${tr('analytics.tagDistribution')}: ${tr('analytics.noTags')}'
+                : '${tr('analytics.tagDistribution')}: ${tags.entries.map((entry) => '${store.tagDistributionLabel(entry.key)} ${entry.value}').join('，')}',
             child: tags.isEmpty
                 ? SizedBox(
                     height: 80,
@@ -262,6 +272,8 @@ class AnalyticsHomePage extends StatelessWidget {
             title: tr('analytics.serviceDuration'),
             subtitle: tr('analytics.serviceDurationDesc'),
             onTap: () => showServiceDurationDetail(context, store),
+            semanticLabel:
+                '${tr('analytics.serviceDuration')}: ${store.assets.length} ${tr('analytics.countUnit')}',
             child: SizedBox(
                 height: 170,
                 child: BarChartLite(
@@ -271,6 +283,16 @@ class AnalyticsHomePage extends StatelessWidget {
       ],
     );
   }
+}
+
+String _trendChartSemantics(
+    String title, List<AssetTrendPoint> points, AppSettings settings) {
+  if (points.isEmpty) return '$title: ${tr('analytics.noTrendData')}';
+  final first = points.first;
+  final last = points.last;
+  return '$title: ${points.length} ${tr('analytics.countUnit')}; '
+      '${first.label} ${money(first.value, settings)}; '
+      '${last.label} ${money(last.value, settings)}';
 }
 
 void showAnalyticsSummaryDetail(BuildContext context, AppStore store) {

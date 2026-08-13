@@ -75,6 +75,8 @@ class AssetDetailPage extends StatelessWidget {
                         title: tr('detail.dailyCostTrend'),
                         subtitle: tr('detail.dailyCostTrendDesc'),
                         onTap: () => showAssetTrendGuide(context, asset, store),
+                        semanticLabel:
+                            '${tr('detail.dailyCostTrend')}: ${asset.name}',
                         child: Column(children: [
                           SizedBox(
                               height: 190,
@@ -1095,41 +1097,49 @@ class DetailCell extends StatelessWidget {
                 lower.contains('target')
             ? const Color(0xFF7CC6F2)
             : kBrandStrong;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-      decoration: BoxDecoration(
-        color: context.isDark
-            ? Colors.white.withOpacity(.048)
-            : const Color(0xFFF7FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: accent.withOpacity(context.isDark ? .18 : .12)),
-      ),
-      child: Row(children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-              color: accent.withOpacity(.14),
-              borderRadius: BorderRadius.circular(10)),
-          child: Icon(_icon, size: 15, color: accent),
+    return Semantics(
+      container: true,
+      label: '$label: $value',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+        decoration: BoxDecoration(
+          color: context.isDark
+              ? Colors.white.withOpacity(.048)
+              : const Color(0xFFF7FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border:
+              Border.all(color: accent.withOpacity(context.isDark ? .18 : .12)),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: kMuted, fontSize: 11.2, height: 1)),
-          const SizedBox(height: 5),
-          Text(value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontWeight: FontWeight.normal, fontSize: 13.8, height: 1.05)),
-        ])),
-      ]),
+        child: Row(children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+                color: accent.withOpacity(.14),
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(_icon, size: 15, color: accent),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: kMuted, fontSize: 11.2, height: 1)),
+                const SizedBox(height: 5),
+                Text(value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.normal,
+                        fontSize: 13.8,
+                        height: 1.05)),
+              ])),
+        ]),
+      ),
     );
   }
 }
@@ -1139,14 +1149,23 @@ class ChartPanel extends StatelessWidget {
   final String subtitle;
   final Widget child;
   final VoidCallback? onTap;
+  final String? semanticLabel;
   const ChartPanel(
       {super.key,
       required this.title,
       required this.subtitle,
       required this.child,
-      this.onTap});
+      this.onTap,
+      this.semanticLabel});
   @override
   Widget build(BuildContext context) {
+    final chart = semanticLabel == null
+        ? child
+        : Semantics(
+            container: true,
+            label: semanticLabel,
+            child: child,
+          );
     final content = AppCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -1160,7 +1179,7 @@ class ChartPanel extends StatelessWidget {
       const SizedBox(height: 4),
       Text(subtitle, style: const TextStyle(color: kMuted)),
       const SizedBox(height: 14),
-      child,
+      chart,
     ]));
     if (onTap == null) return content;
     return InkWell(

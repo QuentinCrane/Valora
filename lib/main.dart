@@ -16,9 +16,11 @@ import 'domain/validators.dart';
 import 'l10n/generated/valora_message_catalog.dart';
 import 'l10n/generated/valora_localizations.dart';
 import 'platform/native_bridge_contract.dart';
+import 'ui/adaptive_layout.dart';
 
 export 'domain/validators.dart';
 export 'platform/native_bridge_contract.dart';
+export 'ui/adaptive_layout.dart';
 
 part 'src_parts/l10n.dart';
 part 'src_parts/app_bootstrap.dart';

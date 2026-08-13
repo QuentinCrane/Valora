@@ -143,6 +143,8 @@ class ValueQuadrantCard extends StatelessWidget {
       subtitle: tr('review.quadrantSubtitle'),
       onTap:
           active.isEmpty ? null : () => showValueQuadrantDetail(context, store),
+      semanticLabel:
+          '${tr('review.quadrantTitle')}: ${active.length} ${tr('analytics.countUnit')}',
       child: active.isEmpty
           ? SizedBox(
               height: 150,

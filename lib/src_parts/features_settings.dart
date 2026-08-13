@@ -398,8 +398,8 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 value: store.settings.motionMode,
                 values: MotionMode.values,
                 labelOf: (v) => v.localizedLabel,
-                onChanged: (v) => store.updateSettings(
-                    store.settings.copyWith(motionMode: v)),
+                onChanged: (v) => store
+                    .updateSettings(store.settings.copyWith(motionMode: v)),
               ),
             ),
             SettingRow(
@@ -1525,35 +1525,48 @@ class MiniChoiceBar<T> extends StatelessWidget {
                 tapHaptic();
                 onChanged(item);
               },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                width: values.length >= 3 ? 46 : 56,
-                padding: const EdgeInsets.symmetric(vertical: 5),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: active
-                      ? (dark ? Colors.white.withOpacity(.14) : Colors.white)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
-                  boxShadow: active && !dark
-                      ? [
-                          BoxShadow(
-                              color: Colors.black.withOpacity(.05),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2))
-                        ]
-                      : null,
+              child: Semantics(
+                button: true,
+                label: labelOf(item),
+                selected: active,
+                onTap: () => onChanged(item),
+                child: ValoraMinimumTouchTarget(
+                  minWidth: values.length >= 3 ? 46 : 56,
+                  child: AnimatedContainer(
+                    duration: valoraMotionDuration(
+                        context, const Duration(milliseconds: 150),
+                        reduced: const Duration(milliseconds: 90)),
+                    width: values.length >= 3 ? 46 : 56,
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: active
+                          ? (dark
+                              ? Colors.white.withOpacity(.14)
+                              : Colors.white)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(999),
+                      boxShadow: active && !dark
+                          ? [
+                              BoxShadow(
+                                  color: Colors.black.withOpacity(.05),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2))
+                            ]
+                          : null,
+                    ),
+                    child: Text(labelOf(item),
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.normal,
+                            color: active
+                                ? (dark ? Colors.white.withOpacity(.92) : kText)
+                                : kMuted)),
+                  ),
                 ),
-                child: Text(labelOf(item),
-                    maxLines: 1,
-                    overflow: TextOverflow.fade,
-                    softWrap: false,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.normal,
-                        color: active
-                            ? (dark ? Colors.white.withOpacity(.92) : kText)
-                            : kMuted)),
               ),
             );
           }).toList()),

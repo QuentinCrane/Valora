@@ -35,8 +35,7 @@ class ValoraRightSlideFadePageTransitionsBuilder
         // no center shrink, no clipping layer.
         final reduced = valoraMotionTier(context) == ValoraMotionTier.reduced;
         final dx = (reduced ? 54.0 : 86.0) * (1.0 - curve);
-        final opacity = ((reduced ? .44 : .28) +
-                (reduced ? .56 : .72) * curve)
+        final opacity = ((reduced ? .44 : .28) + (reduced ? .56 : .72) * curve)
             .clamp(0.0, 1.0)
             .toDouble();
         return Transform.translate(
@@ -467,48 +466,56 @@ class _GlassBackButtonState extends State<GlassBackButton> {
   @override
   Widget build(BuildContext context) {
     final dark = context.isDark;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => down = true),
-      onTapCancel: () => setState(() => down = false),
-      onTapUp: (_) => setState(() => down = false),
-      onTap: () {
-        lightHaptic();
-        widget.onTap();
-      },
-      child: AnimatedScale(
-        duration: valoraMotionDuration(context,
-            const Duration(milliseconds: 320),
-            reduced: const Duration(milliseconds: 180)),
-        curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
-        scale: down ? 1.065 : 1,
-        child: ValoraLiquidGlassSurface(
-          width: 88,
-          height: 44,
-          radius: 999,
-          distortion: .08,
-          distortionWidth: 24,
-          blurSigma: 1.2,
-          tintOpacity: dark ? .09 : .30,
-          padding: const EdgeInsets.symmetric(horizontal: 13),
-          child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.chevron_left_rounded,
-                    size: 24,
-                    color: dark
-                        ? Colors.white.withOpacity(.94)
-                        : kText.withOpacity(.88)),
-                const SizedBox(width: 2),
-                Text(tr('common.back'),
-                    style: TextStyle(
+    return Semantics(
+      button: true,
+      label: tr('common.back'),
+      onTap: widget.onTap,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => down = true),
+        onTapCancel: () => setState(() => down = false),
+        onTapUp: (_) => setState(() => down = false),
+        onTap: () {
+          lightHaptic();
+          widget.onTap();
+        },
+        child: AnimatedScale(
+          duration: valoraMotionDuration(
+              context, const Duration(milliseconds: 320),
+              reduced: const Duration(milliseconds: 180)),
+          curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
+          scale: down ? 1.065 : 1,
+          child: ValoraMinimumTouchTarget(
+            minWidth: 88,
+            child: ValoraLiquidGlassSurface(
+              width: 88,
+              height: 48,
+              radius: 999,
+              distortion: .08,
+              distortionWidth: 24,
+              blurSigma: 1.2,
+              tintOpacity: dark ? .09 : .30,
+              padding: const EdgeInsets.symmetric(horizontal: 13),
+              child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.chevron_left_rounded,
+                        size: 24,
                         color: dark
-                            ? Colors.white.withOpacity(.92)
-                            : kText.withOpacity(.88),
-                        fontWeight: FontWeight.normal,
-                        fontSize: 13)),
-              ]),
+                            ? Colors.white.withOpacity(.94)
+                            : kText.withOpacity(.88)),
+                    const SizedBox(width: 2),
+                    Text(tr('common.back'),
+                        style: TextStyle(
+                            color: dark
+                                ? Colors.white.withOpacity(.92)
+                                : kText.withOpacity(.88),
+                            fontWeight: FontWeight.normal,
+                            fontSize: 13)),
+                  ]),
+            ),
+          ),
         ),
       ),
     );
@@ -873,6 +880,7 @@ class ValoraGlassIconButton extends StatefulWidget {
   final VoidCallback onTap;
   final double size;
   final String? tooltip;
+  final String? semanticLabel;
   final Color? iconColor;
   const ValoraGlassIconButton(
       {super.key,
@@ -880,6 +888,7 @@ class ValoraGlassIconButton extends StatefulWidget {
       required this.onTap,
       this.size = 44,
       this.tooltip,
+      this.semanticLabel,
       this.iconColor});
 
   @override
@@ -891,41 +900,54 @@ class _ValoraGlassIconButtonState extends State<ValoraGlassIconButton> {
 
   @override
   Widget build(BuildContext context) {
-    final button = GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => down = true),
-      onTapCancel: () => setState(() => down = false),
-      onTapUp: (_) => setState(() => down = false),
-      onTap: () {
-        lightHaptic();
-        widget.onTap();
-      },
-      child: AnimatedScale(
-        duration: valoraMotionDuration(context,
-            const Duration(milliseconds: 300),
-            reduced: const Duration(milliseconds: 170)),
-        curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
-        scale: down ? 1.08 : 1,
-        child: ValoraLiquidGlassSurface(
-          width: widget.size,
-          height: widget.size,
-          radius: widget.size / 2,
-          circular: true,
-          distortion: .125,
-          distortionWidth: 26,
-          blurSigma: .55,
-          tintOpacity: context.isDark ? .12 : .24,
-          child: Icon(widget.icon,
-              size: widget.size * .50,
-              color: widget.iconColor ??
-                  (context.isDark
-                      ? Colors.white.withOpacity(.92)
-                      : kText.withOpacity(.90))),
+    final button = ValoraMinimumTouchTarget(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => down = true),
+        onTapCancel: () => setState(() => down = false),
+        onTapUp: (_) => setState(() => down = false),
+        onTap: () {
+          lightHaptic();
+          widget.onTap();
+        },
+        child: Center(
+          child: AnimatedScale(
+            duration: valoraMotionDuration(
+                context, const Duration(milliseconds: 300),
+                reduced: const Duration(milliseconds: 170)),
+            curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
+            scale: down ? 1.08 : 1,
+            child: ValoraLiquidGlassSurface(
+              width: widget.size,
+              height: widget.size,
+              radius: widget.size / 2,
+              circular: true,
+              distortion: .125,
+              distortionWidth: 26,
+              blurSigma: .55,
+              tintOpacity: context.isDark ? .12 : .24,
+              child: Icon(widget.icon,
+                  size: widget.size * .50,
+                  color: widget.iconColor ??
+                      (context.isDark
+                          ? Colors.white.withOpacity(.92)
+                          : kText.withOpacity(.90))),
+            ),
+          ),
         ),
       ),
     );
-    if (widget.tooltip == null) return button;
-    return Tooltip(message: widget.tooltip!, child: button);
+    final label = widget.semanticLabel ?? widget.tooltip;
+    final accessibleButton = label == null
+        ? button
+        : Semantics(
+            button: true,
+            label: label,
+            onTap: widget.onTap,
+            child: button,
+          );
+    if (widget.tooltip == null) return accessibleButton;
+    return Tooltip(message: widget.tooltip!, child: accessibleButton);
   }
 }
 
@@ -2203,30 +2225,41 @@ class IconSourceTabs extends StatelessWidget {
           children: List.generate(labels.length, (i) {
             final active = i == index;
             return Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  tapHaptic();
-                  onChanged(i);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  decoration: BoxDecoration(
-                      color: active
-                          ? (context.isDark
-                              ? Colors.white.withOpacity(.14)
-                              : Colors.white)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14)),
-                  child: Text(labels[i],
-                      maxLines: 1,
-                      style: TextStyle(
-                          fontWeight: FontWeight.normal,
-                          fontSize: 15,
+              child: Semantics(
+                button: true,
+                label: labels[i],
+                selected: active,
+                onTap: () => onChanged(i),
+                child: GestureDetector(
+                  onTap: () {
+                    tapHaptic();
+                    onChanged(i);
+                  },
+                  child: ValoraMinimumTouchTarget(
+                    minWidth: 0,
+                    child: AnimatedContainer(
+                      duration: valoraMotionDuration(
+                          context, const Duration(milliseconds: 180),
+                          reduced: const Duration(milliseconds: 110)),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
                           color: active
-                              ? (context.isDark ? Colors.white : kText)
-                              : kMuted)),
+                              ? (context.isDark
+                                  ? Colors.white.withOpacity(.14)
+                                  : Colors.white)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14)),
+                      child: Text(labels[i],
+                          maxLines: 1,
+                          style: TextStyle(
+                              fontWeight: FontWeight.normal,
+                              fontSize: 15,
+                              color: active
+                                  ? (context.isDark ? Colors.white : kText)
+                                  : kMuted)),
+                    ),
+                  ),
                 ),
               ),
             );
@@ -2366,36 +2399,47 @@ class _SmartImportChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(right: 8),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: () {
-            tapHaptic();
-            onTap();
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: context.isDark
-                  ? Colors.white.withOpacity(.07)
-                  : Colors.white.withOpacity(.86),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                  color: (context.isDark ? Colors.white : Colors.black)
-                      .withOpacity(.06)),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(context.isDark ? 0 : .04),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6))
-              ],
+        child: Semantics(
+          button: true,
+          label: label,
+          onTap: onTap,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () {
+              tapHaptic();
+              onTap();
+            },
+            child: ValoraMinimumTouchTarget(
+              minWidth: 0,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: context.isDark
+                      ? Colors.white.withOpacity(.07)
+                      : Colors.white.withOpacity(.86),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                      color: (context.isDark ? Colors.white : Colors.black)
+                          .withOpacity(.06)),
+                  boxShadow: [
+                    BoxShadow(
+                        color:
+                            Colors.black.withOpacity(context.isDark ? 0 : .04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6))
+                  ],
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(icon, size: 16),
+                  const SizedBox(width: 6),
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.normal))
+                ]),
+              ),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(icon, size: 16),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.normal))
-            ]),
           ),
         ),
       );
@@ -2418,29 +2462,40 @@ class ComposeSegmentedTabs extends StatelessWidget {
               : tr('compose.wish');
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: GestureDetector(
+            child: Semantics(
+              button: true,
+              label: label,
+              selected: active,
               onTap: () => onChanged(tab),
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                children: [
-                  AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      height: 10,
-                      width: active ? 54 : 0,
-                      decoration: BoxDecoration(
-                          color: kBrand.withOpacity(.95),
-                          borderRadius: BorderRadius.circular(999))),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(label,
-                        style: TextStyle(
-                            fontSize: 21,
-                            fontWeight: FontWeight.normal,
-                            color: active
-                                ? (context.isDark ? Colors.white : kText)
-                                : kMuted.withOpacity(.70))),
+              child: GestureDetector(
+                onTap: () => onChanged(tab),
+                child: ValoraMinimumTouchTarget(
+                  minWidth: 0,
+                  child: Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      AnimatedContainer(
+                          duration: valoraMotionDuration(
+                              context, const Duration(milliseconds: 180),
+                              reduced: const Duration(milliseconds: 110)),
+                          height: 10,
+                          width: active ? 54 : 0,
+                          decoration: BoxDecoration(
+                              color: kBrand.withOpacity(.95),
+                              borderRadius: BorderRadius.circular(999))),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(label,
+                            style: TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.normal,
+                                color: active
+                                    ? (context.isDark ? Colors.white : kText)
+                                    : kMuted.withOpacity(.70))),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           );
@@ -2914,8 +2969,8 @@ class _ValoraDatePickerSheetState extends State<_ValoraDatePickerSheet> {
             onNext: () => shiftMonth(1),
           ),
           AnimatedSwitcher(
-            duration: valoraMotionDuration(context,
-                const Duration(milliseconds: 220),
+            duration: valoraMotionDuration(
+                context, const Duration(milliseconds: 220),
                 reduced: const Duration(milliseconds: 130)),
             switchInCurve: Curves.easeOutCubic,
             switchOutCurve: Curves.easeInCubic,
@@ -3140,39 +3195,48 @@ class _DateDayCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = context.isDark;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(15),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected
-                ? kBrand
-                : today
-                    ? kBrand.withOpacity(dark ? .12 : .16)
-                    : Colors.transparent,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-                color: selected
-                    ? kBrandStrong
-                    : today
-                        ? kBrandStrong.withOpacity(.65)
-                        : Colors.transparent,
-                width: 1),
-          ),
-          child: Text(
-            '${date.day}',
-            style: TextStyle(
-              fontSize: 15,
+    return Semantics(
+      button: true,
+      container: true,
+      label: dateText(date),
+      selected: selected,
+      onTap: onTap,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(15),
+          child: AnimatedContainer(
+            duration: valoraMotionDuration(
+                context, const Duration(milliseconds: 150),
+                reduced: const Duration(milliseconds: 90)),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
               color: selected
-                  ? kBrandInk
-                  : dark
-                      ? Colors.white.withOpacity(.90)
-                      : kText,
-              fontWeight: FontWeight.normal,
+                  ? kBrand
+                  : today
+                      ? kBrand.withOpacity(dark ? .12 : .16)
+                      : Colors.transparent,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                  color: selected
+                      ? kBrandStrong
+                      : today
+                          ? kBrandStrong.withOpacity(.65)
+                          : Colors.transparent,
+                  width: 1),
+            ),
+            child: Text(
+              '${date.day}',
+              style: TextStyle(
+                fontSize: 15,
+                color: selected
+                    ? kBrandInk
+                    : dark
+                        ? Colors.white.withOpacity(.90)
+                        : kText,
+                fontWeight: FontWeight.normal,
+              ),
             ),
           ),
         ),
@@ -3232,8 +3296,8 @@ class _ValoraGlassSaveContentState extends State<ValoraGlassSaveContent> {
       },
       onTap: widget.onPressed,
       child: AnimatedScale(
-        duration: valoraMotionDuration(context,
-            const Duration(milliseconds: 320),
+        duration: valoraMotionDuration(
+            context, const Duration(milliseconds: 320),
             reduced: const Duration(milliseconds: 180)),
         curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
         scale: down ? 1.055 : 1,
@@ -3292,8 +3356,8 @@ class _LiquidSaveButtonState extends State<LiquidSaveButton> {
       onTapUp: (_) => setState(() => down = false),
       onTap: widget.onPressed,
       child: AnimatedScale(
-        duration: valoraMotionDuration(context,
-            const Duration(milliseconds: 320),
+        duration: valoraMotionDuration(
+            context, const Duration(milliseconds: 320),
             reduced: const Duration(milliseconds: 180)),
         curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
         scale: down ? 1.055 : 1,

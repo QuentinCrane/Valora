@@ -80,15 +80,18 @@ void main() {
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Align(
-            alignment: Alignment.topRight,
-            child: MiniChoiceBar<AppLanguageSetting>(
-              value: AppLanguageSetting.zhHans,
-              values: AppLanguageSetting.values,
-              labelOf: (value) => value.label,
-              onChanged: (_) {},
+      AppScope(
+        store: AppStore(),
+        child: MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topRight,
+              child: MiniChoiceBar<AppLanguageSetting>(
+                value: AppLanguageSetting.zhHans,
+                values: AppLanguageSetting.values,
+                labelOf: (value) => value.label,
+                onChanged: (_) {},
+              ),
             ),
           ),
         ),

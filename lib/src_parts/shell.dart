@@ -607,8 +607,9 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     final safe = media.padding;
     final screen = media.size;
     final dark = context.isDark;
-    final dockWidth =
-        math.min(screen.width - 158, 404.0).clamp(238.0, 404.0).toDouble();
+    final dockWidth = valoraIsCompact(context)
+        ? (screen.width - 112).clamp(208.0, 278.0).toDouble()
+        : math.min(screen.width - 158, 404.0).clamp(238.0, 404.0).toDouble();
     final dockHeight = 76.0;
     final dockMagicScale = _dockMagicActive ? 1.135 : 1.0;
     final dockGlassWidth = dockWidth * dockMagicScale;
@@ -785,55 +786,65 @@ class PersistenceStatusBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final failed = state.isFailed;
     final scheme = Theme.of(context).colorScheme;
-    return Material(
-      elevation: 4,
-      color: failed ? scheme.errorContainer : scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(kRadiusMd),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-        child: Row(
-          children: [
-            failed
-                ? Icon(Icons.warning_amber_rounded,
-                    color: scheme.onErrorContainer)
-                : SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: scheme.primary,
+    final message =
+        tr(failed ? 'store.persistence.failed' : 'store.persistence.saving');
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: message,
+      child: Material(
+        elevation: 4,
+        color: failed ? scheme.errorContainer : scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(kRadiusMd),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          child: Row(
+            children: [
+              failed
+                  ? Icon(Icons.warning_amber_rounded,
+                      color: scheme.onErrorContainer)
+                  : SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.primary,
+                      ),
                     ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: failed ? scheme.onErrorContainer : scheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
                   ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                tr(failed
-                    ? 'store.persistence.failed'
-                    : 'store.persistence.saving'),
-                style: TextStyle(
-                  color: failed ? scheme.onErrorContainer : scheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
                 ),
               ),
-            ),
-            if (failed)
-              TextButton(
-                onPressed: () async {
-                  try {
-                    await store.retryPersistence();
-                    if (!context.mounted) return;
-                    showNativeSnack(context, tr('store.persistence.retryDone'));
-                  } catch (_) {
-                    if (!context.mounted) return;
-                    showNativeSnack(
-                        context, tr('store.persistence.retryFailed'));
-                  }
-                },
-                child: Text(tr('store.persistence.retry')),
-              ),
-          ],
+              if (failed)
+                Semantics(
+                  button: true,
+                  label: tr('store.persistence.retry'),
+                  child: TextButton(
+                    onPressed: () async {
+                      try {
+                        await store.retryPersistence();
+                        if (!context.mounted) return;
+                        showNativeSnack(
+                            context, tr('store.persistence.retryDone'));
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        showNativeSnack(
+                            context, tr('store.persistence.retryFailed'));
+                      }
+                    },
+                    child: Text(tr('store.persistence.retry')),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -1025,7 +1036,7 @@ class _LiquidDockState extends State<LiquidDock> {
               builder: (context, c) {
                 final w = c.maxWidth;
                 final itemW = w / 4;
-                final thumbW = math.max(itemW - 6, 52).toDouble();
+                final thumbW = math.max(itemW - 6, 48).toDouble();
                 final thumbLeft = (_fingerDown || _dragging)
                     ? (_fingerX - thumbW / 2)
                         .clamp(5.0, math.max(5.0, w - thumbW - 5))
@@ -1083,63 +1094,80 @@ class _LiquidDockState extends State<LiquidDock> {
                               : widget.index;
                           final active = i == visualIndex;
                           final scale = _macScaleFor(i, itemW);
+                          void selectItem() {
+                            tapHaptic();
+                            widget.onChanged(i);
+                          }
+
                           return Expanded(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                tapHaptic();
-                                widget.onChanged(i);
-                              },
-                              child: AnimatedScale(
-                                duration: (_fingerDown || _dragging)
-                                    ? valoraMotionDuration(context,
-                                        const Duration(milliseconds: 90),
+                            child: Semantics(
+                              button: true,
+                              container: true,
+                              label: items[i].label,
+                              selected: active,
+                              onTap: selectItem,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: selectItem,
+                                child: AnimatedScale(
+                                  duration: (_fingerDown || _dragging)
+                                      ? valoraMotionDuration(context,
+                                          const Duration(milliseconds: 90),
+                                          reduced:
+                                              const Duration(milliseconds: 60))
+                                      : valoraMotionDuration(context,
+                                          const Duration(milliseconds: 330),
+                                          reduced: const Duration(
+                                              milliseconds: 190)),
+                                  curve: (_fingerDown || _dragging)
+                                      ? Curves.easeOutCubic
+                                      : Curves.easeOutBack,
+                                  scale: scale,
+                                  child: AnimatedContainer(
+                                    duration: valoraMotionDuration(context,
+                                        const Duration(milliseconds: 260),
                                         reduced:
-                                            const Duration(milliseconds: 60))
-                                    : valoraMotionDuration(context,
-                                        const Duration(milliseconds: 330),
-                                        reduced:
-                                            const Duration(milliseconds: 190)),
-                                curve: (_fingerDown || _dragging)
-                                    ? Curves.easeOutCubic
-                                    : Curves.easeOutBack,
-                                scale: scale,
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 260),
-                                  curve: Curves.easeOutCubic,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        items[i].icon,
-                                        size: active ? 24 : 22,
-                                        color: active
-                                            ? (context.isDark
-                                                ? Colors.white.withOpacity(.95)
-                                                : kText.withOpacity(.94))
-                                            : kMuted.withOpacity(
-                                                context.isDark ? .62 : .56),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      AnimatedContainer(
-                                        duration:
-                                            const Duration(milliseconds: 240),
-                                        width: active ? 18 : 4,
-                                        height: active ? 3 : 2,
-                                        decoration: BoxDecoration(
+                                            const Duration(milliseconds: 150)),
+                                    curve: Curves.easeOutCubic,
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          items[i].icon,
+                                          size: active ? 24 : 22,
                                           color: active
                                               ? (context.isDark
                                                   ? Colors.white
-                                                      .withOpacity(.82)
-                                                  : kText.withOpacity(.70))
-                                              : Colors.transparent,
-                                          borderRadius:
-                                              BorderRadius.circular(999),
+                                                      .withOpacity(.95)
+                                                  : kText.withOpacity(.94))
+                                              : kMuted.withOpacity(
+                                                  context.isDark ? .62 : .56),
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 3),
+                                        AnimatedContainer(
+                                          duration: valoraMotionDuration(
+                                              context,
+                                              const Duration(milliseconds: 240),
+                                              reduced: const Duration(
+                                                  milliseconds: 140)),
+                                          width: active ? 18 : 4,
+                                          height: active ? 3 : 2,
+                                          decoration: BoxDecoration(
+                                            color: active
+                                                ? (context.isDark
+                                                    ? Colors.white
+                                                        .withOpacity(.82)
+                                                    : kText.withOpacity(.70))
+                                                : Colors.transparent,
+                                            borderRadius:
+                                                BorderRadius.circular(999),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1456,36 +1484,41 @@ class _GlassAddButtonState extends State<GlassAddButton> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) {
-        setState(() => down = true);
-        widget.onPressChanged?.call(true);
-      },
-      onTapCancel: () {
-        setState(() => down = false);
-        widget.onPressChanged?.call(false);
-      },
-      onTapUp: (_) {
-        setState(() => down = false);
-        widget.onPressChanged?.call(false);
-      },
+    return Semantics(
+      button: true,
+      label: tr('common.add'),
       onTap: widget.onTap,
-      child: AnimatedScale(
-        duration: valoraMotionDuration(
-            context, Duration(milliseconds: down ? 260 : 340),
-            reduced: Duration(milliseconds: down ? 150 : 200)),
-        curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
-        scale: down ? 1.075 : 1,
-        child: SizedBox(
-          width: 58,
-          height: 58,
-          child: Center(
-            child: Icon(Icons.add_rounded,
-                size: 34,
-                color: context.isDark
-                    ? Colors.white.withOpacity(.94)
-                    : kText.withOpacity(.92)),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) {
+          setState(() => down = true);
+          widget.onPressChanged?.call(true);
+        },
+        onTapCancel: () {
+          setState(() => down = false);
+          widget.onPressChanged?.call(false);
+        },
+        onTapUp: (_) {
+          setState(() => down = false);
+          widget.onPressChanged?.call(false);
+        },
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          duration: valoraMotionDuration(
+              context, Duration(milliseconds: down ? 260 : 340),
+              reduced: Duration(milliseconds: down ? 150 : 200)),
+          curve: down ? Curves.easeOutBack : Curves.easeOutCubic,
+          scale: down ? 1.075 : 1,
+          child: SizedBox(
+            width: 58,
+            height: 58,
+            child: Center(
+              child: Icon(Icons.add_rounded,
+                  size: 34,
+                  color: context.isDark
+                      ? Colors.white.withOpacity(.94)
+                      : kText.withOpacity(.92)),
+            ),
           ),
         ),
       ),
@@ -1510,7 +1543,9 @@ class PageFrame extends StatelessWidget {
       physics:
           const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       padding: padding ?? const EdgeInsets.fromLTRB(14, 16, 14, 116),
-      children: children,
+      children: children
+          .map((child) => ValoraAdaptiveContent(child: child))
+          .toList(growable: false),
     );
   }
 }
@@ -1540,7 +1575,9 @@ class SliverPageFrame extends StatelessWidget {
           padding: contentPadding,
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
-              (context, index) => sections[index](context),
+              (context, index) => ValoraAdaptiveContent(
+                child: sections[index](context),
+              ),
               childCount: sections.length,
               addAutomaticKeepAlives: false,
             ),

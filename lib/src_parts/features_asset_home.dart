@@ -1153,27 +1153,41 @@ class FilterPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: () {
-          tapHaptic();
-          onTap();
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: active ? kBrand : (context.isDark ? kSoftDark : kSoft),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: active
-                  ? (context.isDark ? kBrandInk : kBrandInk)
-                  : (context.isDark ? Colors.white.withOpacity(.86) : kText),
-              fontWeight: FontWeight.normal,
-              fontSize: 13,
+      child: Semantics(
+        button: true,
+        label: label,
+        selected: active,
+        onTap: onTap,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () {
+            tapHaptic();
+            onTap();
+          },
+          child: ValoraMinimumTouchTarget(
+            minWidth: 0,
+            child: AnimatedContainer(
+              duration: valoraMotionDuration(
+                  context, const Duration(milliseconds: 160),
+                  reduced: const Duration(milliseconds: 100)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active ? kBrand : (context.isDark ? kSoftDark : kSoft),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: active
+                      ? (context.isDark ? kBrandInk : kBrandInk)
+                      : (context.isDark
+                          ? Colors.white.withOpacity(.86)
+                          : kText),
+                  fontWeight: FontWeight.normal,
+                  fontSize: 13,
+                ),
+              ),
             ),
           ),
         ),
@@ -1531,7 +1545,8 @@ class AppCard extends StatelessWidget {
     );
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 320),
+      duration: valoraMotionDuration(context, const Duration(milliseconds: 320),
+          reduced: const Duration(milliseconds: 180)),
       curve: Curves.easeOutCubic,
       child: card,
       builder: (context, t, content) => Opacity(
