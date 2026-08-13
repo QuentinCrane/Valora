@@ -76,6 +76,15 @@ extension NativeBridgeErrorCodeX on NativeBridgeErrorCode {
       case 'barcode_scan_error':
       case 'ocr_error':
       case 'cutout_error':
+      case 'archive_export_error':
+      case 'archive_import_error':
+      case 'archive_commit_failed':
+      case 'archive_discard_failed':
+      case 'archive_rollback_failed':
+      case 'archive_finalize_failed':
+      case 'persist_image_error':
+      case 'text_import_failed':
+      case 'text_export_failed':
       case 'processing_failed':
         return NativeBridgeErrorCode.processingFailed;
       case 'native_result_error':
@@ -123,6 +132,49 @@ class NativeBridgeError {
   const NativeBridgeError(this.code, {this.safeDetail});
 }
 
+class NativeOperationProgress {
+  final String operationId;
+  final String operation;
+  final String status;
+  final int processed;
+  final int total;
+  final String? message;
+
+  const NativeOperationProgress({
+    required this.operationId,
+    required this.operation,
+    required this.status,
+    required this.processed,
+    required this.total,
+    this.message,
+  });
+
+  factory NativeOperationProgress.fromWire(Object? raw) {
+    final map = raw is Map ? Map<Object?, Object?>.from(raw) : const {};
+    int integer(Object? value, [int fallback = 0]) {
+      if (value is int) return value;
+      return int.tryParse(value?.toString() ?? '') ?? fallback;
+    }
+
+    return NativeOperationProgress(
+      operationId: map['operationId']?.toString() ?? '',
+      operation: map['operation']?.toString() ?? 'native',
+      status: map['status']?.toString() ?? 'running',
+      processed: integer(map['processed']),
+      total: integer(map['total'], -1),
+      message: map['message']?.toString(),
+    );
+  }
+
+  bool get isTerminal =>
+      status == 'completed' || status == 'failed' || status == 'cancelled';
+
+  double? get fraction {
+    if (total <= 0) return null;
+    return (processed / total).clamp(0, 1).toDouble();
+  }
+}
+
 class NativeBridgeResult<T> {
   final NativeBridgeStatus status;
   final T? value;
@@ -153,6 +205,7 @@ class NativeBridgeResult<T> {
 class NativeBridge {
   static const MethodChannel _channel = MethodChannel('valora/native');
   static const Duration _callTimeout = Duration(seconds: 30);
+  static const Duration _backgroundCallTimeout = Duration(minutes: 5);
 
   static Future<NativeBridgeResult<T>> _callResult<T>(
     String method, {
@@ -268,26 +321,29 @@ class NativeBridge {
       });
 
   static Future<NativeBridgeResult<String>> capturePhotoResult() =>
-      _callResult<String>('capturePhoto', nullMeansCancellation: true);
+      _callResult<String>('capturePhoto',
+          nullMeansCancellation: true, timeout: _backgroundCallTimeout);
 
   static Future<String?> capturePhoto() async =>
       (await capturePhotoResult()).value;
 
   static Future<NativeBridgeResult<String>> scanBarcodeFromImageResult() =>
-      _callResult<String>('scanBarcodeFromImage', nullMeansCancellation: true);
+      _callResult<String>('scanBarcodeFromImage',
+          nullMeansCancellation: true, timeout: _backgroundCallTimeout);
 
   static Future<String?> scanBarcodeFromImage() async =>
       (await scanBarcodeFromImageResult()).value;
 
   static Future<NativeBridgeResult<String>> recognizeReceiptFromImageResult() =>
       _callResult<String>('recognizeReceiptFromImage',
-          nullMeansCancellation: true);
+          nullMeansCancellation: true, timeout: _backgroundCallTimeout);
 
   static Future<String?> recognizeReceiptFromImage() async =>
       (await recognizeReceiptFromImageResult()).value;
 
   static Future<NativeBridgeResult<String>> cutoutImageFromPickerResult() =>
-      _callResult<String>('cutoutImageFromPicker', nullMeansCancellation: true);
+      _callResult<String>('cutoutImageFromPicker',
+          nullMeansCancellation: true, timeout: _backgroundCallTimeout);
 
   static Future<String?> cutoutImageFromPicker() async =>
       (await cutoutImageFromPickerResult()).value;
@@ -295,7 +351,7 @@ class NativeBridge {
   static Future<NativeBridgeResult<Map<String, dynamic>>>
       cutoutImageFromPickerDetailedResult() async {
     final result = await _callResult<String>('cutoutImageFromPickerDetailed',
-        nullMeansCancellation: true);
+        nullMeansCancellation: true, timeout: _backgroundCallTimeout);
     return _decodeJsonMapResult(result);
   }
 
@@ -328,7 +384,9 @@ class NativeBridge {
 
   static Future<NativeBridgeResult<String>> persistImageUriResult(String uri) =>
       _callResult<String>('persistImageUri',
-          args: {'uri': uri}, nullMeansCancellation: true);
+          args: {'uri': uri},
+          nullMeansCancellation: true,
+          timeout: _backgroundCallTimeout);
 
   static Future<String?> persistImageUri(String uri) async =>
       (await persistImageUriResult(uri)).value;
@@ -349,7 +407,9 @@ class NativeBridge {
   static Future<NativeBridgeResult<String>> importTextFileResult(
           {String mimeType = '*/*'}) =>
       _callResult<String>('importTextFile',
-          args: {'mimeType': mimeType}, nullMeansCancellation: true);
+          args: {'mimeType': mimeType},
+          nullMeansCancellation: true,
+          timeout: _backgroundCallTimeout);
 
   static Future<String?> importTextFile({String mimeType = '*/*'}) async =>
       (await importTextFileResult(mimeType: mimeType)).value;
@@ -364,7 +424,8 @@ class NativeBridge {
             'mimeType': mimeType,
             'text': text,
           },
-          nullMeansCancellation: true);
+          nullMeansCancellation: true,
+          timeout: _backgroundCallTimeout);
 
   static Future<String?> exportTextFile(
           {required String fileName,
@@ -395,14 +456,16 @@ class NativeBridge {
     required List<String> mediaPaths,
     required String fileName,
   }) {
-    return _callResult<Object>('shareDataArchive', args: {
-      'title': title,
-      'json': json,
-      'csv': csv,
-      'markdown': markdown,
-      'mediaPaths': mediaPaths,
-      'fileName': fileName,
-    });
+    return _callResult<Object>('shareDataArchive',
+        args: {
+          'title': title,
+          'json': json,
+          'csv': csv,
+          'markdown': markdown,
+          'mediaPaths': mediaPaths,
+          'fileName': fileName,
+        },
+        timeout: _backgroundCallTimeout);
   }
 
   static Future<void> shareDataArchive({
@@ -426,7 +489,7 @@ class NativeBridge {
   static Future<NativeBridgeResult<Map<String, dynamic>>>
       importDataArchiveResult() async =>
           _decodeJsonMapResult(await _callResult<String>('importDataArchive',
-              nullMeansCancellation: true));
+              nullMeansCancellation: true, timeout: _backgroundCallTimeout));
 
   static Future<Map<String, dynamic>> importDataArchive() async =>
       (await importDataArchiveResult()).value ?? <String, dynamic>{};
@@ -434,7 +497,7 @@ class NativeBridge {
   static Future<NativeBridgeResult<Map<String, dynamic>>>
       commitDataArchiveResult(String stagingId) async =>
           _decodeJsonMapResult(await _callResult<String>('commitDataArchive',
-              args: {'stagingId': stagingId}));
+              args: {'stagingId': stagingId}, timeout: _backgroundCallTimeout));
 
   static Future<Map<String, dynamic>> commitDataArchive(
           String stagingId) async =>
@@ -443,7 +506,7 @@ class NativeBridge {
   static Future<NativeBridgeResult<Map<String, dynamic>>>
       discardDataArchiveResult(String stagingId) async =>
           _decodeJsonMapResult(await _callResult<String>('discardDataArchive',
-              args: {'stagingId': stagingId}));
+              args: {'stagingId': stagingId}, timeout: _backgroundCallTimeout));
 
   static Future<Map<String, dynamic>> discardDataArchive(
           String stagingId) async =>
@@ -452,7 +515,7 @@ class NativeBridge {
   static Future<NativeBridgeResult<Map<String, dynamic>>>
       rollbackDataArchiveResult(String stagingId) async =>
           _decodeJsonMapResult(await _callResult<String>('rollbackDataArchive',
-              args: {'stagingId': stagingId}));
+              args: {'stagingId': stagingId}, timeout: _backgroundCallTimeout));
 
   static Future<Map<String, dynamic>> rollbackDataArchive(
           String stagingId) async =>
@@ -461,7 +524,7 @@ class NativeBridge {
   static Future<NativeBridgeResult<Map<String, dynamic>>>
       finalizeDataArchiveResult(String stagingId) async =>
           _decodeJsonMapResult(await _callResult<String>('finalizeDataArchive',
-              args: {'stagingId': stagingId}));
+              args: {'stagingId': stagingId}, timeout: _backgroundCallTimeout));
 
   static Future<Map<String, dynamic>> finalizeDataArchive(
           String stagingId) async =>
@@ -470,7 +533,9 @@ class NativeBridge {
   static Future<NativeBridgeResult<String>> readPrivateTextFileResult(
           String path) =>
       _callResult<String>('readPrivateTextFile',
-          args: {'path': path}, nullMeansCancellation: true);
+          args: {'path': path},
+          nullMeansCancellation: true,
+          timeout: _backgroundCallTimeout);
 
   static Future<String?> readPrivateTextFile(String path) async =>
       (await readPrivateTextFileResult(path)).value;
@@ -590,13 +655,28 @@ class NativeBridge {
   static Future<String?> getInitialIntentInfo() async =>
       (await getInitialIntentInfoResult()).value;
 
-  static void listenIncomingIntents(ValueChanged<String> onInfo) {
+  static void listenIncomingIntents(
+    ValueChanged<String> onInfo, {
+    ValueChanged<NativeOperationProgress>? onProgress,
+  }) {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'incomingShareChanged') {
         onInfo(call.arguments?.toString() ?? '');
+      } else if (call.method == 'nativeOperationProgress' &&
+          onProgress != null) {
+        onProgress(NativeOperationProgress.fromWire(call.arguments));
       }
     });
   }
+
+  static Future<NativeBridgeResult<bool>> cancelNativeOperationResult(
+          String operationId) =>
+      _callResult<bool>('cancelNativeOperation', args: {
+        'operationId': operationId,
+      });
+
+  static Future<bool> cancelNativeOperation(String operationId) async =>
+      (await cancelNativeOperationResult(operationId)).value ?? false;
 
   static Future<NativeBridgeResult<bool>>
       requestNotificationPermissionResult() =>

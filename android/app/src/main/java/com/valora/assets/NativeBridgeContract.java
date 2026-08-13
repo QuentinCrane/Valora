@@ -107,6 +107,15 @@ public final class NativeBridgeContract {
             case "barcode_scan_error":
             case "ocr_error":
             case "cutout_error":
+            case "archive_export_error":
+            case "archive_import_error":
+            case "archive_commit_failed":
+            case "archive_discard_failed":
+            case "archive_rollback_failed":
+            case "archive_finalize_failed":
+            case "persist_image_error":
+            case "text_import_failed":
+            case "text_export_failed":
                 return "processing_failed";
             default:
                 return code.isEmpty() ? "unknown" : code;

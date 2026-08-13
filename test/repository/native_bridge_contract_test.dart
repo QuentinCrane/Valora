@@ -140,4 +140,72 @@ void main() {
     expect(receivedArgs?['targets'], containsAll(<String>['total', 'mini']));
     expect(receivedArgs?['targets'], hasLength(2));
   });
+
+  test('decodes background native progress without requiring a known total',
+      () {
+    final progress = NativeOperationProgress.fromWire({
+      'operationId': 'archive_import_1',
+      'operation': 'archive_import',
+      'status': 'running',
+      'processed': 4,
+      'total': -1,
+      'message': 'archive media',
+    });
+
+    expect(progress.operationId, 'archive_import_1');
+    expect(progress.operation, 'archive_import');
+    expect(progress.processed, 4);
+    expect(progress.total, -1);
+    expect(progress.fraction, isNull);
+    expect(progress.isTerminal, isFalse);
+  });
+
+  test('routes native progress events through the shared channel handler',
+      () async {
+    NativeOperationProgress? received;
+    NativeBridge.listenIncomingIntents((_) {}, onProgress: (value) {
+      received = value;
+    });
+
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+      channel.name,
+      const StandardMethodCodec().encodeMethodCall(MethodCall(
+        'nativeOperationProgress',
+        <String, Object>{
+          'operationId': 'archive_export_1',
+          'operation': 'archive_export',
+          'status': 'completed',
+          'processed': 1,
+          'total': 1,
+        },
+      )),
+      (_) {},
+    );
+
+    expect(received?.operationId, 'archive_export_1');
+    expect(received?.isTerminal, isTrue);
+    expect(received?.fraction, 1);
+  });
+
+  test('exposes cancellation through the native operation contract', () async {
+    Map<Object?, Object?>? receivedArgs;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'cancelNativeOperation');
+      receivedArgs = Map<Object?, Object?>.from(call.arguments as Map);
+      return {
+        'protocolVersion': 1,
+        'status': 'success',
+        'data': true,
+      };
+    });
+
+    final result =
+        await NativeBridge.cancelNativeOperationResult('archive_import_1');
+
+    expect(result.isSuccess, isTrue);
+    expect(result.value, isTrue);
+    expect(receivedArgs?['operationId'], 'archive_import_1');
+  });
 }

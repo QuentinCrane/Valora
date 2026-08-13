@@ -67,6 +67,8 @@ import com.google.mlkit.vision.barcode.BarcodeScanning;
 
 import com.google.mlkit.vision.barcode.BarcodeScanner;
 
+import com.google.android.gms.tasks.Tasks;
+
 import java.util.regex.Pattern;
 
 import java.util.regex.Matcher;
@@ -112,6 +114,17 @@ import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CountDownLatch;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipInputStream;
@@ -189,8 +202,38 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     private String pendingSaveText;
     private String pendingSaveMimeType;
     private String lastIntentInfo = "";
-    private String storageMigrationErrorCode;
-    private String storageMigrationErrorMessage;
+    private volatile String storageMigrationErrorCode;
+    private volatile String storageMigrationErrorMessage;
+
+    // SQLite writes stay on one queue so Flutter's save and validation revisions
+    // cannot overtake one another. Archive/media work uses a separate pool so a
+    // large file never blocks the database queue or the Android main thread.
+    private final ExecutorService databaseExecutor = Executors.newSingleThreadExecutor(
+            namedThreadFactory("valora-db"));
+    private final ExecutorService backgroundExecutor = Executors.newFixedThreadPool(
+            2, namedThreadFactory("valora-worker"));
+    private final ConcurrentMap<String, Future<?>> runningOperations = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, AtomicBoolean> operationCompletions = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, MethodChannel.Result> operationResults = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, String> operationNames = new ConcurrentHashMap<>();
+    private final ThreadLocal<String> activeOperationId = new ThreadLocal<>();
+    private final ThreadLocal<String> activeOperationName = new ThreadLocal<>();
+
+    private interface BackgroundWork {
+        Object run() throws Exception;
+    }
+
+    private interface BackgroundSuccess {
+        void accept(Object value);
+    }
+
+    private static ThreadFactory namedThreadFactory(final String prefix) {
+        return runnable -> {
+            Thread thread = new Thread(runnable, prefix + "-" + UUID.randomUUID());
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
 
     private final LifecycleRegistry lifecycleRegistry = new LifecycleRegistry(this);
     private final ActivityResultRegistry activityResultRegistry = new ActivityResultRegistry() {
@@ -268,8 +311,141 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
 
     @Override
     protected void onDestroy() {
+        for (Map.Entry<String, Future<?>> entry : runningOperations.entrySet()) {
+            final String operationId = entry.getKey();
+            final AtomicBoolean completion = operationCompletions.get(operationId);
+            if (completion != null && completion.compareAndSet(false, true)) {
+                entry.getValue().cancel(true);
+                final MethodChannel.Result result = operationResults.get(operationId);
+                if (result != null) result.error("cancelled", "Native operation cancelled", null);
+            }
+        }
+        runningOperations.clear();
+        operationCompletions.clear();
+        operationResults.clear();
+        operationNames.clear();
+        nativeChannel = null;
+        databaseExecutor.shutdownNow();
+        backgroundExecutor.shutdownNow();
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY);
         super.onDestroy();
+    }
+
+    private void postToMain(Runnable callback) {
+        if (callback == null) return;
+        runOnUiThread(callback);
+    }
+
+    private void emitNativeProgress(final String operationId,
+                                    final String operation,
+                                    final String status,
+                                    final long processed,
+                                    final long total,
+                                    final String message) {
+        if (nativeChannel == null || operationId == null) return;
+        final Map<String, Object> payload = new HashMap<>();
+        payload.put("operationId", operationId);
+        payload.put("operation", operation == null ? "native" : operation);
+        payload.put("status", status == null ? "running" : status);
+        payload.put("processed", processed);
+        payload.put("total", total);
+        if (message != null && !message.trim().isEmpty()) payload.put("message", message);
+        postToMain(() -> {
+            if (nativeChannel == null) return;
+            try {
+                nativeChannel.invokeMethod("nativeOperationProgress", payload);
+            } catch (Exception ignored) {
+                // Progress is advisory. The MethodChannel result remains authoritative.
+            }
+        });
+    }
+
+    private void reportProgress(long processed, long total, String message) {
+        final String operationId = activeOperationId.get();
+        if (operationId == null) return;
+        emitNativeProgress(operationId, activeOperationName.get(), "running", processed, total, message);
+    }
+
+    private void submitBackground(final String operation,
+                                  final ExecutorService executor,
+                                  final BackgroundWork work,
+                                  final MethodChannel.Result result) {
+        submitBackground(operation, executor, work, result, operation + "_failed", null);
+    }
+
+    private void submitBackground(final String operation,
+                                  final ExecutorService executor,
+                                  final BackgroundWork work,
+                                  final MethodChannel.Result result,
+                                  final String failureCode,
+                                  final BackgroundSuccess success) {
+        final String operationId = (operation == null || operation.trim().isEmpty()
+                ? "native" : operation) + "_" + UUID.randomUUID().toString().replace("-", "");
+        operationCompletions.put(operationId, new AtomicBoolean(false));
+        operationResults.put(operationId, result);
+        operationNames.put(operationId, operation);
+        final FutureTask<Void> task = new FutureTask<>(() -> {
+            activeOperationId.set(operationId);
+            activeOperationName.set(operation);
+            emitNativeProgress(operationId, operation, "started", 0, -1, null);
+            try {
+                final Object value = work.run();
+                postToMain(() -> {
+                    if (!claimOperationCompletion(operationId)) return;
+                    removeOperation(operationId);
+                    emitNativeProgress(operationId, operation, "completed", 1, 1, null);
+                    if (success == null) result.success(value); else success.accept(value);
+                });
+            } catch (Exception error) {
+                final boolean cancelled = Thread.currentThread().isInterrupted()
+                        || isCancellationFailure(error);
+                final String code = cancelled ? "cancelled" : failureCode;
+                final String message = cancelled
+                        ? "Native operation cancelled"
+                        : (error.getMessage() == null ? "Native operation failed" : error.getMessage());
+                postToMain(() -> {
+                    if (!claimOperationCompletion(operationId)) return;
+                    removeOperation(operationId);
+                    emitNativeProgress(operationId, operation, cancelled ? "cancelled" : "failed", 0, -1, null);
+                    result.error(code, message, null);
+                });
+            } finally {
+                activeOperationId.remove();
+                activeOperationName.remove();
+            }
+            return null;
+        });
+        runningOperations.put(operationId, task);
+        try {
+            executor.execute(task);
+        } catch (RuntimeException error) {
+            postToMain(() -> {
+                if (!claimOperationCompletion(operationId)) return;
+                removeOperation(operationId);
+                result.error(failureCode, "Native executor is unavailable", null);
+            });
+        }
+    }
+
+    private boolean isCancellationFailure(Exception error) {
+        return error instanceof InterruptedException
+                || (error.getMessage() != null && "Operation cancelled".equals(error.getMessage()));
+    }
+
+    private void throwIfInterrupted() throws IOException {
+        if (Thread.currentThread().isInterrupted()) throw new IOException("Operation cancelled");
+    }
+
+    private boolean claimOperationCompletion(String operationId) {
+        final AtomicBoolean completion = operationCompletions.get(operationId);
+        return completion != null && completion.compareAndSet(false, true);
+    }
+
+    private void removeOperation(String operationId) {
+        runningOperations.remove(operationId);
+        operationCompletions.remove(operationId);
+        operationResults.remove(operationId);
+        operationNames.remove(operationId);
     }
 
     @Override
@@ -325,65 +501,49 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
         super.configureFlutterEngine(flutterEngine);
         storeDb = new LocalStoreDb(this);
-        migrateSharedPreferencesToSqlite();
+        databaseExecutor.execute(this::migrateSharedPreferencesToSqlite);
 
         new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), STORE_CHANNEL)
                 .setMethodCallHandler((call, result) -> {
                     if ("loadJson".equals(call.method)) {
-                        try {
+                        submitBackground("database_load", databaseExecutor, () -> {
+                            if (storageMigrationErrorCode != null) migrateSharedPreferencesToSqlite();
                             if (storageMigrationErrorCode != null) {
-                                migrateSharedPreferencesToSqlite();
+                                throw new IOException(storageMigrationErrorMessage == null
+                                        ? "Storage migration failed" : storageMigrationErrorMessage);
                             }
-                            if (storageMigrationErrorCode != null) {
-                                result.error(storageMigrationErrorCode, storageMigrationErrorMessage, null);
-                                return;
-                            }
-                            result.success(storeDb.loadResult());
-                        } catch (Exception e) {
-                            result.error("storage_read_failed", e.getMessage(), null);
-                        }
+                            return storeDb.loadResult();
+                        }, result, "storage_read_failed", null);
                     } else if ("saveJson".equals(call.method)) {
-                        try {
+                        submitBackground("database_save", databaseExecutor, () -> {
                             String json = call.argument("json");
-                            result.success(storeDb.saveJson(json == null ? "" : json));
-                        } catch (Exception e) {
-                            result.error("storage_write_failed", e.getMessage(), null);
-                        }
+                            return storeDb.saveJson(json == null ? "" : json);
+                        }, result, "storage_write_failed", null);
                     } else if ("markValidated".equals(call.method)) {
-                        try {
+                        submitBackground("database_validate", databaseExecutor, () -> {
                             String json = call.argument("json");
-                            result.success(storeDb.markValidated(json == null ? "" : json));
-                        } catch (Exception e) {
-                            result.error("storage_snapshot_failed", e.getMessage(), null);
-                        }
+                            return storeDb.markValidated(json == null ? "" : json);
+                        }, result, "storage_snapshot_failed", null);
                     } else if ("loadCredentials".equals(call.method)) {
-                        try {
-                            result.success(loadSecureCredentials());
-                        } catch (Exception e) {
-                            result.error("credentials_read_failed", e.getMessage(), null);
-                        }
+                        submitBackground("credentials_load", databaseExecutor,
+                                () -> loadSecureCredentials(), result,
+                                "credentials_read_failed", null);
                     } else if ("saveCredentials".equals(call.method)) {
-                        try {
+                        submitBackground("credentials_save", databaseExecutor, () -> {
                             String username = call.argument("username");
                             String password = call.argument("password");
-                            result.success(saveSecureCredentials(
+                            return saveSecureCredentials(
                                     username == null ? "" : username,
-                                    password == null ? "" : password));
-                        } catch (Exception e) {
-                            result.error("credentials_write_failed", e.getMessage(), null);
-                        }
+                                    password == null ? "" : password);
+                        }, result, "credentials_write_failed", null);
                     } else if ("clearCredentials".equals(call.method)) {
-                        try {
-                            result.success(clearSecureCredentials());
-                        } catch (Exception e) {
-                            result.error("credentials_clear_failed", e.getMessage(), null);
-                        }
+                        submitBackground("credentials_clear", databaseExecutor,
+                                () -> clearSecureCredentials(), result,
+                                "credentials_clear_failed", null);
                     } else if ("clearJson".equals(call.method)) {
-                        try {
-                            result.success(storeDb.clearJson());
-                        } catch (Exception e) {
-                            result.error("storage_clear_failed", e.getMessage(), null);
-                        }
+                        submitBackground("database_clear", databaseExecutor,
+                                () -> storeDb.clearJson(), result,
+                                "storage_clear_failed", null);
                     } else {
                         result.notImplemented();
                     }
@@ -435,11 +595,9 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
                     result.success(getSubjectSegmentationStatusJson());
                     break;
                 case "persistImageUri":
-                    try {
-                        result.success(persistImageUri(arg(call.argument("uri"), "")));
-                    } catch (Exception e) {
-                        result.error("persist_image_error", e.getMessage(), null);
-                    }
+                    submitBackground("image_persist", backgroundExecutor,
+                            () -> persistImageUri(arg(call.argument("uri"), "")), result,
+                            "persist_image_error", null);
                     break;
                 case "importTextFile":
                     Intent open = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -461,8 +619,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
                     result.success(true);
                     break;
                 case "shareDataArchive":
-                    shareDataArchive(call.arguments);
-                    result.success(true);
+                    shareDataArchive(call.arguments, result);
                     break;
                 case "importDataArchive":
                     Intent openArchive = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -475,19 +632,43 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
                     startSingleResult(result, REQ_OPEN_ARCHIVE, openArchive);
                     break;
                 case "commitDataArchive":
-                    result.success(commitDataArchive(arg(call.argument("stagingId"), "")));
+                    submitBackground("archive_commit", backgroundExecutor,
+                            () -> commitDataArchive(arg(call.argument("stagingId"), "")), result);
                     break;
                 case "discardDataArchive":
-                    result.success(discardDataArchive(arg(call.argument("stagingId"), "")));
+                    submitBackground("archive_discard", backgroundExecutor,
+                            () -> discardDataArchive(arg(call.argument("stagingId"), "")), result);
                     break;
                 case "rollbackDataArchive":
-                    result.success(rollbackDataArchive(arg(call.argument("stagingId"), "")));
+                    submitBackground("archive_rollback", backgroundExecutor,
+                            () -> rollbackDataArchive(arg(call.argument("stagingId"), "")), result);
                     break;
                 case "finalizeDataArchive":
-                    result.success(finalizeDataArchive(arg(call.argument("stagingId"), "")));
+                    submitBackground("archive_finalize", backgroundExecutor,
+                            () -> finalizeDataArchive(arg(call.argument("stagingId"), "")), result);
                     break;
                 case "readPrivateTextFile":
-                    result.success(readPrivateTextFile(arg(call.argument("path"), "")));
+                    submitBackground("private_file_read", backgroundExecutor,
+                            () -> readPrivateTextFile(arg(call.argument("path"), "")), result);
+                    break;
+                case "cancelNativeOperation":
+                    String operationId = arg(call.argument("operationId"), "");
+                    Future<?> operation = runningOperations.get(operationId);
+                    AtomicBoolean completion = operationCompletions.get(operationId);
+                    boolean cancelled = operation != null
+                            && completion != null
+                            && completion.compareAndSet(false, true);
+                    if (cancelled) {
+                        operation.cancel(true);
+                        MethodChannel.Result operationResult = operationResults.get(operationId);
+                        String operationName = operationNames.get(operationId);
+                        removeOperation(operationId);
+                        emitNativeProgress(operationId, operationName, "cancelled", 0, -1, null);
+                        if (operationResult != null) {
+                            operationResult.error("cancelled", "Native operation cancelled", null);
+                        }
+                    }
+                    result.success(cancelled);
                     break;
                 case "readClipboard":
                     result.success(readClipboardText());
@@ -967,12 +1148,17 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             if (uri == null) {
                 result.error("invalid_format", "Image picker returned no URI", null);
             } else {
-                result.success(persistImageFromUri(uri));
+                submitBackground("image_persist", backgroundExecutor,
+                        () -> persistImageFromUri(uri), result,
+                        "persist_image_error", null);
             }
         } else if (requestCode == REQ_CAPTURE_PHOTO) {
-            String persisted = saveCameraCapture();
-            clearPendingOperation();
-            result.success(persisted);
+            final String capturePath = pendingCapturePath;
+            final String captureUri = pendingCaptureUri;
+            clearPendingOperation(false);
+            submitBackground("camera_persist", backgroundExecutor,
+                    () -> saveCameraCapture(capturePath, captureUri), result,
+                    "persist_image_error", null);
         } else if (requestCode == REQ_SCAN_BARCODE
                 || requestCode == REQ_OCR_IMAGE
                 || requestCode == REQ_CUTOUT_IMAGE
@@ -983,22 +1169,18 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
                 result.error("invalid_format", "Image operation returned no URI", null);
                 return;
             }
-            String persisted = persistImageFromUri(uri);
             clearPendingOperation();
-            Uri privateUri = Uri.parse(persisted);
-            if (requestCode == REQ_SCAN_BARCODE) {
-                scanBarcodeFromUri(privateUri, result);
-            } else if (requestCode == REQ_OCR_IMAGE) {
-                recognizeReceiptFromUri(privateUri, result);
-            } else if (requestCode == REQ_CUTOUT_IMAGE) {
-                cutoutImageFromUri(privateUri, result);
-            } else {
-                cutoutImageFromUriDetailed(privateUri, result);
-            }
+            persistAndProcessImage(uri, requestCode, result);
         } else if (requestCode == REQ_OPEN_TEXT) {
             Uri uri = data == null ? null : data.getData();
             clearPendingOperation();
-            result.success(uri == null ? null : readTextFromUri(uri));
+            if (uri == null) {
+                result.success(null);
+            } else {
+                submitBackground("text_import", backgroundExecutor,
+                        () -> readTextFromUri(uri), result,
+                        "text_import_failed", null);
+            }
         } else if (requestCode == REQ_OPEN_ARCHIVE) {
             Uri uri = data == null ? null : data.getData();
             if (uri == null) {
@@ -1014,13 +1196,43 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             }
         } else if (requestCode == REQ_CREATE_TEXT) {
             Uri uri = data == null ? null : data.getData();
-            if (uri != null) writeTextToUri(uri, pendingSaveText == null ? "" : pendingSaveText);
+            final String text = pendingSaveText == null ? "" : pendingSaveText;
             clearPendingOperation();
-            result.success(uri == null ? null : uri.toString());
+            if (uri == null) {
+                result.success(null);
+            } else {
+                submitBackground("text_export", backgroundExecutor, () -> {
+                    writeTextToUri(uri, text);
+                    return uri.toString();
+                }, result, "text_export_failed", null);
+            }
         } else {
             clearPendingOperation();
             result.success(null);
         }
+    }
+
+    private void persistAndProcessImage(final Uri uri,
+                                        final int requestCode,
+                                        final MethodChannel.Result result) {
+        submitBackground("image_persist", backgroundExecutor,
+                () -> persistImageFromUri(uri), result,
+                "persist_image_error", value -> {
+                    if (!(value instanceof String) || ((String) value).trim().isEmpty()) {
+                        result.error("persist_image_error", "Image could not be persisted", null);
+                        return;
+                    }
+                    final Uri privateUri = Uri.parse((String) value);
+                    if (requestCode == REQ_SCAN_BARCODE) {
+                        scanBarcodeFromUri(privateUri, result);
+                    } else if (requestCode == REQ_OCR_IMAGE) {
+                        recognizeReceiptFromUri(privateUri, result);
+                    } else if (requestCode == REQ_CUTOUT_IMAGE) {
+                        cutoutImageFromUri(privateUri, result);
+                    } else {
+                        cutoutImageFromUriDetailed(privateUri, result);
+                    }
+                });
     }
 
     @Override
@@ -1058,6 +1270,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             byte[] buf = new byte[8192];
             int n;
             while ((n = source.read(buf)) >= 0) {
+                throwIfInterrupted();
                 if (n == 0) continue;
                 total += n;
                 if (total > MAX_MEDIA_BYTES) throw new IOException("Image exceeds the allowed size");
@@ -1076,14 +1289,22 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     }
 
     private String saveCameraCapture() throws Exception {
-        if (pendingCaptureUri == null || pendingCaptureUri.trim().isEmpty()) {
+        return saveCameraCapture(pendingCapturePath, pendingCaptureUri);
+    }
+
+    private String saveCameraCapture(String capturePath, String captureUri) throws Exception {
+        if (captureUri == null || captureUri.trim().isEmpty()) {
             throw new IOException("Camera output URI is missing");
         }
-        File capture = pendingCapturePath == null ? null : new File(pendingCapturePath);
+        File capture = capturePath == null ? null : new File(capturePath);
         if (capture == null || !capture.exists() || capture.length() <= 0) {
             throw new IOException("Camera returned no full-resolution output");
         }
-        return persistImageFromUri(Uri.parse(pendingCaptureUri));
+        try {
+            return persistImageFromUri(Uri.parse(captureUri));
+        } finally {
+            if (capture.exists()) capture.delete();
+        }
     }
 
     private void restoreMediaOperation(Bundle savedInstanceState) {
@@ -1114,7 +1335,11 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     }
 
     private void clearPendingOperation() {
-        if (pendingCapturePath != null && pendingCapturePath.trim().length() > 0) {
+        clearPendingOperation(true);
+    }
+
+    private void clearPendingOperation(boolean deleteCapture) {
+        if (deleteCapture && pendingCapturePath != null && pendingCapturePath.trim().length() > 0) {
             File capture = new File(pendingCapturePath);
             if (capture.exists()) capture.delete();
         }
@@ -1286,151 +1511,120 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     }
 
     private void cutoutImageInternal(Uri uri, boolean detailed, MethodChannel.Result result) {
-        try {
-            StickerEngineConfig config = readStickerEngineConfig();
-            Bitmap source = decodeScaledBitmap(uri, config.decodeMaxSide);
-            if (source == null) {
-                String persisted = persistImageFromUri(uri);
-                if (detailed) {
-                    result.success("{\"selectedUri\":\"" + escape(persisted)
-                            + "\",\"modelStatus\":\""
-                            + escape(getSubjectSegmentationModelStatus())
-                            + "\",\"candidates\":[]}");
-                } else {
-                    result.success(persisted);
-                }
-                return;
+        submitBackground("sticker_cutout", backgroundExecutor,
+                () -> processStickerCutout(uri, detailed), result,
+                "cutout_error", null);
+    }
+
+    private String processStickerCutout(Uri uri, boolean detailed) throws Exception {
+        StickerEngineConfig config = readStickerEngineConfig();
+        Bitmap source = decodeScaledBitmap(uri, config.decodeMaxSide);
+        if (source == null) {
+            String persisted = persistImageFromUri(uri);
+            if (detailed) {
+                return "{\"selectedUri\":\"" + escape(persisted)
+                        + "\",\"modelStatus\":\""
+                        + escape(getSubjectSegmentationModelStatus())
+                        + "\",\"candidates\":[]}";
             }
-            generateStickerCandidates(source, config, candidates -> {
-                try {
-                    if (candidates == null || candidates.isEmpty()) {
-                        Bitmap fallback = createEdgeAwareStickerCutout(source);
-                        String path = saveStickerPng(fallback, "cutout_");
-                        if (detailed) {
-                            StickerCandidate only = new StickerCandidate();
-                            only.uri = path;
-                            only.label = getString(R.string.sticker_label_fallback);
-                            only.engine = "Heuristic";
-                            only.score = 0.42;
-                            only.width = fallback.getWidth();
-                            only.height = fallback.getHeight();
-                            List<StickerCandidate> list = new ArrayList<>();
-                            list.add(only);
-                            result.success(buildStickerJson(path, list));
-                        } else {
-                            result.success(path);
-                        }
-                        if (fallback != source) fallback.recycle();
-                        return;
-                    }
-                    Collections.sort(candidates, (a, b) -> Double.compare(b.score, a.score));
-                    String best = candidates.get(0).uri;
-                    if (detailed) result.success(buildStickerJson(best, candidates)); else result.success(best);
-                } catch (Exception e) {
-                    result.error("cutout_error", e.getMessage(), null);
-                } finally {
-                    source.recycle();
-                }
-            }, error -> {
-                try {
-                    Bitmap fallback = createEdgeAwareStickerCutout(source);
-                    String path = saveStickerPng(fallback, "cutout_");
-                    if (detailed) {
-                        StickerCandidate only = new StickerCandidate();
-                        only.uri = path;
-                        only.label = getString(R.string.sticker_label_fallback);
-                        only.engine = "Heuristic";
-                        only.score = 0.42;
-                        only.width = fallback.getWidth();
-                        only.height = fallback.getHeight();
-                        List<StickerCandidate> list = new ArrayList<>();
-                        list.add(only);
-                        result.success(buildStickerJson(path, list));
-                    } else {
-                        result.success(path);
-                    }
+            return persisted;
+        }
+        try {
+            List<StickerCandidate> candidates = generateStickerCandidatesBlocking(source, config);
+            if (candidates == null || candidates.isEmpty()) {
+                Bitmap fallback = createEdgeAwareStickerCutout(source);
+                String path = saveStickerPng(fallback, "cutout_");
+                if (detailed) {
+                    StickerCandidate only = new StickerCandidate();
+                    only.uri = path;
+                    only.label = getString(R.string.sticker_label_fallback);
+                    only.engine = "Heuristic";
+                    only.score = 0.42;
+                    only.width = fallback.getWidth();
+                    only.height = fallback.getHeight();
+                    List<StickerCandidate> list = new ArrayList<>();
+                    list.add(only);
                     if (fallback != source) fallback.recycle();
-                    source.recycle();
-                } catch (Exception e) {
-                    result.error("cutout_error", e.getMessage() == null ? error.getMessage() : e.getMessage(), null);
+                    return buildStickerJson(path, list);
                 }
-            });
-        } catch (Exception e) {
-            result.error("cutout_error", e.getMessage(), null);
+                if (fallback != source) fallback.recycle();
+                return path;
+            }
+            Collections.sort(candidates, (a, b) -> Double.compare(b.score, a.score));
+            String best = candidates.get(0).uri;
+            return detailed ? buildStickerJson(best, candidates) : best;
+        } finally {
+            source.recycle();
         }
     }
 
-    private interface CandidateSuccess { void accept(List<StickerCandidate> candidates); }
-    private interface CandidateFailure { void accept(Exception e); }
-
-    private void generateStickerCandidates(Bitmap source, StickerEngineConfig config, CandidateSuccess success, CandidateFailure failure) {
+    private List<StickerCandidate> generateStickerCandidatesBlocking(
+            Bitmap source, StickerEngineConfig config) throws Exception {
         final List<StickerCandidate> candidates = new ArrayList<>();
         try {
             // 預留本機 TFLite 模型入口；若未來模型檔案存在，可在這裡接入。
             candidates.addAll(generateOptionalLocalModelCandidates(source, config));
         } catch (Exception ignored) {}
 
+        SubjectSegmenter segmenter = null;
         try {
             SubjectSegmenterOptions options = new SubjectSegmenterOptions.Builder()
                     .enableForegroundBitmap()
                     .enableForegroundConfidenceMask()
                     .build();
-            SubjectSegmenter segmenter = SubjectSegmentation.getClient(options);
-            InputImage image = InputImage.fromBitmap(source, 0);
+            segmenter = SubjectSegmentation.getClient(options);
+            final SubjectSegmenter currentSegmenter = segmenter;
+            final InputImage image = InputImage.fromBitmap(source, 0);
+            final AtomicReference<Bitmap> foreground = new AtomicReference<>();
+            final AtomicReference<FloatBuffer> confidenceMask = new AtomicReference<>();
+            final AtomicReference<Exception> segmentationError = new AtomicReference<>();
+            final CountDownLatch completion = new CountDownLatch(1);
             setSubjectSegmentationStatus(SEGMENTATION_STATUS_DOWNLOADING, "initializing");
-            segmenter.getInitTask()
+            currentSegmenter.getInitTask()
                     .addOnSuccessListener(ignored -> {
                         setSubjectSegmentationStatus(SEGMENTATION_STATUS_READY, "ready");
-                        segmenter.process(image)
-                    .addOnSuccessListener(segmentation -> {
-                        try {
-                            setSubjectSegmentationStatus(SEGMENTATION_STATUS_READY, "ready");
-                            candidates.addAll(generateMlKitCandidates(source, segmentation.getForegroundBitmap(), segmentation.getForegroundConfidenceMask(), config));
-                            if (candidates.isEmpty()) {
-                                candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
-                            } else {
-                                candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_extra_fallback), "Heuristic"));
-                            }
-                            success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
-                        } catch (Exception e) {
-                            setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, e.getClass().getSimpleName());
-                            failure.accept(e);
-                        } finally {
-                            segmenter.close();
-                        }
+                        currentSegmenter.process(image)
+                                .addOnSuccessListener(segmentation -> {
+                                    foreground.set(segmentation.getForegroundBitmap());
+                                    confidenceMask.set(segmentation.getForegroundConfidenceMask());
+                                    completion.countDown();
+                                })
+                                .addOnFailureListener(error -> {
+                                    segmentationError.set(error);
+                                    completion.countDown();
+                                });
                     })
                     .addOnFailureListener(e -> {
-                        setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, e.getClass().getSimpleName());
-                        try {
-                            candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
-                            success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
-                        } catch (Exception inner) {
-                            failure.accept(inner);
-                        } finally {
-                            segmenter.close();
-                        }
+                        segmentationError.set(e);
+                        completion.countDown();
                     });
-                    })
-                    .addOnFailureListener(e -> {
-                        setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, e.getClass().getSimpleName());
-                        try {
-                            candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
-                            success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
-                        } catch (Exception inner) {
-                            failure.accept(inner);
-                        } finally {
-                            segmenter.close();
-                        }
-                    });
-        } catch (Throwable mlInitError) {
-            setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, mlInitError.getClass().getSimpleName());
-            try {
-                candidates.add(generateHeuristicCandidate(source, getString(R.string.sticker_label_fallback), "Heuristic"));
-                success.accept(deduplicateStickerCandidates(candidates, config.maxCandidates));
-            } catch (Exception e) {
-                failure.accept(e);
+            if (!completion.await(4, TimeUnit.MINUTES)) {
+                throw new IOException("Subject segmentation timed out");
             }
+            if (segmentationError.get() != null) {
+                setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE,
+                        segmentationError.get().getClass().getSimpleName());
+            } else {
+                candidates.addAll(generateMlKitCandidates(
+                        source, foreground.get(), confidenceMask.get(), config));
+            }
+        } catch (Throwable mlInitError) {
+            if (mlInitError instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+                throw (InterruptedException) mlInitError;
+            }
+            setSubjectSegmentationStatus(SEGMENTATION_STATUS_UNAVAILABLE, mlInitError.getClass().getSimpleName());
+        } finally {
+            if (segmenter != null) segmenter.close();
         }
+        if (candidates.isEmpty()) {
+            candidates.add(generateHeuristicCandidate(source,
+                    getString(R.string.sticker_label_fallback), "Heuristic"));
+        } else {
+            candidates.add(generateHeuristicCandidate(source,
+                    getString(R.string.sticker_label_extra_fallback), "Heuristic"));
+        }
+        return deduplicateStickerCandidates(candidates, config.maxCandidates);
     }
 
     private List<StickerCandidate> generateOptionalLocalModelCandidates(Bitmap source, StickerEngineConfig config) {
@@ -2098,54 +2292,59 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     }
 
     private void scanBarcodeFromUri(Uri uri, MethodChannel.Result result) {
+        submitBackground("barcode_scan", backgroundExecutor,
+                () -> scanBarcodeBlocking(uri), result,
+                "barcode_scan_error", null);
+    }
+
+    private String scanBarcodeBlocking(Uri uri) throws Exception {
+        BarcodeScanner scanner = null;
         try {
             InputImage image = InputImage.fromFilePath(this, uri);
-            BarcodeScanner scanner = BarcodeScanning.getClient();
-            scanner.process(image)
-                    .addOnSuccessListener(barcodes -> {
-                        if (barcodes == null || barcodes.isEmpty()) {
-                            result.success("{\"found\":false,\"rawValue\":\"\",\"displayValue\":\"\",\"format\":\"\"}");
-                            return;
-                        }
-                        Barcode b = barcodes.get(0);
-                        String raw = b.getRawValue() == null ? "" : b.getRawValue();
-                        String display = b.getDisplayValue() == null ? raw : b.getDisplayValue();
-                        result.success("{"
-                                + "\"found\":true,"
-                                + "\"rawValue\":\"" + escape(raw) + "\","
-                                + "\"displayValue\":\"" + escape(display) + "\","
-                                + "\"format\":\"" + escape(String.valueOf(b.getFormat())) + "\""
-                                + "}");
-                    })
-                    .addOnFailureListener(e -> result.error("barcode_scan_error", e.getMessage(), null))
-                    .addOnCompleteListener(task -> scanner.close());
-        } catch (Exception e) {
-            result.error("barcode_scan_error", e.getMessage(), null);
+            scanner = BarcodeScanning.getClient();
+            List<Barcode> barcodes = Tasks.await(scanner.process(image), 4, TimeUnit.MINUTES);
+            if (barcodes == null || barcodes.isEmpty()) {
+                return "{\"found\":false,\"rawValue\":\"\",\"displayValue\":\"\",\"format\":\"\"}";
+            }
+            Barcode b = barcodes.get(0);
+            String raw = b.getRawValue() == null ? "" : b.getRawValue();
+            String display = b.getDisplayValue() == null ? raw : b.getDisplayValue();
+            return "{"
+                    + "\"found\":true,"
+                    + "\"rawValue\":\"" + escape(raw) + "\","
+                    + "\"displayValue\":\"" + escape(display) + "\","
+                    + "\"format\":\"" + escape(String.valueOf(b.getFormat())) + "\""
+                    + "}";
+        } finally {
+            if (scanner != null) scanner.close();
         }
     }
 
     private void recognizeReceiptFromUri(Uri uri, MethodChannel.Result result) {
+        submitBackground("receipt_ocr", backgroundExecutor,
+                () -> recognizeReceiptBlocking(uri), result,
+                "ocr_error", null);
+    }
+
+    private String recognizeReceiptBlocking(Uri uri) throws Exception {
+        TextRecognizer recognizer = null;
         try {
             InputImage image = InputImage.fromFilePath(this, uri);
-            TextRecognizer recognizer = TextRecognition.getClient(new ChineseTextRecognizerOptions.Builder().build());
-            recognizer.process(image)
-                    .addOnSuccessListener(text -> {
-                        String fullText = text == null ? "" : text.getText();
-                        String price = guessReceiptPrice(fullText);
-                        String date = guessReceiptDate(fullText);
-                        String title = guessReceiptTitle(fullText);
-                        result.success("{"
-                                + "\"found\":" + (!fullText.trim().isEmpty()) + ","
-                                + "\"fullText\":\"" + escape(fullText) + "\","
-                                + "\"priceCandidate\":\"" + escape(price) + "\","
-                                + "\"dateCandidate\":\"" + escape(date) + "\","
-                                + "\"nameCandidate\":\"" + escape(title) + "\""
-                                + "}");
-                    })
-                    .addOnFailureListener(e -> result.error("ocr_error", e.getMessage(), null))
-                    .addOnCompleteListener(task -> recognizer.close());
-        } catch (Exception e) {
-            result.error("ocr_error", e.getMessage(), null);
+            recognizer = TextRecognition.getClient(new ChineseTextRecognizerOptions.Builder().build());
+            Text text = Tasks.await(recognizer.process(image), 4, TimeUnit.MINUTES);
+            String fullText = text == null ? "" : text.getText();
+            String price = guessReceiptPrice(fullText);
+            String date = guessReceiptDate(fullText);
+            String title = guessReceiptTitle(fullText);
+            return "{"
+                    + "\"found\":" + (!fullText.trim().isEmpty()) + ","
+                    + "\"fullText\":\"" + escape(fullText) + "\","
+                    + "\"priceCandidate\":\"" + escape(price) + "\","
+                    + "\"dateCandidate\":\"" + escape(date) + "\","
+                    + "\"nameCandidate\":\"" + escape(title) + "\""
+                    + "}";
+        } finally {
+            if (recognizer != null) recognizer.close();
         }
     }
 
@@ -2221,69 +2420,105 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     private String readTextFromUri(Uri uri) throws Exception {
         InputStream in = getContentResolver().openInputStream(uri);
         if (in == null) return "";
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buf = new byte[8192];
-        int n;
-        while ((n = in.read(buf)) >= 0) out.write(buf, 0, n);
-        in.close();
-        return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        try (InputStream source = in) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = source.read(buf)) >= 0) {
+                throwIfInterrupted();
+                if (n > 0) out.write(buf, 0, n);
+            }
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        }
     }
 
     private void writeTextToUri(Uri uri, String text) throws Exception {
+        throwIfInterrupted();
         OutputStream out = getContentResolver().openOutputStream(uri);
         if (out == null) return;
-        out.write(text.getBytes(StandardCharsets.UTF_8));
-        out.flush();
-        out.close();
+        try (OutputStream target = out) {
+            target.write(text.getBytes(StandardCharsets.UTF_8));
+            target.flush();
+        }
+    }
+
+    private static final class ArchiveSharePayload {
+        File file;
+        String title;
+        String markdown;
     }
 
     @SuppressWarnings("unchecked")
-    private void shareDataArchive(Object arguments) {
+    private void shareDataArchive(Object arguments, MethodChannel.Result result) {
         Map<String, Object> args = arguments instanceof Map ? (Map<String, Object>) arguments : new HashMap<>();
-        String title = arg(args.get("title"), getString(R.string.archive_share_title));
-        String rawJson = arg(args.get("json"), "{}");
-        String csv = arg(args.get("csv"), "");
-        String markdown = arg(args.get("markdown"), "");
-        String fileName = sanitizeArchiveFileName(arg(args.get("fileName"), "zhipu_complete_backup.zip"));
+        final String title = arg(args.get("title"), getString(R.string.archive_share_title));
+        final String rawJson = arg(args.get("json"), "{}");
+        final String csv = arg(args.get("csv"), "");
+        final String markdown = arg(args.get("markdown"), "");
+        final String fileName = sanitizeArchiveFileName(arg(args.get("fileName"), "zhipu_complete_backup.zip"));
         Object rawPaths = args.get("mediaPaths");
-        List<String> mediaPaths = new ArrayList<>();
+        final List<String> mediaPaths = new ArrayList<>();
         if (rawPaths instanceof List) {
             for (Object item : (List<?>) rawPaths) {
                 if (item != null && item.toString().trim().length() > 0) mediaPaths.add(item.toString());
             }
         }
-        try {
+        submitBackground("archive_export", backgroundExecutor, () -> {
             String json = redactCredentialFields(rawJson);
             if (storeDb != null && json.trim().length() > 0) {
-                storeDb.saveJson(json);
-                storeDb.markValidated(json);
+                // Keep the export snapshot ordered after any pending Flutter write.
+                databaseExecutor.submit(() -> {
+                    storeDb.saveJson(json);
+                    storeDb.markValidated(json);
+                    return true;
+                }).get(4, TimeUnit.MINUTES);
             }
             File shareDir = new File(getCacheDir(), "share");
-            if (!shareDir.exists()) shareDir.mkdirs();
+            if (!shareDir.exists() && !shareDir.mkdirs()) {
+                throw new IOException("Could not create archive share directory");
+            }
             File zip = new File(shareDir, fileName.endsWith(".zip") ? fileName : fileName + ".zip");
-            ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zip));
-            addTextEntry(zos, "backup/valora_backup.json", json);
-            // 相容中文品牌名「值譜」以及歷史 zhipu 備份命名：新包同時寫入兩份同內容 JSON。
-            addTextEntry(zos, "backup/zhipu_backup.json", json);
-            addTextEntry(zos, "backup/valora_assets.csv", csv);
-            addTextEntry(zos, "backup/zhipu_assets.csv", csv);
-            addTextEntry(zos, "backup/valora_report.md", markdown);
-            addTextEntry(zos, "backup/zhipu_report.md", markdown);
-            addTextEntry(zos, "README.txt", getString(R.string.archive_readme));
-            addSqliteFiles(zos, json);
-            String mediaManifest = addMediaFiles(zos, mediaPaths);
-            addTextEntry(zos, "backup/media_manifest.tsv", mediaManifest);
-            zos.close();
-            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", zip);
-            Intent send = new Intent(Intent.ACTION_SEND);
-            send.setType("application/zip");
-            send.putExtra(Intent.EXTRA_SUBJECT, title);
-            send.putExtra(Intent.EXTRA_STREAM, uri);
-            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(send, title));
-        } catch (Exception e) {
-            shareText(title, getString(R.string.archive_share_failed, e.getMessage()) + "\n\n" + markdown);
-        }
+            try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zip))) {
+                addTextEntry(zos, "backup/valora_backup.json", json);
+                // 相容中文品牌名「值譜」以及歷史 zhipu 備份命名：新包同時寫入兩份同內容 JSON。
+                addTextEntry(zos, "backup/zhipu_backup.json", json);
+                addTextEntry(zos, "backup/valora_assets.csv", csv);
+                addTextEntry(zos, "backup/zhipu_assets.csv", csv);
+                addTextEntry(zos, "backup/valora_report.md", markdown);
+                addTextEntry(zos, "backup/zhipu_report.md", markdown);
+                addTextEntry(zos, "README.txt", getString(R.string.archive_readme));
+                addSqliteFiles(zos, json);
+                String mediaManifest = addMediaFiles(zos, mediaPaths);
+                addTextEntry(zos, "backup/media_manifest.tsv", mediaManifest);
+            }
+            ArchiveSharePayload payload = new ArchiveSharePayload();
+            payload.file = zip;
+            payload.title = title;
+            payload.markdown = markdown;
+            return payload;
+        }, result, "archive_export_error", value -> {
+            ArchiveSharePayload payload = (ArchiveSharePayload) value;
+            try {
+                Uri uri = FileProvider.getUriForFile(
+                        this, getPackageName() + ".fileprovider", payload.file);
+                Intent send = new Intent(Intent.ACTION_SEND);
+                send.setType("application/zip");
+                send.putExtra(Intent.EXTRA_SUBJECT, payload.title);
+                send.putExtra(Intent.EXTRA_STREAM, uri);
+                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(send, payload.title));
+                result.success(true);
+            } catch (Exception error) {
+                try {
+                    shareText(payload.title,
+                            getString(R.string.archive_share_failed, error.getMessage())
+                                    + "\n\n" + payload.markdown);
+                    result.success(true);
+                } catch (Exception shareError) {
+                    result.error("archive_export_error", shareError.getMessage(), null);
+                }
+            }
+        });
     }
 
     private String redactCredentialFields(String json) {
@@ -2347,6 +2582,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     }
 
     private void addTextEntry(ZipOutputStream zos, String name, String text) throws Exception {
+        throwIfInterrupted();
         ZipEntry entry = new ZipEntry(name);
         zos.putNextEntry(entry);
         byte[] bytes = (text == null ? "" : text).getBytes(StandardCharsets.UTF_8);
@@ -2357,12 +2593,16 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     private void addFileEntry(ZipOutputStream zos, File file, String entryName) throws Exception {
         if (file == null || !file.exists() || !file.isFile()) return;
         zos.putNextEntry(new ZipEntry(entryName));
-        FileInputStream in = new FileInputStream(file);
-        byte[] buf = new byte[8192];
-        int n;
-        while ((n = in.read(buf)) >= 0) zos.write(buf, 0, n);
-        in.close();
-        zos.closeEntry();
+        try (FileInputStream in = new FileInputStream(file)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) >= 0) {
+                throwIfInterrupted();
+                if (n > 0) zos.write(buf, 0, n);
+            }
+        } finally {
+            zos.closeEntry();
+        }
     }
 
     private void addSqliteFiles(ZipOutputStream zos, String redactedJson) throws Exception {
@@ -2393,6 +2633,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
         manifest.append("entry\toriginalPath\toriginalUri\toriginalName\n");
         int index = 1;
         for (String raw : mediaPaths) {
+            throwIfInterrupted();
             String originalUri = raw == null ? "" : raw.trim();
             String path = originalUri;
             if (path.startsWith("file://")) path = Uri.parse(path).getPath();
@@ -2409,6 +2650,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
                     .append(escapeTsv(path)).append('\t')
                     .append(escapeTsv(originalUri)).append('\t')
                     .append(escapeTsv(originalName)).append('\n');
+            reportProgress(index, mediaPaths.size(), "archive media");
             index++;
         }
         return manifest.toString();
@@ -2550,6 +2792,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
         int count;
         budget.beginEntry();
         while ((count = input.read(buffer)) >= 0) {
+            throwIfInterrupted();
             if (count == 0) continue;
             budget.consume(count);
             output.write(buffer, 0, count);
@@ -2563,6 +2806,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             final byte[] buffer = new byte[8192];
             int count;
             while ((count = input.read(buffer)) >= 0) {
+                throwIfInterrupted();
                 if (count > 0) digest.update(buffer, 0, count);
             }
         } finally {
@@ -2646,13 +2890,19 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
     }
 
     private void restoreDataArchiveFromUri(Uri uri, MethodChannel.Result result) {
+        submitBackground("archive_import", backgroundExecutor,
+                () -> restoreDataArchiveFromUriBlocking(uri), result,
+                "archive_import_error", null);
+    }
+
+    private String restoreDataArchiveFromUriBlocking(Uri uri) {
         ZipInputStream zis = null;
         File stageDir = null;
         try {
             final InputStream raw = getContentResolver().openInputStream(uri);
             if (raw == null) {
-                result.success("{\"ok\":false,\"message\":\"" + escape(getString(R.string.archive_restore_read_failed)) + "\"}");
-                return;
+                return "{\"ok\":false,\"message\":\""
+                        + escape(getString(R.string.archive_restore_read_failed)) + "\"}";
             }
             final File stageRoot = archiveStageRoot();
             if (!stageRoot.exists() && !stageRoot.mkdirs()) throw new IOException("Could not create archive staging root");
@@ -2675,6 +2925,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             int totalEntries = 0;
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
+                throwIfInterrupted();
                 if (++totalEntries > ARCHIVE_MAX_ENTRIES) throw new IOException("Archive has too many entries");
                 final String entryName = normalizeArchiveEntryName(entry.getName());
                 if (entry.isDirectory()) {
@@ -2707,6 +2958,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
                     mediaHashes.put(stagedName, sha256File(stagedFile));
                     mediaOriginalNames.put(stagedName, safeOriginalName);
                     mediaCount++;
+                    reportProgress(mediaCount, -1, "archive media");
                 } else if (lower.startsWith("sqlite/") || lower.contains("/sqlite/")) {
                     sqliteCount++;
                     readZipEntry(zis, budget);
@@ -2748,10 +3000,13 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             response.append(",\"jsonPath\":\"").append(escape(jsonPath)).append("\"");
             if (rewrittenJson.length() < 256000) response.append(",\"json\":\"").append(escape(rewrittenJson)).append("\"");
             response.append("}");
-            result.success(response.toString());
+            return response.toString();
         } catch (Exception e) {
             if (stageDir != null) deleteRecursively(stageDir);
-            result.success("{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}");
+            if (Thread.currentThread().isInterrupted() || isCancellationFailure(e)) {
+                throw new RuntimeException("Operation cancelled", e);
+            }
+            return "{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}";
         } finally {
             if (zis != null) {
                 try { zis.close(); } catch (Exception ignored) {}
@@ -2776,6 +3031,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             int index = 0;
             if (media != null) {
                 for (int i = 0; i < media.length(); i++) {
+                    throwIfInterrupted();
                     final JSONObject item = media.getJSONObject(i);
                     final String stagedName = item.optString("name", "");
                     final String expectedHash = item.optString("sha256", "");
@@ -2792,6 +3048,7 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
                     replacements.put(fileUri(staged), fileUri(target));
                     rollbackPaths.append(target.getCanonicalPath()).append('\n');
                     index++;
+                    reportProgress(index, media.length(), "archive commit media");
                 }
             }
             String rewrittenJson = payload;
@@ -2819,6 +3076,9 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             if (committedJson != null) committedJson.delete();
             if (rollbackManifest != null) rollbackManifest.delete();
             if (stageDir != null) deleteRecursively(stageDir);
+            if (Thread.currentThread().isInterrupted() || isCancellationFailure(e)) {
+                throw new RuntimeException("Operation cancelled", e);
+            }
             return "{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}";
         }
     }
@@ -2857,7 +3117,10 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
         try {
             final byte[] buffer = new byte[8192];
             int count;
-            while ((count = input.read(buffer)) >= 0) if (count > 0) output.write(buffer, 0, count);
+            while ((count = input.read(buffer)) >= 0) {
+                throwIfInterrupted();
+                if (count > 0) output.write(buffer, 0, count);
+            }
             output.flush();
         } finally {
             input.close();
@@ -2871,6 +3134,9 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             deleteRecursively(archiveStageDirectory(stagingId));
             return "{\"ok\":true}";
         } catch (Exception e) {
+            if (Thread.currentThread().isInterrupted() || isCancellationFailure(e)) {
+                throw new RuntimeException("Operation cancelled", e);
+            }
             return "{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}";
         }
     }
@@ -2893,6 +3159,9 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             deleteRecursively(archiveStageDirectory(stagingId));
             return "{\"ok\":true}";
         } catch (Exception e) {
+            if (Thread.currentThread().isInterrupted() || isCancellationFailure(e)) {
+                throw new RuntimeException("Operation cancelled", e);
+            }
             return "{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}";
         }
     }
@@ -2905,6 +3174,9 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             deleteRecursively(archiveStageDirectory(stagingId));
             return "{\"ok\":true}";
         } catch (Exception e) {
+            if (Thread.currentThread().isInterrupted() || isCancellationFailure(e)) {
+                throw new RuntimeException("Operation cancelled", e);
+            }
             return "{\"ok\":false,\"message\":\"" + escape(e.getMessage()) + "\"}";
         }
     }
@@ -2946,14 +3218,20 @@ public class MainActivity extends FlutterActivity implements ActivityResultRegis
             String canonicalFile = file.getCanonicalPath();
             String canonicalRoot = root.getCanonicalPath();
             if (!canonicalFile.equals(canonicalRoot) && !canonicalFile.startsWith(canonicalRoot + File.separator)) return "";
-            FileInputStream in = new FileInputStream(file);
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) >= 0) out.write(buf, 0, n);
-            in.close();
-            return out.toString("UTF-8");
+            try (FileInputStream in = new FileInputStream(file)) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) >= 0) {
+                    throwIfInterrupted();
+                    if (n > 0) out.write(buf, 0, n);
+                }
+                return out.toString("UTF-8");
+            }
         } catch (Exception e) {
+            if (Thread.currentThread().isInterrupted() || isCancellationFailure(e)) {
+                throw new RuntimeException("Operation cancelled", e);
+            }
             return "";
         }
     }
