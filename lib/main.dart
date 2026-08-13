@@ -13,8 +13,10 @@ import 'package:crypto/crypto.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart' as lge;
 
 import 'domain/validators.dart';
+import 'platform/native_bridge_contract.dart';
 
 export 'domain/validators.dart';
+export 'platform/native_bridge_contract.dart';
 
 part 'src_parts/l10n.dart';
 part 'src_parts/app_bootstrap.dart';
