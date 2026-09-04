@@ -18,8 +18,12 @@ const double kRadiusMd = 20;
 const double kRadiusLg = 28;
 const double kPagePad = 10;
 
-String localizedAppName(Locale locale) =>
-    _localeKey(locale) == 'en' ? tr('app.name.en') : tr('app.name');
+String localizedAppName(Locale locale) {
+  final key = _localeKey(locale);
+  if (key == 'en') return 'Valora';
+  if (key == 'zh_Hant') return '值譜';
+  return '值谱';
+}
 
 Locale currentPlatformLocale() {
   final locales = WidgetsBinding.instance.platformDispatcher.locales;
@@ -111,6 +115,7 @@ class _ValoraAppState extends State<ValoraApp> {
                   GlobalCupertinoLocalizations.delegate,
                 ],
                 supportedLocales: const [
+                  Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
                   Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
                   Locale('en'),
                 ],
