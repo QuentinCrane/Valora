@@ -17,7 +17,9 @@ Valora 的资产列表和详情目前是同一 Flutter Activity 内的路由；`
 
 `experiments/sharedview_probe` 是独立的 API 26+ 原生应用，使用调用者提供的官方 AAR。它提供 View／Bitmap 起点、能力查询、返回坐标及 Android 默认转场，记录 SDK 回调；具体构建和设备操作见该目录的 README。这个探针不连接 Valora Flutter 页面，不能证明 Flutter 页面、预测式返回、应用数据同步或性能通过验收。
 
-2026-11-01 的本机验证：探针使用 1.0.0.5 AAR 和 Gradle 8.14 离线完成 debug 构建，APK 的 minSdk 为 26。官方 Demo 首次联网构建因 Kotlin Compose 编译器下载时 TLS 握手失败而中止；在临时副本中改为本地 AAR、复用本机 Gradle 8.14、去掉示例未使用的 Compose 插件和构建开关后，debug 构建成功。未修改或复制 SDK 源码。检查时 `adb devices -l` 没有设备，因此两者均未安装或运行，设备兼容性、回调和手势尚未验证。
+2026-11-01 的本机验证：探针使用 1.0.0.5 AAR 和 Gradle 8.14 离线完成 debug 构建，APK 的 minSdk 为 26。官方 Demo 首次联网构建因 Kotlin Compose 编译器下载时 TLS 握手失败而中止；在临时副本中改为本地 AAR、复用本机 Gradle 8.14、去掉示例未使用的 Compose 插件和构建开关后，debug 构建成功。未修改或复制 SDK 源码。
+
+随后在一台 Xiaomi 23127PN0CC、Android 16／HyperOS `OS3.0.307.0.WNCCNXM` 手机上运行：探针能力查询返回协议版本 `0`；官方 Demo 的 View 和 Bitmap 构造接口均返回空启动参数并回退。具体操作、日志和证据边界见 [真机验证记录](../../experiments/sharedview_probe/VALIDATION.md)。该结果不代表其他设备或系统版本，也不能证明 Flutter 混合宿主可行。
 
 下一步首先在支持设备上运行官方 Demo 和探针，再制作隔离的 Flutter 混合宿主实验，比较至少以下方案：
 

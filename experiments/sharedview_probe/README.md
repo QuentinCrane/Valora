@@ -34,6 +34,8 @@ adb -s <设备序列号> logcat -s ValoraSharedViewProbe:I
 
 设备声明协议版本大于零仅表示 ROM 声明支持；`ActivityOptions` 非空仅表示 SDK 返回了启动参数。是否真正播放、回调是否完整、返回是否跟手，都需要结合屏幕和 `ValoraSharedViewProbe` 日志检查。构造或启动失败时探针使用 Android 默认转场。不同设备的能力和 `getViewAnimationExtras()` 可不同，不能按品牌推断支持情况。
 
+首台测试设备的记录见 [VALIDATION.md](VALIDATION.md)。
+
 ## 性能边界
 
 探针只能比较同一原生样例中的 View、Bitmap 和 Android 默认转场。它没有 Flutter 内容，不能用这些结果推断 Valora 的 Flutter UI 或双引擎性能。后续应用内 A/B 应固定设备、页面、数据、刷新率与采样次数，分别记录冷热启动、有效样本数、首次视觉响应、UI/raster 的 P95、掉帧、内存和系统合成；使用 Flutter profile 模式与 Perfetto FrameTimeline，并单独记录返回手势完成及取消的行为。60 Hz 和 120 Hz 的标称帧预算分别约为 16.67 ms 和 8.33 ms，实际判断仍以设备与系统帧时间线为准。

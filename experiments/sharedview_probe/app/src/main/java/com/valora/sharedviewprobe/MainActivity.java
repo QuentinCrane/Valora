@@ -69,18 +69,24 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        int protocol = supportedProtocol();
-        status.setText(protocol > 0
-                ? "设备声明支持 SharedView，协议版本：" + protocol
-                : "设备未声明支持 SharedView，测试将使用 Android 默认转场");
+        Integer protocol = supportedProtocol();
+        if (protocol == null) {
+            status.setText("SharedView 能力查询失败；测试将使用 Android 默认转场");
+        } else {
+            Log.i(TAG, "SDK capability protocol=" + protocol);
+            status.setText(protocol > 0
+                    ? "设备声明支持 SharedView，协议版本：" + protocol
+                    : "设备未声明支持 SharedView，协议版本：" + protocol
+                        + "；测试将使用 Android 默认转场");
+        }
     }
 
-    private int supportedProtocol() {
+    private Integer supportedProtocol() {
         try {
             return ViewAnimationManager.isViewAnimationSupported();
         } catch (RuntimeException | LinkageError error) {
             Log.w(TAG, "Capability query failed", error);
-            return 0;
+            return null;
         }
     }
 
@@ -88,7 +94,8 @@ public final class MainActivity extends Activity {
         Intent intent = new Intent(this, DetailActivity.class);
         intent.putExtra("requestedMode", mode);
         ActivityOptions options = null;
-        if (!"system".equals(mode) && supportedProtocol() > 0
+        Integer protocol = "system".equals(mode) ? null : supportedProtocol();
+        if (protocol != null && protocol > 0
                 && source.isAttachedToWindow() && source.getWidth() > 0 && source.getHeight() > 0) {
             try {
                 Map<String, String> extras = ViewAnimationManager.getViewAnimationExtras();
