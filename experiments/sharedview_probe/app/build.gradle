@@ -1,0 +1,30 @@
+plugins {
+    id 'com.android.application' version '8.11.1'
+}
+
+def kitPath = providers.gradleProperty('sharedViewAar').orNull
+if (kitPath == null || !file(kitPath).isFile()) {
+    throw new GradleException('Supply the official SharedView Kit AAR with -PsharedViewAar=<absolute path>.')
+}
+
+android {
+    namespace 'com.valora.sharedviewprobe'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.valora.sharedviewprobe'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation files(kitPath)
+}
