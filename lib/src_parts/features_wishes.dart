@@ -1376,19 +1376,22 @@ class WishCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(24),
       onTap: () {
         lightHaptic();
-        Navigator.of(context).push(softRoute(WishEditorPage(initial: wish)));
+        Navigator.of(context).push(valoraSharedRoute(
+            context, WishEditorPage(initial: wish, sharedFromCard: true)));
       },
       child: AppCard(
           child: Row(children: [
-        Container(
-            width: 54,
-            height: 54,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-                color: kBrand.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(18)),
-            child: valoraIconVisual(context, wish.iconValue,
-                emojiSize: 21, borderRadius: 18)),
+        ValoraSharedSurface(
+            tag: ValoraMotionTag('wish', wish.id),
+            child: Container(
+                width: 54,
+                height: 54,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                    color: kBrand.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(18)),
+                child: valoraIconVisual(context, wish.iconValue,
+                    emojiSize: 21, borderRadius: 18))),
         const SizedBox(width: 12),
         Expanded(
             child:
@@ -1470,7 +1473,8 @@ Future<void> confirmDeleteWish(BuildContext context, Wish wish) async {
 
 class WishEditorPage extends StatefulWidget {
   final Wish? initial;
-  const WishEditorPage({super.key, this.initial});
+  final bool sharedFromCard;
+  const WishEditorPage({super.key, this.initial, this.sharedFromCard = false});
   @override
   State<WishEditorPage> createState() => _WishEditorPageState();
 }
@@ -1583,9 +1587,16 @@ class _WishEditorPageState extends State<WishEditorPage> {
                       GestureDetector(
                           onTap: () => pickValoraIcon(context, icon,
                               onChanged: () => setState(() {})),
-                          child: EditableIconPreview(
-                              controller: icon,
-                              onChanged: () => setState(() {}))),
+                          child: ValoraSharedSurface(
+                            tag: ValoraMotionTag(
+                                'wish', widget.initial?.id ?? ''),
+                            destination: true,
+                            enabled:
+                                widget.sharedFromCard && widget.initial != null,
+                            child: EditableIconPreview(
+                                controller: icon,
+                                onChanged: () => setState(() {})),
+                          )),
                       const SizedBox(height: 8),
                       CoverImportBar(
                         onPickCover: pickNativeCover,

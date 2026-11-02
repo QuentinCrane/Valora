@@ -92,7 +92,7 @@ class AnalyticsHomePage extends StatelessWidget {
             child: ChartPanel(
                 title: tr('analytics.valueTrend'),
                 subtitle: tr('analytics.valueTrendDesc'),
-                onTap: () => showValueTrendDetail(context, store),
+                onTap: (context) => showValueTrendDetail(context, store),
                 semanticLabel: _trendChartSemantics(tr('analytics.valueTrend'),
                     analytics.valueTrend, store.settings),
                 child: SizedBox(
@@ -102,7 +102,7 @@ class AnalyticsHomePage extends StatelessWidget {
         (_) => ChartPanel(
             title: tr('analytics.dailyCostTrend'),
             subtitle: tr('analytics.dailyCostTrendDesc'),
-            onTap: () => showDailyCostTrendDetail(context, store),
+            onTap: (context) => showDailyCostTrendDetail(context, store),
             semanticLabel: _trendChartSemantics(tr('analytics.dailyCostTrend'),
                 analytics.dailyCostTrend, store.settings),
             child: SizedBox(
@@ -167,7 +167,7 @@ class AnalyticsHomePage extends StatelessWidget {
         (_) => ChartPanel(
             title: tr('analytics.categoryValuation'),
             subtitle: tr('analytics.categoryValuationDesc'),
-            onTap: () => showCategoryDistributionDetail(context, store),
+            onTap: (context) => showCategoryDistributionDetail(context, store),
             semanticLabel: category.isEmpty
                 ? '${tr('analytics.categoryValuation')}: ${tr('analytics.noData')}'
                 : '${tr('analytics.categoryValuation')}: ${category.entries.map((entry) => '${store.categoryDistributionLabel(entry.key)} ${money(entry.value, store.settings)}').join('，')}',
@@ -197,7 +197,7 @@ class AnalyticsHomePage extends StatelessWidget {
         (_) => ChartPanel(
             title: tr('analytics.tagDistribution'),
             subtitle: tr('analytics.tagDistributionDesc'),
-            onTap: () => showTagDistributionDetail(context, store),
+            onTap: (context) => showTagDistributionDetail(context, store),
             semanticLabel: tags.isEmpty
                 ? '${tr('analytics.tagDistribution')}: ${tr('analytics.noTags')}'
                 : '${tr('analytics.tagDistribution')}: ${tags.entries.map((entry) => '${store.tagDistributionLabel(entry.key)} ${entry.value}').join('，')}',
@@ -239,31 +239,40 @@ class AnalyticsHomePage extends StatelessWidget {
                           style: const TextStyle(color: kMuted)),
                     ...topDaily.take(6).map((a) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () => Navigator.of(context).push(
-                                softRoute(AssetDetailPage(assetId: a.id))),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(children: [
-                                SizedBox(
-                                    width: 28,
-                                    height: 28,
-                                    child: valoraIconVisual(
-                                        context, a.iconValue,
-                                        emojiSize: 20, borderRadius: 10)),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                    child: Text(a.name,
+                          child: ValoraSharedSurface(
+                              tag: ValoraMotionTag('analytics-asset', a.id),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: () => Navigator.of(context).push(
+                                    valoraSharedRoute(
+                                        context,
+                                        AssetDetailPage(
+                                            assetId: a.id,
+                                            motionTag: ValoraMotionTag(
+                                                'analytics-asset', a.id)))),
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(children: [
+                                    SizedBox(
+                                        width: 28,
+                                        height: 28,
+                                        child: valoraIconVisual(
+                                            context, a.iconValue,
+                                            emojiSize: 20, borderRadius: 10)),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                        child: Text(a.name,
+                                            style: const TextStyle(
+                                                fontWeight:
+                                                    FontWeight.normal))),
+                                    Text(
+                                        '${money(a.dailyCost, store.settings)} ${tr('time.perDay')}',
                                         style: const TextStyle(
-                                            fontWeight: FontWeight.normal))),
-                                Text(
-                                    '${money(a.dailyCost, store.settings)} ${tr('time.perDay')}',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.normal))
-                              ]),
-                            ),
-                          ),
+                                            fontWeight: FontWeight.normal))
+                                  ]),
+                                ),
+                              )),
                         )),
                   ])),
             ),
@@ -271,7 +280,7 @@ class AnalyticsHomePage extends StatelessWidget {
         (_) => ChartPanel(
             title: tr('analytics.serviceDuration'),
             subtitle: tr('analytics.serviceDurationDesc'),
-            onTap: () => showServiceDurationDetail(context, store),
+            onTap: (context) => showServiceDurationDetail(context, store),
             semanticLabel:
                 '${tr('analytics.serviceDuration')}: ${store.assets.length} ${tr('analytics.countUnit')}',
             child: SizedBox(

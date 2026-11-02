@@ -1025,10 +1025,15 @@ class WalletLeakCard extends StatelessWidget {
         Text(tr('home.walletLeakDesc'),
             style: TextStyle(color: kMuted, fontSize: 12)),
         const SizedBox(height: 12),
-        ...leaks.map((item) => InkWell(
+        ...leaks.map((item) => ValoraSharedSurface(
+            tag: ValoraMotionTag('home-leak', item.asset.id),
+            child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: () => Navigator.of(context)
-                  .push(softRoute(AssetDetailPage(assetId: item.asset.id))),
+              onTap: () => Navigator.of(context).push(valoraSharedRoute(
+                  context,
+                  AssetDetailPage(
+                      assetId: item.asset.id,
+                      motionTag: ValoraMotionTag('home-leak', item.asset.id)))),
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(children: [
@@ -1054,7 +1059,7 @@ class WalletLeakCard extends StatelessWidget {
                   const Icon(Icons.chevron_right_rounded, color: kMuted),
                 ]),
               ),
-            )),
+            ))),
       ]),
     );
   }
@@ -1217,10 +1222,15 @@ class PricelessHomeCard extends StatelessWidget {
         Text(tr('home.pricelessDesc'),
             style: TextStyle(color: kMuted, fontSize: 12, height: 1.35)),
         const SizedBox(height: 10),
-        ...rows.map((asset) => InkWell(
+        ...rows.map((asset) => ValoraSharedSurface(
+            tag: ValoraMotionTag('home-priceless', asset.id),
+            child: InkWell(
               borderRadius: BorderRadius.circular(14),
-              onTap: () => Navigator.of(context)
-                  .push(softRoute(AssetDetailPage(assetId: asset.id))),
+              onTap: () => Navigator.of(context).push(valoraSharedRoute(
+                  context,
+                  AssetDetailPage(
+                      assetId: asset.id,
+                      motionTag: ValoraMotionTag('home-priceless', asset.id)))),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(children: [
@@ -1247,7 +1257,7 @@ class PricelessHomeCard extends StatelessWidget {
                   const Icon(Icons.chevron_right_rounded, color: kMuted),
                 ]),
               ),
-            )),
+            ))),
       ]),
     );
   }
@@ -1290,16 +1300,22 @@ class DueSoonCard extends StatelessWidget {
       ...rows.map((asset) {
         final days =
             math.max(asset.expiresAt!.difference(DateTime.now()).inDays, 0);
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: AssetIcon(asset: asset, store: store, size: 42),
-          title: Text(asset.name,
-              style: const TextStyle(fontWeight: FontWeight.normal)),
-          subtitle: Text(
-              '${dateText(asset.expiresAt!)} ${tr('home.expiresIn').replaceAll('{n}', '$days')}'),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => Navigator.of(context)
-              .push(softRoute(AssetDetailPage(assetId: asset.id))),
+        return ValoraSharedSurface(
+          tag: ValoraMotionTag('home-due', asset.id),
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: AssetIcon(asset: asset, store: store, size: 42),
+            title: Text(asset.name,
+                style: const TextStyle(fontWeight: FontWeight.normal)),
+            subtitle: Text(
+                '${dateText(asset.expiresAt!)} ${tr('home.expiresIn').replaceAll('{n}', '$days')}'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.of(context).push(valoraSharedRoute(
+                context,
+                AssetDetailPage(
+                    assetId: asset.id,
+                    motionTag: ValoraMotionTag('home-due', asset.id)))),
+          ),
         );
       }),
     ]));
@@ -1313,57 +1329,60 @@ class AssetGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(24),
-      onTap: () {
-        lightHaptic();
-        Navigator.of(context)
-            .push(softRoute(AssetDetailPage(assetId: asset.id)));
-      },
-      child: AppCard(
-        padding: const EdgeInsets.fromLTRB(13, 13, 13, 12),
-        child: SizedBox.expand(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              AssetCardIcon(asset: asset, size: 58),
+    return ValoraSharedSurface(
+      tag: ValoraMotionTag('asset', asset.id),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: () {
+          lightHaptic();
+          Navigator.of(context).push(valoraSharedRoute(context,
+              AssetDetailPage(assetId: asset.id, sharedFromHome: true)));
+        },
+        child: AppCard(
+          padding: const EdgeInsets.fromLTRB(13, 13, 13, 12),
+          child: SizedBox.expand(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                AssetCardIcon(asset: asset, size: 58),
+                const Spacer(),
+                StatusBadge(status: asset.status),
+              ]),
               const Spacer(),
-              StatusBadge(status: asset.status),
+              Text(asset.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 15.2,
+                      fontWeight: FontWeight.normal,
+                      height: 1.14,
+                      letterSpacing: -.08)),
+              const SizedBox(height: 4),
+              HomeAssetMetaLine(asset: asset, store: store, baseFontSize: 12.0),
+              const SizedBox(height: 12),
+              RichText(
+                  text: TextSpan(
+                      style: DefaultTextStyle.of(context).style,
+                      children: [
+                    TextSpan(
+                        text: assetMetricCompactValue(asset, store.settings),
+                        style: TextStyle(
+                            fontWeight: FontWeight.normal,
+                            fontSize: 18.2,
+                            height: 1,
+                            letterSpacing: -.45,
+                            color: context.isDark
+                                ? Colors.white.withOpacity(.92)
+                                : kText)),
+                    TextSpan(
+                        text: assetMetricCompactSuffix(asset),
+                        style: TextStyle(
+                            color: kMuted,
+                            fontWeight: FontWeight.normal,
+                            fontSize: 12.8)),
+                  ])),
             ]),
-            const Spacer(),
-            Text(asset.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 15.2,
-                    fontWeight: FontWeight.normal,
-                    height: 1.14,
-                    letterSpacing: -.08)),
-            const SizedBox(height: 4),
-            HomeAssetMetaLine(asset: asset, store: store, baseFontSize: 12.0),
-            const SizedBox(height: 12),
-            RichText(
-                text: TextSpan(
-                    style: DefaultTextStyle.of(context).style,
-                    children: [
-                  TextSpan(
-                      text: assetMetricCompactValue(asset, store.settings),
-                      style: TextStyle(
-                          fontWeight: FontWeight.normal,
-                          fontSize: 18.2,
-                          height: 1,
-                          letterSpacing: -.45,
-                          color: context.isDark
-                              ? Colors.white.withOpacity(.92)
-                              : kText)),
-                  TextSpan(
-                      text: assetMetricCompactSuffix(asset),
-                      style: TextStyle(
-                          color: kMuted,
-                          fontWeight: FontWeight.normal,
-                          fontSize: 12.8)),
-                ])),
-          ]),
+          ),
         ),
       ),
     );
@@ -1378,58 +1397,61 @@ class AssetListTileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-      onTap: () {
-        lightHaptic();
-        Navigator.of(context)
-            .push(softRoute(AssetDetailPage(assetId: asset.id)));
-      },
-      child: AppCard(
-        padding: const EdgeInsets.all(12),
-        child: SizedBox(
-          height: 70,
-          child: Row(children: [
-            AssetIcon(asset: asset, store: store, size: 52),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                  Row(children: [
-                    Expanded(
-                        child: Text(asset.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.normal,
-                                fontSize: 15.5))),
-                    StatusBadge(status: asset.status)
+    return ValoraSharedSurface(
+      tag: ValoraMotionTag('asset', asset.id),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: () {
+          lightHaptic();
+          Navigator.of(context).push(valoraSharedRoute(context,
+              AssetDetailPage(assetId: asset.id, sharedFromHome: true)));
+        },
+        child: AppCard(
+          padding: const EdgeInsets.all(12),
+          child: SizedBox(
+            height: 70,
+            child: Row(children: [
+              AssetIcon(asset: asset, store: store, size: 52),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text(asset.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.normal,
+                                  fontSize: 15.5))),
+                      StatusBadge(status: asset.status)
+                    ]),
+                    const SizedBox(height: 5),
+                    HomeAssetMetaLine(
+                        asset: asset,
+                        store: store,
+                        baseFontSize: 12.2,
+                        spaced: true),
+                  ])),
+              const SizedBox(width: 10),
+              Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(assetMetricCompactValue(asset, store.settings),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.normal, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text(
+                        asset.isPriceless
+                            ? tr('home.sinceLast')
+                            : tr('home.perDay'),
+                        style: TextStyle(color: kMuted, fontSize: 12)),
                   ]),
-                  const SizedBox(height: 5),
-                  HomeAssetMetaLine(
-                      asset: asset,
-                      store: store,
-                      baseFontSize: 12.2,
-                      spaced: true),
-                ])),
-            const SizedBox(width: 10),
-            Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(assetMetricCompactValue(asset, store.settings),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.normal, fontSize: 16)),
-                  const SizedBox(height: 4),
-                  Text(
-                      asset.isPriceless
-                          ? tr('home.sinceLast')
-                          : tr('home.perDay'),
-                      style: TextStyle(color: kMuted, fontSize: 12)),
-                ]),
-          ]),
+            ]),
+          ),
         ),
       ),
     );
@@ -1451,70 +1473,73 @@ class AssetStickerChip extends StatelessWidget {
         (dark ? Colors.white : Colors.black).withOpacity(dark ? .07 : .045);
     final titleColor = dark ? Colors.white.withOpacity(.92) : kText;
     final metaColor = dark ? Colors.white.withOpacity(.58) : kMuted;
-    return Transform.rotate(
-      angle: tilt,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(26),
-        onTap: () => Navigator.of(context)
-            .push(softRoute(AssetDetailPage(assetId: asset.id))),
-        child: Container(
-          width: double.infinity,
-          height: 166,
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: borderColor),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(dark ? .28 : .135),
-                  blurRadius: 34,
-                  spreadRadius: -9,
-                  offset: const Offset(0, 24)),
-              BoxShadow(
-                  color: Colors.black.withOpacity(dark ? .14 : .060),
-                  blurRadius: 12,
-                  spreadRadius: -6,
-                  offset: const Offset(0, 8)),
-            ],
-          ),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              AssetCardIcon(asset: asset, size: 58),
+    return ValoraSharedSurface(
+      tag: ValoraMotionTag('asset', asset.id),
+      child: Transform.rotate(
+        angle: tilt,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(26),
+          onTap: () => Navigator.of(context).push(valoraSharedRoute(context,
+              AssetDetailPage(assetId: asset.id, sharedFromHome: true))),
+          child: Container(
+            width: double.infinity,
+            height: 166,
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: borderColor),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(dark ? .28 : .135),
+                    blurRadius: 34,
+                    spreadRadius: -9,
+                    offset: const Offset(0, 24)),
+                BoxShadow(
+                    color: Colors.black.withOpacity(dark ? .14 : .060),
+                    blurRadius: 12,
+                    spreadRadius: -6,
+                    offset: const Offset(0, 8)),
+              ],
+            ),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                AssetCardIcon(asset: asset, size: 58),
+                const Spacer(),
+                StatusBadge(status: asset.status),
+              ]),
               const Spacer(),
-              StatusBadge(status: asset.status),
+              Text(asset.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: titleColor,
+                      fontWeight: FontWeight.normal,
+                      fontSize: 16,
+                      height: 1.18,
+                      letterSpacing: -.2)),
+              const SizedBox(height: 8),
+              RichText(
+                  text: TextSpan(
+                      style: DefaultTextStyle.of(context).style,
+                      children: [
+                    TextSpan(
+                        text: assetMetricCompactValue(asset, store.settings),
+                        style: TextStyle(
+                            color: titleColor,
+                            fontWeight: FontWeight.normal,
+                            fontSize: 19,
+                            letterSpacing: -.55)),
+                    TextSpan(
+                        text: assetMetricCompactSuffix(asset),
+                        style: TextStyle(
+                            color: metaColor,
+                            fontWeight: FontWeight.normal,
+                            fontSize: 13)),
+                  ])),
             ]),
-            const Spacer(),
-            Text(asset.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: titleColor,
-                    fontWeight: FontWeight.normal,
-                    fontSize: 16,
-                    height: 1.18,
-                    letterSpacing: -.2)),
-            const SizedBox(height: 8),
-            RichText(
-                text: TextSpan(
-                    style: DefaultTextStyle.of(context).style,
-                    children: [
-                  TextSpan(
-                      text: assetMetricCompactValue(asset, store.settings),
-                      style: TextStyle(
-                          color: titleColor,
-                          fontWeight: FontWeight.normal,
-                          fontSize: 19,
-                          letterSpacing: -.55)),
-                  TextSpan(
-                      text: assetMetricCompactSuffix(asset),
-                      style: TextStyle(
-                          color: metaColor,
-                          fontWeight: FontWeight.normal,
-                          fontSize: 13)),
-                ])),
-          ]),
+          ),
         ),
       ),
     );
@@ -1543,6 +1568,7 @@ class AppCard extends StatelessWidget {
       ),
       child: child,
     );
+    if (_ValoraMotionFlightScope.isInFlight(context)) return card;
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: 1),
       duration: valoraMotionDuration(context, const Duration(milliseconds: 320),
@@ -1952,17 +1978,24 @@ Future<void> appSheet(BuildContext context,
     required String subtitle,
     required Widget child}) async {
   mediumHaptic();
-  await Navigator.of(context).push(softRoute(
-      _AppSheetRoutePage(title: title, subtitle: subtitle, child: child),
-      style: ValoraRouteStyle.sheet));
+  final motionTag = ValoraMotionSource.maybeOf(context);
+  final page = _AppSheetRoutePage(
+      title: title, subtitle: subtitle, motionTag: motionTag, child: child);
+  await Navigator.of(context).push(motionTag == null
+      ? softRoute(page, style: ValoraRouteStyle.sheet)
+      : valoraSharedRoute(context, page, style: ValoraRouteStyle.sheet));
 }
 
 class _AppSheetRoutePage extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget child;
+  final ValoraMotionTag? motionTag;
   const _AppSheetRoutePage(
-      {required this.title, required this.subtitle, required this.child});
+      {required this.title,
+      required this.subtitle,
+      required this.child,
+      this.motionTag});
 
   @override
   Widget build(BuildContext context) {
@@ -1976,32 +2009,36 @@ class _AppSheetRoutePage extends StatelessWidget {
               14,
               116 + MediaQuery.viewInsetsOf(context).bottom),
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: context.isDark
-                    ? kCardDark.withOpacity(.88)
-                    : Colors.white.withOpacity(.92),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(
-                    color:
-                        Colors.white.withOpacity(context.isDark ? .12 : .72)),
-                boxShadow: [softShadow(context)],
-              ),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.normal, fontSize: 19)),
-                    const SizedBox(height: 5),
-                    Text(subtitle,
-                        style: const TextStyle(
-                            color: kMuted, fontSize: 13, height: 1.45)),
-                    const SizedBox(height: 16),
-                    child,
-                  ]),
-            ),
+            ValoraSharedSurface(
+                tag: motionTag ?? const ValoraMotionTag('sheet', ''),
+                enabled: motionTag != null,
+                destination: true,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: context.isDark
+                        ? kCardDark.withOpacity(.88)
+                        : Colors.white.withOpacity(.92),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                        color: Colors.white
+                            .withOpacity(context.isDark ? .12 : .72)),
+                    boxShadow: [softShadow(context)],
+                  ),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.normal, fontSize: 19)),
+                        const SizedBox(height: 5),
+                        Text(subtitle,
+                            style: const TextStyle(
+                                color: kMuted, fontSize: 13, height: 1.45)),
+                        const SizedBox(height: 16),
+                        child,
+                      ]),
+                )),
           ],
         ),
         GlobalBackButton(onTap: () => Navigator.pop(context)),

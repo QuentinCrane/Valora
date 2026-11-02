@@ -2,7 +2,13 @@ part of '../main.dart';
 
 class AssetDetailPage extends StatelessWidget {
   final String assetId;
-  const AssetDetailPage({super.key, required this.assetId});
+  final bool sharedFromHome;
+  final ValoraMotionTag? motionTag;
+  const AssetDetailPage(
+      {super.key,
+      required this.assetId,
+      this.sharedFromHome = false,
+      this.motionTag});
 
   @override
   Widget build(BuildContext context) {
@@ -21,43 +27,47 @@ class AssetDetailPage extends StatelessWidget {
             children: [
               TutorialTargetAnchor(
                   id: 'detail.summary',
-                  child: AppCard(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(children: [
-                      AssetIcon(asset: asset, size: 78),
-                      const SizedBox(height: 12),
-                      Text(asset.name,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              fontSize: 21, fontWeight: FontWeight.normal)),
-                      const SizedBox(height: 4),
-                      Text(
-                          '${category?.name ?? tr('common.uncategorized')} · ${asset.status.localizedLabel}',
-                          style: const TextStyle(color: kMuted)),
-                      const SizedBox(height: 12),
-                      Text(assetValueLabelText(asset, store.settings),
-                          style: const TextStyle(
-                              fontSize: 23, fontWeight: FontWeight.normal)),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(
-                            child: DetailMini(
-                                label: asset.isPriceless
-                                    ? tr('detail.recordTime')
-                                    : tr('detail.holdingTime'),
-                                value: durationWithCalendarText(
-                                    asset.serviceDays,
-                                    store.settings.durationMode),
-                                onTap: () => showHoldingTimeExplanation(
-                                    context, asset, store))),
-                        Expanded(
-                            child: DetailMini(
-                                label: assetMetricLabel(asset),
-                                value: assetMetricValueText(
-                                    asset, store.settings))),
-                      ]),
-                    ]),
-                  )),
+                  child: ValoraSharedSurface(
+                      tag: motionTag ?? ValoraMotionTag('asset', asset.id),
+                      destination: true,
+                      enabled: sharedFromHome || motionTag != null,
+                      child: AppCard(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(children: [
+                          AssetIcon(asset: asset, size: 78),
+                          const SizedBox(height: 12),
+                          Text(asset.name,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontSize: 21, fontWeight: FontWeight.normal)),
+                          const SizedBox(height: 4),
+                          Text(
+                              '${category?.name ?? tr('common.uncategorized')} · ${asset.status.localizedLabel}',
+                              style: const TextStyle(color: kMuted)),
+                          const SizedBox(height: 12),
+                          Text(assetValueLabelText(asset, store.settings),
+                              style: const TextStyle(
+                                  fontSize: 23, fontWeight: FontWeight.normal)),
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            Expanded(
+                                child: DetailMini(
+                                    label: asset.isPriceless
+                                        ? tr('detail.recordTime')
+                                        : tr('detail.holdingTime'),
+                                    value: durationWithCalendarText(
+                                        asset.serviceDays,
+                                        store.settings.durationMode),
+                                    onTap: () => showHoldingTimeExplanation(
+                                        context, asset, store))),
+                            Expanded(
+                                child: DetailMini(
+                                    label: assetMetricLabel(asset),
+                                    value: assetMetricValueText(
+                                        asset, store.settings))),
+                          ]),
+                        ]),
+                      ))),
               const SizedBox(height: 12),
               TutorialTargetAnchor(
                   id: 'detail.flow',
@@ -74,7 +84,8 @@ class AssetDetailPage extends StatelessWidget {
                     child: ChartPanel(
                         title: tr('detail.dailyCostTrend'),
                         subtitle: tr('detail.dailyCostTrendDesc'),
-                        onTap: () => showAssetTrendGuide(context, asset, store),
+                        onTap: (motionContext) =>
+                            showAssetTrendGuide(motionContext, asset, store),
                         semanticLabel:
                             '${tr('detail.dailyCostTrend')}: ${asset.name}',
                         child: Column(children: [
@@ -288,10 +299,15 @@ class AssetDetailPage extends StatelessWidget {
               right: 16,
               top: MediaQuery.paddingOf(context).top + 16,
               child: Row(children: [
-                HeaderIcon(
-                    icon: Icons.edit_rounded,
-                    onTap: () => Navigator.of(context)
-                        .push(softRoute(AssetEditorPage(initial: asset)))),
+                ValoraSharedSurface(
+                  tag: ValoraMotionTag('asset-edit', asset.id),
+                  child: HeaderIcon(
+                      icon: Icons.edit_rounded,
+                      onTap: () => Navigator.of(context).push(valoraSharedRoute(
+                          context,
+                          AssetEditorPage(
+                              initial: asset, sharedFromDetail: true)))),
+                ),
                 const SizedBox(width: 8),
                 HeaderIcon(
                     icon: Icons.delete_outline_rounded,
@@ -388,13 +404,15 @@ class AssetDetailPage extends StatelessWidget {
             height: 46,
             alignment: Alignment.topRight,
             margin: EdgeInsets.only(right: 70, top: safe.top + 17),
-            onTap: () => Navigator.of(context)
-                .push(softRoute(AssetEditorPage(initial: asset))),
-            child: Icon(Icons.edit_rounded,
-                size: 22,
-                color: dark
-                    ? Colors.white.withOpacity(.94)
-                    : kText.withOpacity(.90)),
+            onTap: () => Navigator.of(context).push(valoraSharedRoute(context,
+                AssetEditorPage(initial: asset, sharedFromDetail: true))),
+            child: ValoraSharedSurface(
+                tag: ValoraMotionTag('asset-edit', asset.id),
+                child: Icon(Icons.edit_rounded,
+                    size: 22,
+                    color: dark
+                        ? Colors.white.withOpacity(.94)
+                        : kText.withOpacity(.90))),
           ),
           glassButton(
             width: 46,
@@ -1148,7 +1166,7 @@ class ChartPanel extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget child;
-  final VoidCallback? onTap;
+  final ValueChanged<BuildContext>? onTap;
   final String? semanticLabel;
   const ChartPanel(
       {super.key,
@@ -1182,13 +1200,23 @@ class ChartPanel extends StatelessWidget {
       chart,
     ]));
     if (onTap == null) return content;
-    return InkWell(
-        borderRadius: BorderRadius.circular(kRadiusLg),
-        onTap: () {
-          tapHaptic();
-          onTap!.call();
-        },
-        child: content);
+    final tag = ValoraMotionTag('chart', title);
+    return ValoraMotionSource(
+      tag: tag,
+      child: Builder(
+        builder: (motionContext) => ValoraSharedSurface(
+          tag: tag,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(kRadiusLg),
+            onTap: () {
+              tapHaptic();
+              onTap!.call(motionContext);
+            },
+            child: content,
+          ),
+        ),
+      ),
+    );
   }
 }
 

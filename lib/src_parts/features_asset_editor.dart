@@ -2,7 +2,9 @@ part of '../main.dart';
 
 class AssetEditorPage extends StatefulWidget {
   final Asset? initial;
-  const AssetEditorPage({super.key, this.initial});
+  final bool sharedFromDetail;
+  const AssetEditorPage(
+      {super.key, this.initial, this.sharedFromDetail = false});
   @override
   State<AssetEditorPage> createState() => _AssetEditorPageState();
 }
@@ -199,8 +201,13 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                         ?.copyWith(fontWeight: FontWeight.normal)),
                 const SizedBox(height: 12),
                 Center(
-                    child: EditableIconPreview(
-                        controller: icon, onChanged: () => setState(() {}))),
+                    child: ValoraSharedSurface(
+                  tag: ValoraMotionTag('asset-edit', widget.initial?.id ?? ''),
+                  enabled: widget.sharedFromDetail && widget.initial != null,
+                  destination: true,
+                  child: EditableIconPreview(
+                      controller: icon, onChanged: () => setState(() {})),
+                )),
                 const SizedBox(height: 8),
                 SmartAssetImportBar(
                   onPickCover: pickNativeCover,

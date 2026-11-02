@@ -11,6 +11,245 @@ enum ValoraRouteStyle {
   plain
 }
 
+/// Identifies one shared surface without colliding with unrelated Hero tags.
+class ValoraMotionTag {
+  final String kind;
+  final String id;
+  const ValoraMotionTag(this.kind, this.id);
+
+  @override
+  bool operator ==(Object other) =>
+      other is ValoraMotionTag && other.kind == kind && other.id == id;
+
+  @override
+  int get hashCode => Object.hash(kind, id);
+}
+
+/// Provides the tapped surface to a route opened synchronously from its child.
+class ValoraMotionSource extends InheritedWidget {
+  final ValoraMotionTag tag;
+  const ValoraMotionSource(
+      {super.key, required this.tag, required super.child});
+
+  static ValoraMotionTag? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ValoraMotionSource>()?.tag;
+
+  @override
+  bool updateShouldNotify(ValoraMotionSource oldWidget) => tag != oldWidget.tag;
+}
+
+class _ValoraMotionFlightScope extends InheritedWidget {
+  const _ValoraMotionFlightScope({required super.child});
+
+  static bool isInFlight(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_ValoraMotionFlightScope>() !=
+      null;
+
+  @override
+  bool updateShouldNotify(_ValoraMotionFlightScope oldWidget) => false;
+}
+
+/// A shared container whose route animation also follows predictive back.
+class ValoraSharedSurface extends StatefulWidget {
+  final ValoraMotionTag tag;
+  final Widget child;
+  final bool destination;
+  final bool enabled;
+
+  const ValoraSharedSurface({
+    super.key,
+    required this.tag,
+    required this.child,
+    this.destination = false,
+    this.enabled = true,
+  });
+
+  @override
+  State<ValoraSharedSurface> createState() => _ValoraSharedSurfaceState();
+}
+
+class _ValoraSharedSurfaceState extends State<ValoraSharedSurface> {
+  final GlobalKey _destinationKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled || valoraMotionTier(context) != ValoraMotionTier.full) {
+      return widget.child;
+    }
+    return Hero(
+      tag: widget.tag,
+      transitionOnUserGestures: true,
+      flightShuttleBuilder: _buildFlight,
+      placeholderBuilder:
+          widget.destination ? _buildDestinationPlaceholder : null,
+      child: widget.destination
+          ? _ValoraMotionDestination(
+              key: _destinationKey, inFlight: false, child: widget.child)
+          : widget.child,
+    );
+  }
+
+  Widget _buildDestinationPlaceholder(
+      BuildContext context, Size size, Widget child) {
+    final destination = child as _ValoraMotionDestination;
+    return _ValoraMotionDestination(
+        key: _destinationKey, inFlight: true, child: destination.child);
+  }
+
+  static Widget _buildFlight(
+    BuildContext context,
+    Animation<double> animation,
+    HeroFlightDirection direction,
+    BuildContext fromContext,
+    BuildContext toContext,
+  ) {
+    // The originating surface is the same on push and pop. The destination
+    // stays mounted in its placeholder, preserving form and focus state.
+    final sourceContext =
+        direction == HeroFlightDirection.push ? fromContext : toContext;
+    final source = sourceContext.widget as Hero;
+    final sourceBox = sourceContext.findRenderObject() as RenderBox;
+    final sourceSize = sourceBox.size;
+    final sourceTextStyle = DefaultTextStyle.of(sourceContext).style;
+    final store = sourceContext.readStore;
+    return AppScope(
+      store: store,
+      child: Material(
+          type: MaterialType.transparency,
+          child: _ValoraMotionFlightScope(
+            child: AnimatedBuilder(
+              animation: animation,
+              child: ClipRect(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox.fromSize(
+                    size: sourceSize,
+                    child: DefaultTextStyle(
+                      style: sourceTextStyle,
+                      child: source.child,
+                    ),
+                  ),
+                ),
+              ),
+              builder: (context, child) {
+                final progress = animation.value.clamp(0.0, 1.0).toDouble();
+                return Opacity(
+                  opacity: 1 - const Interval(.48, .96).transform(progress),
+                  child: child,
+                );
+              },
+            ),
+          )),
+    );
+  }
+}
+
+/// Keeps the destination subtree in the same element position during flight.
+class _ValoraMotionDestination extends StatelessWidget {
+  final bool inFlight;
+  final Widget child;
+  const _ValoraMotionDestination(
+      {super.key, required this.inFlight, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final animation =
+        ModalRoute.of(context)?.animation ?? kAlwaysCompleteAnimation;
+    return IgnorePointer(
+      ignoring: inFlight,
+      child: ExcludeSemantics(
+        excluding: inFlight,
+        child: AnimatedBuilder(
+          animation: animation,
+          child: child,
+          builder: (context, child) => Opacity(
+            opacity: inFlight
+                ? const Interval(.48, .96)
+                    .transform(animation.value.clamp(0.0, 1.0).toDouble())
+                : 1,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Retains MaterialPageRoute's Android predictive-back gesture handling.
+Route<T> valoraSharedRoute<T>(BuildContext context, Widget page,
+    {ValoraRouteStyle style = ValoraRouteStyle.auto}) {
+  if (valoraMotionTier(context) != ValoraMotionTier.full) {
+    return softRoute<T>(page, style: style);
+  }
+  final resolved =
+      style == ValoraRouteStyle.auto ? valoraRouteStyleFor(page) : style;
+  return MaterialPageRoute<T>(
+    settings:
+        RouteSettings(name: 'valora:${resolved.name}:${page.runtimeType}'),
+    builder: (_) => PredictiveBackBoundary(
+      style: resolved,
+      contextualMotion: false,
+      child: _ValoraBackFocusGuard(child: page),
+    ),
+  );
+}
+
+class _ValoraBackFocusGuard extends StatefulWidget {
+  final Widget child;
+  const _ValoraBackFocusGuard({required this.child});
+
+  @override
+  State<_ValoraBackFocusGuard> createState() => _ValoraBackFocusGuardState();
+}
+
+class _ValoraBackFocusGuardState extends State<_ValoraBackFocusGuard> {
+  NavigatorState? _navigator;
+  FocusNode? _gestureFocus;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final navigator = Navigator.of(context);
+    if (identical(_navigator, navigator)) return;
+    _navigator?.userGestureInProgressNotifier.removeListener(_onGestureChanged);
+    _navigator = navigator;
+    navigator.userGestureInProgressNotifier.addListener(_onGestureChanged);
+  }
+
+  void _onGestureChanged() {
+    if (_navigator?.userGestureInProgress == true) {
+      final focus = FocusManager.instance.primaryFocus;
+      final focusContext = focus?.context;
+      _gestureFocus = focusContext != null &&
+              ModalRoute.of(focusContext) == ModalRoute.of(context)
+          ? focus
+          : null;
+      return;
+    }
+    final focus = _gestureFocus;
+    _gestureFocus = null;
+    if (focus == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      final current = FocusManager.instance.primaryFocus;
+      if (focus.context != null &&
+          focus.canRequestFocus &&
+          (current == null || current is FocusScopeNode || current == focus)) {
+        focus.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _navigator?.userGestureInProgressNotifier.removeListener(_onGestureChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class ValoraRightSlideFadePageTransitionsBuilder
     extends PageTransitionsBuilder {
   const ValoraRightSlideFadePageTransitionsBuilder();
@@ -350,15 +589,21 @@ ValoraRouteStyle valoraRouteStyleFor(Widget page) {
 class PredictiveBackBoundary extends StatelessWidget {
   final Widget child;
   final ValoraRouteStyle style;
+  final bool contextualMotion;
   const PredictiveBackBoundary(
-      {super.key, required this.child, this.style = ValoraRouteStyle.plain});
+      {super.key,
+      required this.child,
+      this.style = ValoraRouteStyle.plain,
+      this.contextualMotion = true});
 
   @override
   Widget build(BuildContext context) {
     final route = ModalRoute.of(context);
     final animation = route?.animation;
     final content = RepaintBoundary(child: child);
-    if (animation == null) return PopScope(canPop: true, child: content);
+    if (animation == null || !contextualMotion) {
+      return PopScope(canPop: true, child: content);
+    }
 
     return PopScope(
       canPop: true,
@@ -496,24 +741,26 @@ class _GlassBackButtonState extends State<GlassBackButton> {
               blurSigma: 1.2,
               tintOpacity: dark ? .09 : .30,
               padding: const EdgeInsets.symmetric(horizontal: 13),
-              child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.chevron_left_rounded,
-                        size: 24,
-                        color: dark
-                            ? Colors.white.withOpacity(.94)
-                            : kText.withOpacity(.88)),
-                    const SizedBox(width: 2),
-                    Text(tr('common.back'),
-                        style: TextStyle(
+              child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.chevron_left_rounded,
+                            size: 24,
                             color: dark
-                                ? Colors.white.withOpacity(.92)
-                                : kText.withOpacity(.88),
-                            fontWeight: FontWeight.normal,
-                            fontSize: 13)),
-                  ]),
+                                ? Colors.white.withOpacity(.94)
+                                : kText.withOpacity(.88)),
+                        const SizedBox(width: 2),
+                        Text(tr('common.back'),
+                            style: TextStyle(
+                                color: dark
+                                    ? Colors.white.withOpacity(.92)
+                                    : kText.withOpacity(.88),
+                                fontWeight: FontWeight.normal,
+                                fontSize: 13)),
+                      ])),
             ),
           ),
         ),
