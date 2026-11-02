@@ -218,6 +218,163 @@ void main() {
     });
   }
 
+  testWidgets('asset metadata opens and returns without nesting Heroes',
+      (tester) async {
+    final store = _store();
+    final asset = store.assets.firstWhere((item) => !item.isPriceless);
+    await tester
+        .pumpWidget(_harness(store, AssetGridCard(asset: asset, store: store)));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byType(HomeAssetMetaLine));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text(tr('home.durationDetail')), findsOneWidget);
+    expect(
+        find.byWidgetPredicate((widget) =>
+            widget is Hero && widget.tag == ValoraMotionTag('asset', asset.id)),
+        findsOneWidget);
+    Navigator.of(tester.element(find.text(tr('home.durationDetail')))).pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(AssetGridCard), findsOneWidget);
+  });
+
+  testWidgets('select field morphs into its options and applies a choice',
+      (tester) async {
+    final store = _store();
+    var selected = 'first';
+    await tester.pumpWidget(_harness(
+      store,
+      RoundedSelectField<String>(
+        label: 'Choose value',
+        value: selected,
+        options: const [
+          SelectOption(value: 'first', label: 'First option'),
+          SelectOption(value: 'second', label: 'Second option'),
+        ],
+        onChanged: (value) => selected = value,
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 400));
+    final source = find.ancestor(
+        of: find.byType(RoundedSelectField<String>),
+        matching: find.byType(Hero));
+    expect(source, findsNothing);
+    final hero = find.descendant(
+        of: find.byType(RoundedSelectField<String>),
+        matching: find.byType(Hero));
+    final tag = tester.widget<Hero>(hero).tag;
+    await tester.tap(find.byType(RoundedSelectField<String>));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byWidgetPredicate((w) => w is Hero && w.tag == tag),
+        findsOneWidget);
+    await tester.tap(find.text('Second option'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(selected, 'second');
+    expect(find.byType(RoundedSelectField<String>), findsOneWidget);
+  });
+
+  testWidgets('home sort button opens its matching sheet and returns',
+      (tester) async {
+    final store = _store();
+    await tester.pumpWidget(_harness(store, StatusAndViewRow(store: store)));
+    await tester.pump(const Duration(milliseconds: 400));
+    final button = find.byIcon(Icons.sort_rounded);
+    final source = find.ancestor(of: button, matching: find.byType(Hero));
+    final tag = tester.widget<Hero>(source).tag;
+    await tester.tap(button);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text(tr('home.sortAndDisplayStyle')), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is Hero && w.tag == tag),
+        findsOneWidget);
+    Navigator.of(tester.element(find.text(tr('home.sortAndDisplayStyle'))))
+        .pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byIcon(Icons.sort_rounded), findsOneWidget);
+  });
+
+  testWidgets('settings group and manager return to their tapped rows',
+      (tester) async {
+    final store = _store();
+    setActiveLocale(
+        const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'));
+    await tester.pumpWidget(
+        _pageHarness(store, const Scaffold(body: SettingsHomePage())));
+    await tester.pump(const Duration(milliseconds: 400));
+    final group = find.text(tr('settings.dataBackup'));
+    await tester.scrollUntilVisible(group, 200,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pump();
+    await tester.tap(group);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byWidgetPredicate((w) => w is SettingsHomePage && w.asSubPage),
+        findsOneWidget);
+    final manager = find.text(tr('settings.categoryManage'));
+    await tester.scrollUntilVisible(manager, 200,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pump();
+    await tester.tap(manager);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text(tr('settings.categoryManage')), findsWidgets);
+    final category = find.descendant(
+        of: find.byType(CategoryManager),
+        matching: find.text(store.categoryName(store.categories.first.id)));
+    await tester.scrollUntilVisible(category, 250,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pump();
+    await tester.tap(category);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text(tl('编辑分类')), findsWidgets);
+    Navigator.of(tester.element(find.text(tl('编辑分类')).first)).pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(CategoryManager), findsOneWidget);
+    Navigator.of(tester.element(find.text(tr('settings.categoryManage')).first))
+        .pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byWidgetPredicate((w) => w is SettingsHomePage && w.asSubPage),
+        findsOneWidget);
+    Navigator.of(tester.element(find.byType(SettingsHomePage))).pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text(tr('settings.dataBackup')), findsOneWidget);
+  });
+
+  testWidgets('compose category row opens and returns to the form',
+      (tester) async {
+    final store = _store();
+    setActiveLocale(
+        const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'));
+    await tester.pumpWidget(
+        _pageHarness(store, const ComposePage(initialTab: ComposeTab.asset)));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.enterText(find.byType(TextFormField).first, 'draft asset');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    final category = find.text(tr('compose.category'));
+    await tester.scrollUntilVisible(category, 200,
+        scrollable: find.byType(Scrollable).first);
+    await Scrollable.ensureVisible(tester.element(category), alignment: .5);
+    await tester.pump();
+    await tester.tap(category);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text(tr('compose.selectCategory')), findsOneWidget);
+    Navigator.of(tester.element(find.text(tr('compose.selectCategory')))).pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(ComposePage), findsOneWidget);
+    expect(find.text('draft asset'), findsOneWidget);
+  });
+
   for (final mode in [MotionMode.reduced, MotionMode.off]) {
     testWidgets('$mode does not create a shared flight', (tester) async {
       final store = _store();
@@ -236,6 +393,33 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
       expect(find.byType(AssetDetailPage), findsOneWidget);
+    });
+
+    testWidgets('$mode keeps small selection controls usable', (tester) async {
+      final store = _store();
+      store.settings = store.settings.copyWith(motionMode: mode);
+      var selected = 'first';
+      await tester.pumpWidget(_harness(
+        store,
+        RoundedSelectField<String>(
+          label: 'Choose value',
+          value: selected,
+          options: const [
+            SelectOption(value: 'first', label: 'First option'),
+            SelectOption(value: 'second', label: 'Second option'),
+          ],
+          onChanged: (value) => selected = value,
+        ),
+      ));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(Hero), findsNothing);
+      await tester.tap(find.byType(RoundedSelectField<String>));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.tap(find.text('Second option'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(selected, 'second');
     });
   }
 }
@@ -279,5 +463,21 @@ Widget _harness(AppStore store, Widget child) => AppScope(
         home: Scaffold(
           body: Center(child: SizedBox(width: 320, height: 180, child: child)),
         ),
+      ),
+    );
+
+Widget _pageHarness(AppStore store, Widget child) => AppScope(
+      store: store,
+      child: MaterialApp(
+        locale: const Locale('zh'),
+        theme: buildAppTheme(Brightness.light),
+        localizationsDelegates: const [
+          AppLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('zh'), Locale('en')],
+        home: child,
       ),
     );

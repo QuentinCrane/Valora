@@ -242,12 +242,15 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                   ),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => showSmartCategoryCreateSheet(context,
-                          initialName: name.text,
-                          onCreated: (id) => setState(() => categoryId = id)),
-                      icon: const Icon(Icons.add_circle_outline_rounded),
-                      label: Text(tr('editor.smartNewCategory')),
+                    child: ValoraMotionTrigger(
+                      builder: (sourceContext) => TextButton.icon(
+                        onPressed: () => showSmartCategoryCreateSheet(
+                            sourceContext,
+                            initialName: name.text,
+                            onCreated: (id) => setState(() => categoryId = id)),
+                        icon: const Icon(Icons.add_circle_outline_rounded),
+                        label: Text(tr('editor.smartNewCategory')),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -350,10 +353,11 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                   const SizedBox(height: 8),
                   Align(
                       alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                          onPressed: editTags,
-                          icon: const Icon(Icons.sell_rounded),
-                          label: Text(tr('editor.selectExistingTags')))),
+                      child: ValoraMotionTrigger(
+                          builder: (sourceContext) => OutlinedButton.icon(
+                              onPressed: () => editTags(sourceContext),
+                              icon: const Icon(Icons.sell_rounded),
+                              label: Text(tr('editor.selectExistingTags'))))),
                   const SizedBox(height: 12),
                   TextFormField(
                       controller: note,
@@ -597,7 +601,7 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
     if (mounted) showNativeSnack(context, tr('editor.barcodeApplied'));
   }
 
-  void editTags() {
+  void editTags(BuildContext sourceContext) {
     final ctl = TextEditingController(text: tagsText.text);
     final store = context.store;
 
@@ -611,7 +615,7 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
       ctl.text = parts.join('、');
     }
 
-    appSheet(context,
+    appSheet(sourceContext,
         title: tr('editor.tagsTitle'), subtitle: tr('editor.tagsSubtitle'),
         child: StatefulBuilder(builder: (context, setLocal) {
       final presets = [
@@ -659,12 +663,14 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
                   .toList()),
         ],
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () => showSmartTagCreateSheet(context,
-              initialName: ctl.text.trim(),
-              onCreated: (label) => setLocal(() => toggleLocalTag(label))),
-          icon: const Icon(Icons.add_rounded),
-          label: Text(tr('editor.newTag')),
+        ValoraMotionTrigger(
+          builder: (sourceContext) => OutlinedButton.icon(
+            onPressed: () => showSmartTagCreateSheet(sourceContext,
+                initialName: ctl.text.trim(),
+                onCreated: (label) => setLocal(() => toggleLocalTag(label))),
+            icon: const Icon(Icons.add_rounded),
+            label: Text(tr('editor.newTag')),
+          ),
         ),
         const SizedBox(height: 12),
         Row(children: [

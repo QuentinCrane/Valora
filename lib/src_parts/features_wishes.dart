@@ -251,7 +251,7 @@ class _ComposePageState extends State<ComposePage> {
                         icon: Icons.auto_awesome_rounded,
                         label: tr('compose.valueMode'),
                         trailing: _PlainRightText(valueMode.localizedLabel),
-                        onTap: pickAssetValueMode),
+                        onMotionTap: pickAssetValueMode),
                     const Divider(height: 8),
                   ],
                   FormLine(
@@ -311,14 +311,14 @@ class _ComposePageState extends State<ComposePage> {
                       label: tr('compose.category'),
                       trailing: _PlainRightText(
                           context.store.categoryName(categoryId)),
-                      onTap: pickCategory),
+                      onMotionTap: pickCategory),
                   FormLine(
                       icon: Icons.sell_rounded,
                       label: tr('compose.tags'),
                       trailing: _PlainRightText(tagsText.text.trim().isEmpty
                           ? tr('common.unset')
                           : tagsText.text.trim()),
-                      onTap: editTags),
+                      onMotionTap: editTags),
                 ]))),
             if (assetMode) ...[
               const SizedBox(height: 12),
@@ -790,8 +790,8 @@ class _ComposePageState extends State<ComposePage> {
         onChanged: () => setState(() {}));
   }
 
-  void pickAssetValueMode() {
-    appSheet(context,
+  void pickAssetValueMode(BuildContext sourceContext) {
+    appSheet(sourceContext,
         title: tr('compose.valueMode'),
         subtitle: tr('compose.valueModeSubtitle'),
         child: Column(
@@ -832,8 +832,8 @@ class _ComposePageState extends State<ComposePage> {
         }).toList()));
   }
 
-  void pickCategory() {
-    appSheet(context,
+  void pickCategory(BuildContext sourceContext) {
+    appSheet(sourceContext,
         title: tr('compose.selectCategory'),
         subtitle: tr('compose.selectCategorySubtitle'),
         child: Column(children: [
@@ -854,19 +854,21 @@ class _ComposePageState extends State<ComposePage> {
                 Navigator.pop(context);
               })),
           const Divider(height: 20),
-          ListTile(
-            leading: const Icon(Icons.add_circle_outline_rounded),
-            title: Text(tr('compose.smartNewCategory')),
-            subtitle: Text(tr('compose.smartNewCategoryHint')),
-            onTap: () => showSmartCategoryCreateSheet(context,
-                initialName: name.text, onCreated: (id) {
-              setState(() => categoryId = id);
-            }),
+          ValoraMotionTrigger(
+            builder: (sourceContext) => ListTile(
+              leading: const Icon(Icons.add_circle_outline_rounded),
+              title: Text(tr('compose.smartNewCategory')),
+              subtitle: Text(tr('compose.smartNewCategoryHint')),
+              onTap: () => showSmartCategoryCreateSheet(sourceContext,
+                  initialName: name.text, onCreated: (id) {
+                setState(() => categoryId = id);
+              }),
+            ),
           ),
         ]));
   }
 
-  void editTags() {
+  void editTags(BuildContext sourceContext) {
     final ctl = TextEditingController(text: tagsText.text);
     final store = context.store;
 
@@ -880,7 +882,7 @@ class _ComposePageState extends State<ComposePage> {
       ctl.text = parts.join('、');
     }
 
-    appSheet(context,
+    appSheet(sourceContext,
         title: tr('compose.tags'), subtitle: tr('compose.tagsSubtitle'),
         child: StatefulBuilder(builder: (context, setLocal) {
       final presets = ['通勤', '办公', '学习', '收藏', '吃灰', '维修', '配件', '长期持有'];
@@ -920,12 +922,14 @@ class _ComposePageState extends State<ComposePage> {
                   .toList()),
         ],
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () => showSmartTagCreateSheet(context,
-              initialName: ctl.text.trim(),
-              onCreated: (label) => setLocal(() => toggleLocalTag(label))),
-          icon: const Icon(Icons.add_rounded),
-          label: Text(tr('compose.newTag')),
+        ValoraMotionTrigger(
+          builder: (sourceContext) => OutlinedButton.icon(
+            onPressed: () => showSmartTagCreateSheet(sourceContext,
+                initialName: ctl.text.trim(),
+                onCreated: (label) => setLocal(() => toggleLocalTag(label))),
+            icon: const Icon(Icons.add_rounded),
+            label: Text(tr('compose.newTag')),
+          ),
         ),
         const SizedBox(height: 12),
         Row(children: [
@@ -1633,13 +1637,16 @@ class _WishEditorPageState extends State<WishEditorPage> {
                       ),
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: () => showSmartCategoryCreateSheet(context,
-                              initialName: name.text,
-                              onCreated: (id) =>
-                                  setState(() => categoryId = id)),
-                          icon: const Icon(Icons.add_circle_outline_rounded),
-                          label: Text(tr('compose.smartNewCategory')),
+                        child: ValoraMotionTrigger(
+                          builder: (sourceContext) => TextButton.icon(
+                            onPressed: () => showSmartCategoryCreateSheet(
+                                sourceContext,
+                                initialName: name.text,
+                                onCreated: (id) =>
+                                    setState(() => categoryId = id)),
+                            icon: const Icon(Icons.add_circle_outline_rounded),
+                            label: Text(tr('compose.smartNewCategory')),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1647,10 +1654,12 @@ class _WishEditorPageState extends State<WishEditorPage> {
                       const SizedBox(height: 8),
                       Align(
                           alignment: Alignment.centerLeft,
-                          child: OutlinedButton.icon(
-                              onPressed: editTags,
-                              icon: const Icon(Icons.sell_rounded),
-                              label: Text(tr('compose.selectExistingTags')))),
+                          child: ValoraMotionTrigger(
+                              builder: (sourceContext) => OutlinedButton.icon(
+                                  onPressed: () => editTags(sourceContext),
+                                  icon: const Icon(Icons.sell_rounded),
+                                  label:
+                                      Text(tr('compose.selectExistingTags'))))),
                       const SizedBox(height: 12),
                       TextFormField(
                           controller: note,
@@ -1772,7 +1781,7 @@ class _WishEditorPageState extends State<WishEditorPage> {
     if (mounted) showNativeSnack(context, tr('compose.traceCoverGenerated'));
   }
 
-  void editTags() {
+  void editTags(BuildContext sourceContext) {
     final ctl = TextEditingController(text: tagsText.text);
     final store = context.store;
 
@@ -1786,7 +1795,7 @@ class _WishEditorPageState extends State<WishEditorPage> {
       ctl.text = parts.join('、');
     }
 
-    appSheet(context,
+    appSheet(sourceContext,
         title: tr('compose.tags'), subtitle: tr('compose.tagsSubtitle'),
         child: StatefulBuilder(builder: (context, setLocal) {
       final presets = ['通勤', '办公', '学习', '收藏', '吃灰', '维修', '配件', '长期持有'];
@@ -1826,12 +1835,14 @@ class _WishEditorPageState extends State<WishEditorPage> {
                   .toList()),
         ],
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () => showSmartTagCreateSheet(context,
-              initialName: ctl.text.trim(),
-              onCreated: (label) => setLocal(() => toggleLocalTag(label))),
-          icon: const Icon(Icons.add_rounded),
-          label: Text(tr('compose.newTag')),
+        ValoraMotionTrigger(
+          builder: (sourceContext) => OutlinedButton.icon(
+            onPressed: () => showSmartTagCreateSheet(sourceContext,
+                initialName: ctl.text.trim(),
+                onCreated: (label) => setLocal(() => toggleLocalTag(label))),
+            icon: const Icon(Icons.add_rounded),
+            label: Text(tr('compose.newTag')),
+          ),
         ),
         const SizedBox(height: 12),
         Row(children: [

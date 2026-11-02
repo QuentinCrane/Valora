@@ -27,15 +27,62 @@ class ValoraMotionTag {
 
 /// Provides the tapped surface to a route opened synchronously from its child.
 class ValoraMotionSource extends InheritedWidget {
-  final ValoraMotionTag tag;
+  final Object tag;
   const ValoraMotionSource(
       {super.key, required this.tag, required super.child});
 
-  static ValoraMotionTag? maybeOf(BuildContext context) =>
+  static Object? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<ValoraMotionSource>()?.tag;
 
   @override
   bool updateShouldNotify(ValoraMotionSource oldWidget) => tag != oldWidget.tag;
+}
+
+class _ValoraControlTag {}
+
+/// Makes a small control the source for a sheet opened from its builder.
+class ValoraMotionTrigger extends StatefulWidget {
+  final WidgetBuilder builder;
+  const ValoraMotionTrigger({super.key, required this.builder});
+
+  @override
+  State<ValoraMotionTrigger> createState() => _ValoraMotionTriggerState();
+}
+
+class _ValoraMotionTriggerState extends State<ValoraMotionTrigger> {
+  final Object _tag = _ValoraControlTag();
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ValoraMotionFlightScope.isInFlight(context) ||
+        valoraMotionTier(context) != ValoraMotionTier.full) {
+      return widget.builder(context);
+    }
+    // A Hero cannot be nested in another Hero. When a control lives inside a
+    // shared card, reuse that card as the source instead of nesting Heroes.
+    final ancestor = context.findAncestorWidgetOfExactType<Hero>();
+    final tag = ancestor?.tag ?? _tag;
+    return ValoraMotionSource(
+      tag: tag,
+      child: Builder(
+        builder: (sourceContext) => ancestor != null
+            ? widget.builder(sourceContext)
+            : ValoraSharedSurface(
+                tag: tag, child: widget.builder(sourceContext)),
+      ),
+    );
+  }
+}
+
+class _ValoraSharedRouteScope extends InheritedWidget {
+  const _ValoraSharedRouteScope({required super.child});
+
+  static bool contains(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_ValoraSharedRouteScope>() !=
+      null;
+
+  @override
+  bool updateShouldNotify(_ValoraSharedRouteScope oldWidget) => false;
 }
 
 class _ValoraMotionFlightScope extends InheritedWidget {
@@ -51,7 +98,7 @@ class _ValoraMotionFlightScope extends InheritedWidget {
 
 /// A shared container whose route animation also follows predictive back.
 class ValoraSharedSurface extends StatefulWidget {
-  final ValoraMotionTag tag;
+  final Object tag;
   final Widget child;
   final bool destination;
   final bool enabled;
@@ -112,6 +159,25 @@ class _ValoraSharedSurfaceState extends State<ValoraSharedSurface> {
     final sourceSize = sourceBox.size;
     final sourceTextStyle = DefaultTextStyle.of(sourceContext).style;
     final store = sourceContext.readStore;
+    final controlFlight = source.tag is _ValoraControlTag;
+    final surfaceColor = Theme.of(sourceContext).colorScheme.surface;
+    Widget flightContent = RepaintBoundary(
+      child: SizedBox.fromSize(
+        size: sourceSize,
+        child: DefaultTextStyle(style: sourceTextStyle, child: source.child),
+      ),
+    );
+    flightContent = FittedBox(
+      fit: controlFlight ? BoxFit.contain : BoxFit.cover,
+      child: flightContent,
+    );
+    if (controlFlight) {
+      flightContent = DecoratedBox(
+        decoration: BoxDecoration(
+            color: surfaceColor, borderRadius: BorderRadius.circular(18)),
+        child: flightContent,
+      );
+    }
     return AppScope(
       store: store,
       child: Material(
@@ -119,18 +185,7 @@ class _ValoraSharedSurfaceState extends State<ValoraSharedSurface> {
           child: _ValoraMotionFlightScope(
             child: AnimatedBuilder(
               animation: animation,
-              child: ClipRect(
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox.fromSize(
-                    size: sourceSize,
-                    child: DefaultTextStyle(
-                      style: sourceTextStyle,
-                      child: source.child,
-                    ),
-                  ),
-                ),
-              ),
+              child: ClipRect(child: flightContent),
               builder: (context, child) {
                 final progress = animation.value.clamp(0.0, 1.0).toDouble();
                 return Opacity(
@@ -189,7 +244,7 @@ Route<T> valoraSharedRoute<T>(BuildContext context, Widget page,
     builder: (_) => PredictiveBackBoundary(
       style: resolved,
       contextualMotion: false,
-      child: _ValoraBackFocusGuard(child: page),
+      child: _ValoraSharedRouteScope(child: _ValoraBackFocusGuard(child: page)),
     ),
   );
 }
@@ -2836,7 +2891,7 @@ class SoftFormCard extends StatelessWidget {
                 offset: const Offset(0, 14))
           ],
         ),
-        child: child,
+        child: Material(type: MaterialType.transparency, child: child),
       );
 }
 
@@ -2845,22 +2900,35 @@ class FormLine extends StatelessWidget {
   final String label;
   final Widget trailing;
   final VoidCallback? onTap;
+  final ValueChanged<BuildContext>? onMotionTap;
   const FormLine(
       {super.key,
       required this.icon,
       required this.label,
       required this.trailing,
-      this.onTap});
+      this.onTap,
+      this.onMotionTap})
+      : assert(onTap == null || onMotionTap == null);
 
   @override
   Widget build(BuildContext context) {
+    final motionTap = onMotionTap;
+    if (motionTap != null) {
+      return ValoraMotionTrigger(
+          builder: (sourceContext) =>
+              _buildLine(sourceContext, () => motionTap(sourceContext)));
+    }
+    return _buildLine(context, onTap);
+  }
+
+  Widget _buildLine(BuildContext context, VoidCallback? callback) {
     return InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: onTap == null
+      onTap: callback == null
           ? null
           : () {
               tapHaptic();
-              onTap!.call();
+              callback();
             },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -2916,78 +2984,80 @@ class RoundedSelectField<T> extends StatelessWidget {
       }
     }
     selected ??= options.isNotEmpty ? options.first : null;
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-      onTap: () {
-        lightHaptic();
-        appSheet(
-          context,
-          title: label,
-          subtitle: tr('select.immediateApply'),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: options.map((item) {
-              final active = item.value == value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () {
-                      mediumHaptic();
-                      onChanged(item.value);
-                      Navigator.pop(context);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 13),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? kBrand.withOpacity(context.isDark ? .22 : .34)
-                            : (context.isDark
-                                ? Colors.white.withOpacity(.055)
-                                : const Color(0xFFF4F5F6)),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: active
-                                ? kBrandStrong.withOpacity(.55)
-                                : Colors.transparent),
-                      ),
-                      child: Row(children: [
-                        if (item.iconText != null) ...[
-                          Text(item.iconText!,
-                              style: const TextStyle(fontSize: 18)),
-                          const SizedBox(width: 10)
-                        ],
-                        Expanded(
-                            child: Text(item.label,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.normal,
-                                    fontSize: 15))),
-                        if (active)
-                          const Icon(Icons.check_circle_rounded,
-                              color: kBrandStrong),
-                      ]),
-                    ),
+    return ValoraMotionTrigger(
+        builder: (sourceContext) => InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () {
+                lightHaptic();
+                appSheet(
+                  sourceContext,
+                  title: label,
+                  subtitle: tr('select.immediateApply'),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: options.map((item) {
+                      final active = item.value == value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () {
+                              mediumHaptic();
+                              onChanged(item.value);
+                              Navigator.pop(context);
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 13),
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? kBrand
+                                        .withOpacity(context.isDark ? .22 : .34)
+                                    : (context.isDark
+                                        ? Colors.white.withOpacity(.055)
+                                        : const Color(0xFFF4F5F6)),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: active
+                                        ? kBrandStrong.withOpacity(.55)
+                                        : Colors.transparent),
+                              ),
+                              child: Row(children: [
+                                if (item.iconText != null) ...[
+                                  Text(item.iconText!,
+                                      style: const TextStyle(fontSize: 18)),
+                                  const SizedBox(width: 10)
+                                ],
+                                Expanded(
+                                    child: Text(item.label,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.normal,
+                                            fontSize: 15))),
+                                if (active)
+                                  const Icon(Icons.check_circle_rounded,
+                                      color: kBrandStrong),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      },
-      child: InputDecorator(
-        decoration: InputDecoration(
-            labelText: label,
-            suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded)),
-        child: Text(selected?.label ?? tr('common.unset'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.normal)),
-      ),
-    );
+                );
+              },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                    labelText: label,
+                    suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded)),
+                child: Text(selected?.label ?? tr('common.unset'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.normal)),
+              ),
+            ));
   }
 }
 

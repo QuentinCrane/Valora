@@ -56,19 +56,21 @@ class HomeAssetMetaLine extends StatelessWidget {
       final base = homeMetaFontSize(store.settings, base: baseFontSize);
       final narrow = constraints.maxWidth < 145 || text.length > 24;
       final fontSize = narrow ? (base - 1.1).clamp(9.6, base).toDouble() : base;
-      return InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: () => showHomeDurationPopover(context, asset),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Text(
-            text,
-            softWrap: true,
-            style: TextStyle(
-                color: kMuted,
-                fontSize: fontSize,
-                fontWeight: FontWeight.normal,
-                height: 1.16),
+      return ValoraMotionTrigger(
+        builder: (sourceContext) => InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => showHomeDurationPopover(sourceContext, asset),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              text,
+              softWrap: true,
+              style: TextStyle(
+                  color: kMuted,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.normal,
+                  height: 1.16),
+            ),
           ),
         ),
       );
@@ -275,12 +277,12 @@ class HomeHeroHeader extends StatelessWidget {
                       letterSpacing: -.28,
                       color: dark ? Colors.white : kText,
                       height: 1.0))),
-          _HeaderGlassPill(onSearch: () {
+          _HeaderGlassPill(onSearch: (sourceContext) {
             lightHaptic();
-            showSearchSheet(context);
-          }, onFilter: () {
+            showSearchSheet(sourceContext);
+          }, onFilter: (sourceContext) {
             lightHaptic();
-            showFilterSheet(context);
+            showFilterSheet(sourceContext);
           }),
         ]),
         const SizedBox(height: 18),
@@ -360,8 +362,8 @@ class HomeTopGradientWash extends StatelessWidget {
 }
 
 class _HeaderGlassPill extends StatelessWidget {
-  final VoidCallback onSearch;
-  final VoidCallback onFilter;
+  final ValueChanged<BuildContext> onSearch;
+  final ValueChanged<BuildContext> onFilter;
   const _HeaderGlassPill({required this.onSearch, required this.onFilter});
 
   @override
@@ -381,20 +383,23 @@ class _HeaderGlassPill extends StatelessWidget {
                 color: Colors.white.withOpacity(context.isDark ? .12 : .76)),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            InkWell(
-                borderRadius: BorderRadius.circular(999),
-                onTap: onSearch,
-                child: const SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Icon(Icons.search_rounded, size: 25))),
-            InkWell(
-                borderRadius: BorderRadius.circular(999),
-                onTap: onFilter,
-                child: const SizedBox(
-                    width: 46,
-                    height: 48,
-                    child: Icon(Icons.keyboard_arrow_down_rounded, size: 28))),
+            ValoraMotionTrigger(
+                builder: (sourceContext) => InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () => onSearch(sourceContext),
+                    child: const SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Icon(Icons.search_rounded, size: 25)))),
+            ValoraMotionTrigger(
+                builder: (sourceContext) => InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () => onFilter(sourceContext),
+                    child: const SizedBox(
+                        width: 46,
+                        height: 48,
+                        child: Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 28)))),
           ]),
         ),
       ),
@@ -913,10 +918,12 @@ class LifecycleDashboardCard extends StatelessWidget {
                 Text(tr('home.lifecycleLedgerDesc'),
                     style: const TextStyle(color: kMuted, fontSize: 12)),
               ])),
-          TextButton.icon(
-            onPressed: () => showRecoveryRecordSheet(context, store),
-            icon: const Icon(Icons.add_rounded, size: 17),
-            label: Text(tr('home.recordRecovery')),
+          ValoraMotionTrigger(
+            builder: (sourceContext) => TextButton.icon(
+              onPressed: () => showRecoveryRecordSheet(sourceContext, store),
+              icon: const Icon(Icons.add_rounded, size: 17),
+              label: Text(tr('home.recordRecovery')),
+            ),
           ),
         ]),
         const SizedBox(height: 14),
@@ -962,45 +969,48 @@ class AssetTimeMachineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final latest = store.snapshots.isEmpty ? null : store.snapshots.first;
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-      onTap: () {
-        tapHaptic();
-        showBackupManager(context);
-      },
-      child: AppCard(
-        child: Row(children: [
-          Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                  color: const Color(0xFFA78BFA).withOpacity(.16),
-                  borderRadius: BorderRadius.circular(18)),
-              child:
-                  const Icon(Icons.history_rounded, color: Color(0xFFA78BFA))),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(tr('home.timeMachine'),
-                    style:
-                        TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
-                const SizedBox(height: 3),
-                Text(
-                    latest == null
-                        ? tr('home.timeMachineEmpty')
-                        : tr('home.timeMachineHasSnapshots')
-                            .replaceAll('{n}', '${store.snapshots.length}')
-                            .replaceAll('{label}', latest.label),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: kMuted, fontSize: 12)),
-              ])),
-          const Icon(Icons.manage_history_rounded, color: kBrandStrong),
-        ]),
-      ),
-    );
+    return ValoraMotionTrigger(
+        builder: (sourceContext) => InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () {
+                tapHaptic();
+                showBackupManager(sourceContext);
+              },
+              child: AppCard(
+                child: Row(children: [
+                  Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFA78BFA).withOpacity(.16),
+                          borderRadius: BorderRadius.circular(18)),
+                      child: const Icon(Icons.history_rounded,
+                          color: Color(0xFFA78BFA))),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(tr('home.timeMachine'),
+                            style: TextStyle(
+                                fontWeight: FontWeight.normal, fontSize: 16)),
+                        const SizedBox(height: 3),
+                        Text(
+                            latest == null
+                                ? tr('home.timeMachineEmpty')
+                                : tr('home.timeMachineHasSnapshots')
+                                    .replaceAll(
+                                        '{n}', '${store.snapshots.length}')
+                                    .replaceAll('{label}', latest.label),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                const TextStyle(color: kMuted, fontSize: 12)),
+                      ])),
+                  const Icon(Icons.manage_history_rounded, color: kBrandStrong),
+                ]),
+              ),
+            ));
   }
 }
 
@@ -1096,15 +1106,17 @@ class StatusAndViewRow extends StatelessWidget {
                   .toList()),
         ),
       ),
-      HeaderIcon(
-          icon: Icons.sort_rounded,
-          size: 40,
-          onTap: () => showSortSheet(context)),
+      ValoraMotionTrigger(
+          builder: (sourceContext) => HeaderIcon(
+              icon: Icons.sort_rounded,
+              size: 40,
+              onTap: () => showSortSheet(sourceContext))),
       const SizedBox(width: 6),
-      HeaderIcon(
-          icon: Icons.more_horiz_rounded,
-          size: 40,
-          onTap: () => showFilterSheet(context)),
+      ValoraMotionTrigger(
+          builder: (sourceContext) => HeaderIcon(
+              icon: Icons.more_horiz_rounded,
+              size: 40,
+              onTap: () => showFilterSheet(sourceContext))),
     ]);
   }
 }
@@ -1568,7 +1580,10 @@ class AppCard extends StatelessWidget {
       ),
       child: child,
     );
-    if (_ValoraMotionFlightScope.isInFlight(context)) return card;
+    if (_ValoraMotionFlightScope.isInFlight(context) ||
+        _ValoraSharedRouteScope.contains(context)) {
+      return card;
+    }
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: 1),
       duration: valoraMotionDuration(context, const Duration(milliseconds: 320),
@@ -1990,7 +2005,7 @@ class _AppSheetRoutePage extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget child;
-  final ValoraMotionTag? motionTag;
+  final Object? motionTag;
   const _AppSheetRoutePage(
       {required this.title,
       required this.subtitle,

@@ -31,10 +31,12 @@ String _settingsTabSubtitle(_SettingsTab tab) {
 class SettingsHomePage extends StatefulWidget {
   final _SettingsTab initialTab;
   final bool asSubPage;
+  final Object? motionTag;
   const SettingsHomePage(
       {super.key,
       this.initialTab = _SettingsTab.overview,
-      this.asSubPage = false});
+      this.asSubPage = false,
+      this.motionTag});
 
   @override
   State<SettingsHomePage> createState() => _SettingsHomePageState();
@@ -49,11 +51,15 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
     tab = widget.initialTab;
   }
 
-  void _openGroup(_SettingsTab next) {
+  void _openGroup(BuildContext sourceContext, _SettingsTab next) {
     tapHaptic();
-    Navigator.of(context).push(softRoute(
-        SettingsHomePage(initialTab: next, asSubPage: true),
-        style: ValoraRouteStyle.settings));
+    final tag = ValoraMotionSource.maybeOf(sourceContext);
+    final page =
+        SettingsHomePage(initialTab: next, asSubPage: true, motionTag: tag);
+    Navigator.of(context).push(tag == null
+        ? softRoute(page, style: ValoraRouteStyle.settings)
+        : valoraSharedRoute(sourceContext, page,
+            style: ValoraRouteStyle.settings));
   }
 
   @override
@@ -70,18 +76,23 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 14,
                 112 + MediaQuery.paddingOf(context).bottom),
             children: [
-              Row(children: [
-                Expanded(
-                    child: Text(_settingsTabLabel(tab),
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(
-                                fontWeight: FontWeight.normal,
-                                height: 1.0,
-                                letterSpacing: -.35))),
-                ValuePill(tr('settings.pill.submenu')),
-              ]),
+              ValoraSharedSurface(
+                tag: widget.motionTag ?? const ValoraMotionTag('settings', ''),
+                enabled: widget.motionTag != null,
+                destination: true,
+                child: Row(children: [
+                  Expanded(
+                      child: Text(_settingsTabLabel(tab),
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(
+                                  fontWeight: FontWeight.normal,
+                                  height: 1.0,
+                                  letterSpacing: -.35))),
+                  ValuePill(tr('settings.pill.submenu')),
+                ]),
+              ),
               const SizedBox(height: 8),
               Text(_settingsTabSubtitle(tab),
                   style: const TextStyle(
@@ -142,21 +153,23 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 label: tr('settings.dataBackup'),
                 description: tr('settings.dataBackup.desc'),
                 trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _openGroup(_SettingsTab.data)),
+                onMotionTap: (source) => _openGroup(source, _SettingsTab.data)),
             SettingRow(
                 icon: Icons.palette_rounded,
                 iconBg: const Color(0xFF8998F4),
                 label: tr('settings.appearanceInteraction'),
                 description: tr('settings.appearanceInteraction.desc'),
                 trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _openGroup(_SettingsTab.appearance)),
+                onMotionTap: (source) =>
+                    _openGroup(source, _SettingsTab.appearance)),
             SettingRow(
                 icon: Icons.settings_applications_rounded,
                 iconBg: const Color(0xFFFFE2D6),
                 label: tr('settings.systemPermissions'),
                 description: tr('settings.systemPermissions.desc'),
                 trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _openGroup(_SettingsTab.system)),
+                onMotionTap: (source) =>
+                    _openGroup(source, _SettingsTab.system)),
             SettingRow(
                 icon: Icons.school_rounded,
                 iconBg: const Color(0xFFBDEB7E),
@@ -177,7 +190,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                     '${store.categories.length} ${tr('analytics.countUnit')}，${tr('settings.categoryManage.desc')}',
                 trailing: ValuePill(
                     tlf('{count} 类', {'count': '${store.categories.length}'})),
-                onTap: () => showCategoryManager(context)),
+                onMotionTap: (source) => showCategoryManager(source)),
             SettingRow(
                 icon: Icons.backup_rounded,
                 iconBg: const Color(0xFF8FD0F6),
@@ -185,7 +198,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 description: tr('settings.backupRestore.desc'),
                 trailing: ValuePill(
                     tlf('{count} 份', {'count': '${store.snapshots.length}'})),
-                onTap: () => showBackupManager(context)),
+                onMotionTap: (source) => showBackupManager(source)),
           ])),
     ]);
   }
@@ -267,7 +280,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 description: tr('settings.backupRestore.desc'),
                 trailing: ValuePill(
                     tlf('{count} 份', {'count': '${store.snapshots.length}'})),
-                onTap: () => showBackupManager(context)),
+                onMotionTap: (source) => showBackupManager(source)),
             SettingRow(
                 icon: Icons.palette_rounded,
                 iconBg: const Color(0xFF8998F4),
@@ -294,7 +307,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 description: tl('建议使用电子数码、学习办公等大类'),
                 trailing: ValuePill(
                     tlf('{count} 类', {'count': '${store.categories.length}'})),
-                onTap: () => showCategoryManager(context)),
+                onMotionTap: (source) => showCategoryManager(source)),
             SettingRow(
                 icon: Icons.sell_rounded,
                 iconBg: const Color(0xFF9FD8F8),
@@ -302,7 +315,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 description: tl('细分通勤、收藏、维修、吃灰等状态'),
                 trailing: ValuePill(
                     tlf('{count} 个', {'count': '${store.tags.length}'})),
-                onTap: () => showTagManager(context)),
+                onMotionTap: (source) => showTagManager(source)),
           ]),
           const SizedBox(height: 12),
           SettingsSection(title: tr('settings.backupMigration'), children: [
@@ -313,14 +326,14 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                 description: tl('完整 ZIP、JSON、快照、CSV 和 Markdown'),
                 trailing: ValuePill(
                     tlf('{count} 份', {'count': '${store.snapshots.length}'})),
-                onTap: () => showBackupManager(context)),
+                onMotionTap: (source) => showBackupManager(source)),
             SettingRow(
                 icon: Icons.cloud_sync_rounded,
                 iconBg: const Color(0xFFC8EBFF),
                 label: tr('settings.cloudSync'),
                 description: tl('WebDAV、坚果云、Nextcloud 与手动文件备份'),
                 trailing: ValuePill(store.settings.cloudSync.providerLabel),
-                onTap: () => showCloudSyncEditor(context)),
+                onMotionTap: (source) => showCloudSyncEditor(source)),
             SettingRow(
                 icon: Icons.archive_rounded,
                 iconBg: const Color(0xFFD8E7FF),
@@ -554,7 +567,7 @@ class _SettingsHomePageState extends State<SettingsHomePage> {
                     ? '${store.settings.cloudSync.providerLabel} · ${store.settings.cloudSync.remotePath}'
                     : tl('可选择 WebDAV、坚果云、Nextcloud 或手动文件备份'),
                 trailing: ValuePill(store.settings.cloudSync.providerLabel),
-                onTap: () => showCloudSyncEditor(context)),
+                onMotionTap: (source) => showCloudSyncEditor(source)),
             SettingRow(
                 icon: Icons.upload_rounded,
                 iconBg: const Color(0xFFBDEB7E),
@@ -630,7 +643,7 @@ class _CloudSyncPanelState extends State<CloudSyncPanel> {
               ? '${cloud.providerLabel} · ${cloud.remotePath}'
               : tl('可选择 WebDAV、坚果云、Nextcloud 或手动文件备份'),
           trailing: ValuePill(cloud.providerLabel),
-          onTap: () => showCloudSyncEditor(context),
+          onMotionTap: (source) => showCloudSyncEditor(source),
         ),
         SettingSwitchRow(
           icon: Icons.upload_rounded,
@@ -697,7 +710,7 @@ class _CloudSyncPanelState extends State<CloudSyncPanel> {
             label: tl('系统文件备份'),
             description: tl('导出到任意网盘同步文件夹，或从系统文件恢复'),
             trailing: const ValuePill('SAF'),
-            onTap: () => showBackupManager(context)),
+            onMotionTap: (source) => showBackupManager(source)),
         SettingRow(
             icon: Icons.archive_rounded,
             iconBg: const Color(0xFFD8E7FF),
@@ -1139,6 +1152,7 @@ class SettingRow extends StatelessWidget {
   final String description;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final ValueChanged<BuildContext>? onMotionTap;
   const SettingRow(
       {super.key,
       required this.icon,
@@ -1146,16 +1160,28 @@ class SettingRow extends StatelessWidget {
       required this.label,
       required this.description,
       this.trailing,
-      this.onTap});
+      this.onTap,
+      this.onMotionTap})
+      : assert(onTap == null || onMotionTap == null);
   @override
   Widget build(BuildContext context) {
+    final motionTap = onMotionTap;
+    if (motionTap != null) {
+      return ValoraMotionTrigger(
+          builder: (sourceContext) =>
+              _buildRow(sourceContext, () => motionTap(sourceContext)));
+    }
+    return _buildRow(context, onTap);
+  }
+
+  Widget _buildRow(BuildContext context, VoidCallback? callback) {
     return InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: onTap == null
+      onTap: callback == null
           ? null
           : () {
               lightHaptic();
-              onTap!.call();
+              callback();
             },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 9),
@@ -1197,7 +1223,7 @@ class SettingRow extends StatelessWidget {
               ])),
           const SizedBox(width: 8),
           trailing ??
-              (onTap == null
+              (callback == null
                   ? const SizedBox.shrink()
                   : const Icon(Icons.chevron_right_rounded, color: kMuted)),
         ]),
@@ -2249,11 +2275,11 @@ class _CategoryManagerState extends State<CategoryManager> {
     setState(() {});
   }
 
-  void editCategory(Category category) {
+  void editCategory(BuildContext sourceContext, Category category) {
     final ctl = TextEditingController(text: category.name);
     var iconValue = category.icon;
     var colorValue = category.color;
-    appSheet(context,
+    appSheet(sourceContext,
         title: tl('编辑分类'), subtitle: tl('直接点选图标和颜色，不需要手动输入十六进制色值。'),
         child: StatefulBuilder(builder: (context, setLocal) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2432,33 +2458,35 @@ class _CategoryManagerState extends State<CategoryManager> {
       SectionLabel(tl('已有分类')),
       if (store.categories.isEmpty)
         Text(tl('还没有分类。'), style: const TextStyle(color: kMuted)),
-      ...store.categories.map((c) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                    color: parseColor(c.color).withOpacity(.92),
-                    borderRadius: BorderRadius.circular(15)),
-                child: Text(c.icon, style: const TextStyle(fontSize: 21))),
-            title: Text(store.categoryName(c.id),
-                style: const TextStyle(fontWeight: FontWeight.normal)),
-            subtitle: Text(c.color),
-            onTap: () => editCategory(c),
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              ValoraGlassIconButton(
-                  icon: Icons.edit_rounded,
-                  size: 36,
-                  tooltip: tl('编辑分类'),
-                  onTap: () => editCategory(c)),
-              ValoraGlassIconButton(
-                  icon: Icons.delete_outline_rounded,
-                  size: 36,
-                  tooltip: tl('删除分类'),
-                  onTap: () => confirmDeleteCategory(context, c)),
-            ]),
-          )),
+      ...store.categories.map((c) => ValoraMotionTrigger(
+          key: ValueKey('category-motion-${c.id}'),
+          builder: (sourceContext) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        color: parseColor(c.color).withOpacity(.92),
+                        borderRadius: BorderRadius.circular(15)),
+                    child: Text(c.icon, style: const TextStyle(fontSize: 21))),
+                title: Text(store.categoryName(c.id),
+                    style: const TextStyle(fontWeight: FontWeight.normal)),
+                subtitle: Text(c.color),
+                onTap: () => editCategory(sourceContext, c),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  ValoraGlassIconButton(
+                      icon: Icons.edit_rounded,
+                      size: 36,
+                      tooltip: tl('编辑分类'),
+                      onTap: () => editCategory(sourceContext, c)),
+                  ValoraGlassIconButton(
+                      icon: Icons.delete_outline_rounded,
+                      size: 36,
+                      tooltip: tl('删除分类'),
+                      onTap: () => confirmDeleteCategory(context, c)),
+                ]),
+              ))),
     ]);
   }
 }
@@ -2535,10 +2563,10 @@ class _TagManagerState extends State<TagManager> {
     setState(() {});
   }
 
-  void editTag(Tag tag) {
+  void editTag(BuildContext sourceContext, Tag tag) {
     final ctl = TextEditingController(text: tag.name);
     var colorValue = tag.color;
-    appSheet(context, title: tl('编辑标签'), subtitle: tl('直接选择颜色即可。'),
+    appSheet(sourceContext, title: tl('编辑标签'), subtitle: tl('直接选择颜色即可。'),
         child: StatefulBuilder(builder: (context, setLocal) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -2642,29 +2670,31 @@ class _TagManagerState extends State<TagManager> {
       SectionLabel(tl('已有标签')),
       if (store.tags.isEmpty)
         Text(tl('还没有标签。'), style: const TextStyle(color: kMuted)),
-      ...store.tags.map((t) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: CircleAvatar(
-                backgroundColor: parseColor(t.color),
-                child: const Icon(Icons.sell_rounded,
-                    color: Colors.white, size: 18)),
-            title: Text(store.tagName(t.id),
-                style: const TextStyle(fontWeight: FontWeight.normal)),
-            subtitle: Text(t.color),
-            onTap: () => editTag(t),
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              ValoraGlassIconButton(
-                  icon: Icons.edit_rounded,
-                  size: 36,
-                  tooltip: tl('编辑标签'),
-                  onTap: () => editTag(t)),
-              ValoraGlassIconButton(
-                  icon: Icons.delete_outline_rounded,
-                  size: 36,
-                  tooltip: tl('删除标签'),
-                  onTap: () => confirmDeleteTag(context, t)),
-            ]),
-          )),
+      ...store.tags.map((t) => ValoraMotionTrigger(
+          key: ValueKey('tag-motion-${t.id}'),
+          builder: (sourceContext) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                    backgroundColor: parseColor(t.color),
+                    child: const Icon(Icons.sell_rounded,
+                        color: Colors.white, size: 18)),
+                title: Text(store.tagName(t.id),
+                    style: const TextStyle(fontWeight: FontWeight.normal)),
+                subtitle: Text(t.color),
+                onTap: () => editTag(sourceContext, t),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  ValoraGlassIconButton(
+                      icon: Icons.edit_rounded,
+                      size: 36,
+                      tooltip: tl('编辑标签'),
+                      onTap: () => editTag(sourceContext, t)),
+                  ValoraGlassIconButton(
+                      icon: Icons.delete_outline_rounded,
+                      size: 36,
+                      tooltip: tl('删除标签'),
+                      onTap: () => confirmDeleteTag(context, t)),
+                ]),
+              ))),
     ]);
   }
 }

@@ -43,6 +43,7 @@ class _MotionDeviceHarness extends StatefulWidget {
 
 class _MotionDeviceHarnessState extends State<_MotionDeviceHarness> {
   var selected = 0;
+  var choice = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -66,12 +67,38 @@ class _MotionDeviceHarnessState extends State<_MotionDeviceHarness> {
               title: '测试图表详情', subtitle: '合成数据', child: const Text('图表详情测试内容')),
           child: const SizedBox(height: 100, child: Center(child: Text('图表'))),
         ),
-      _ => ChartPanel(
+      5 => ChartPanel(
           title: '测试资产排行',
           subtitle: '合成数据',
           onTap: (context) => showServiceDurationDetail(context, widget.store),
           child: const SizedBox(height: 100, child: Center(child: Text('排行'))),
         ),
+      _ => Column(children: [
+          SettingRow(
+            icon: Icons.settings_rounded,
+            iconBg: Colors.lightBlue,
+            label: '设置小项',
+            description: '点击打开测试详情',
+            onMotionTap: (source) => appSheet(source,
+                title: '设置小项详情', subtitle: '合成数据', child: const Text('测试内容')),
+          ),
+          RoundedSelectField<int>(
+            label: '测试选择',
+            value: choice,
+            options: const [
+              SelectOption(value: 1, label: '选项一'),
+              SelectOption(value: 2, label: '选项二'),
+            ],
+            onChanged: (value) => setState(() => choice = value),
+          ),
+          FormLine(
+            icon: Icons.category_rounded,
+            label: '表单小项',
+            trailing: const Text('打开'),
+            onMotionTap: (source) => appSheet(source,
+                title: '表单小项详情', subtitle: '合成数据', child: const Text('测试内容')),
+          ),
+        ]),
     };
     return Scaffold(
       appBar: AppBar(title: const Text('Valora Motion 测试')),
@@ -103,8 +130,8 @@ class _MotionDeviceHarnessState extends State<_MotionDeviceHarness> {
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
-          children: List<Widget>.generate(6, (index) {
-            const labels = ['卡片', '列表', '便利贴', '心愿', '图表', '排行'];
+          children: List<Widget>.generate(7, (index) {
+            const labels = ['卡片', '列表', '便利贴', '心愿', '图表', '排行', '小项'];
             return ChoiceChip(
               label: Text(labels[index]),
               selected: selected == index,

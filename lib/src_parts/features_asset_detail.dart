@@ -633,11 +633,13 @@ class AssetValueReplayCard extends StatelessWidget {
                 child: Text(tl('价值回收'),
                     style: const TextStyle(
                         fontWeight: FontWeight.normal, fontSize: 16))),
-            TextButton.icon(
-              onPressed: () =>
-                  showRecoveryRecordSheet(context, store, seedAsset: asset),
-              icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-              label: Text(tl('记录收益')),
+            ValoraMotionTrigger(
+              builder: (sourceContext) => TextButton.icon(
+                onPressed: () => showRecoveryRecordSheet(sourceContext, store,
+                    seedAsset: asset),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                label: Text(tl('记录收益')),
+              ),
             ),
           ]),
           const SizedBox(height: 2),
