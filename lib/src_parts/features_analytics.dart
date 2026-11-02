@@ -443,7 +443,9 @@ void showServiceDurationDetail(BuildContext context, AppStore store) {
         if (list.isEmpty)
           Text(tr('analytics.noAssets'))
         else
-          ...list.take(12).map((a) => ListTile(
+          ...list.take(12).map((a) => ValoraSharedSurface(
+              tag: ValoraMotionTag('duration-sheet-asset', a.id),
+              child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: SizedBox(
                     width: 38,
@@ -456,12 +458,13 @@ void showServiceDurationDetail(BuildContext context, AppStore store) {
                     '${assetMetricLabel(a)} ${assetMetricValueText(a, store.settings)}'),
                 trailing: Text(durationWithCalendarText(
                     a.serviceDays, store.settings.durationMode)),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.of(context)
-                      .push(softRoute(AssetDetailPage(assetId: a.id)));
-                },
-              )),
+                onTap: () => Navigator.of(context).push(valoraSharedRoute(
+                    context,
+                    AssetDetailPage(
+                        assetId: a.id,
+                        motionTag:
+                            ValoraMotionTag('duration-sheet-asset', a.id)))),
+              ))),
       ]));
 }
 
@@ -478,7 +481,9 @@ void showDailyCostRankingDetail(BuildContext context, AppStore store) {
           Text(tr('analytics.noDailyCostAssets'),
               style: const TextStyle(color: kMuted))
         else
-          ...list.map((a) => ListTile(
+          ...list.map((a) => ValoraSharedSurface(
+              tag: ValoraMotionTag('ranking-sheet-asset', a.id),
+              child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: SizedBox(
                     width: 42,
@@ -492,12 +497,13 @@ void showDailyCostRankingDetail(BuildContext context, AppStore store) {
                 trailing: Text(
                     '${money(a.dailyCost, store.settings)} ${tr('time.perDay')}',
                     style: const TextStyle(fontWeight: FontWeight.normal)),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.of(context)
-                      .push(softRoute(AssetDetailPage(assetId: a.id)));
-                },
-              )),
+                onTap: () => Navigator.of(context).push(valoraSharedRoute(
+                    context,
+                    AssetDetailPage(
+                        assetId: a.id,
+                        motionTag:
+                            ValoraMotionTag('ranking-sheet-asset', a.id)))),
+              ))),
       ]));
 }
 

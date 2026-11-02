@@ -338,7 +338,9 @@ void showValueQuadrantDetail(BuildContext context, AppStore store) {
                       Text(tr('review.noAsset'),
                           style: TextStyle(color: kMuted, fontSize: 12))
                     else
-                      ...entry.value.map((asset) => ListTile(
+                      ...entry.value.map((asset) => ValoraSharedSurface(
+                          tag: ValoraMotionTag('review-sheet-asset', asset.id),
+                          child: ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: SizedBox(
                                 width: 40,
@@ -352,12 +354,14 @@ void showValueQuadrantDetail(BuildContext context, AppStore store) {
                                 '${tr('review.served')} ${asset.serviceDays} ${tr('time.day')} · ${tr('review.dailyAvg')} ${money(asset.dailyCost, store.settings)} ${tr('detail.perDay')}'),
                             trailing: const Icon(Icons.chevron_right_rounded,
                                 color: kMuted),
-                            onTap: () {
-                              Navigator.pop(context);
-                              Navigator.of(context).push(softRoute(
-                                  AssetDetailPage(assetId: asset.id)));
-                            },
-                          )),
+                            onTap: () => Navigator.of(context).push(
+                                valoraSharedRoute(
+                                    context,
+                                    AssetDetailPage(
+                                        assetId: asset.id,
+                                        motionTag: ValoraMotionTag(
+                                            'review-sheet-asset', asset.id)))),
+                          ))),
                   ]),
             );
           }),

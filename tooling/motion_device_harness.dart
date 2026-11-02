@@ -59,12 +59,18 @@ class _MotionDeviceHarnessState extends State<_MotionDeviceHarness> {
           height: 166,
           child: AssetStickerChip(asset: asset, store: widget.store)),
       3 => WishCard(wish: wish),
-      _ => ChartPanel(
+      4 => ChartPanel(
           title: '测试图表',
           subtitle: '合成数据',
           onTap: (context) => appSheet(context,
               title: '测试图表详情', subtitle: '合成数据', child: const Text('图表详情测试内容')),
           child: const SizedBox(height: 100, child: Center(child: Text('图表'))),
+        ),
+      _ => ChartPanel(
+          title: '测试资产排行',
+          subtitle: '合成数据',
+          onTap: (context) => showServiceDurationDetail(context, widget.store),
+          child: const SizedBox(height: 100, child: Center(child: Text('排行'))),
         ),
     };
     return Scaffold(
@@ -97,8 +103,8 @@ class _MotionDeviceHarnessState extends State<_MotionDeviceHarness> {
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
-          children: List<Widget>.generate(5, (index) {
-            const labels = ['卡片', '列表', '便利贴', '心愿', '图表'];
+          children: List<Widget>.generate(6, (index) {
+            const labels = ['卡片', '列表', '便利贴', '心愿', '图表', '排行'];
             return ChoiceChip(
               label: Text(labels[index]),
               selected: selected == index,

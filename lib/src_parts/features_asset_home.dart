@@ -1999,6 +1999,23 @@ class _AppSheetRoutePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final animation = ModalRoute.of(context)?.animation;
+    final sheetContents = Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style:
+                const TextStyle(fontWeight: FontWeight.normal, fontSize: 19)),
+        const SizedBox(height: 5),
+        Text(subtitle,
+            style: const TextStyle(color: kMuted, fontSize: 13, height: 1.45)),
+        const SizedBox(height: 16),
+        child,
+      ]),
+    );
+    final animateContents = motionTag != null &&
+        animation != null &&
+        valoraMotionTier(context) == ValoraMotionTier.full;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(children: [
@@ -2009,36 +2026,47 @@ class _AppSheetRoutePage extends StatelessWidget {
               14,
               116 + MediaQuery.viewInsetsOf(context).bottom),
           children: [
-            ValoraSharedSurface(
-                tag: motionTag ?? const ValoraMotionTag('sheet', ''),
-                enabled: motionTag != null,
-                destination: true,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: context.isDark
-                        ? kCardDark.withOpacity(.88)
-                        : Colors.white.withOpacity(.92),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                        color: Colors.white
-                            .withOpacity(context.isDark ? .12 : .72)),
-                    boxShadow: [softShadow(context)],
+            Stack(children: [
+              // Keep the background separate from the content so an asset row
+              // inside the sheet can own its own Hero without nesting Heroes.
+              Positioned.fill(
+                child: ValoraSharedSurface(
+                  tag: motionTag ?? const ValoraMotionTag('sheet', ''),
+                  enabled: motionTag != null,
+                  destination: true,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: context.isDark
+                          ? kCardDark.withOpacity(.88)
+                          : Colors.white.withOpacity(.92),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                          color: Colors.white
+                              .withOpacity(context.isDark ? .12 : .72)),
+                      boxShadow: [softShadow(context)],
+                    ),
                   ),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.normal, fontSize: 19)),
-                        const SizedBox(height: 5),
-                        Text(subtitle,
-                            style: const TextStyle(
-                                color: kMuted, fontSize: 13, height: 1.45)),
-                        const SizedBox(height: 16),
-                        child,
-                      ]),
-                )),
+                ),
+              ),
+              if (animateContents)
+                AnimatedBuilder(
+                  animation: animation,
+                  child: sheetContents,
+                  builder: (context, child) {
+                    final opacity = const Interval(.48, .96)
+                        .transform(animation.value.clamp(0.0, 1.0).toDouble());
+                    return IgnorePointer(
+                      ignoring: opacity < 1,
+                      child: ExcludeSemantics(
+                        excluding: opacity < 1,
+                        child: Opacity(opacity: opacity, child: child),
+                      ),
+                    );
+                  },
+                )
+              else
+                sheetContents,
+            ]),
           ],
         ),
         GlobalBackButton(onTap: () => Navigator.pop(context)),

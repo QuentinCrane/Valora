@@ -144,6 +144,7 @@ void main() {
 
   testWidgets('chart opens its matching sheet and returns', (tester) async {
     final store = _store();
+    var activated = false;
     await tester.pumpWidget(_harness(
       store,
       ChartPanel(
@@ -152,20 +153,70 @@ void main() {
         onTap: (context) => appSheet(context,
             title: 'Trend details',
             subtitle: 'Details',
-            child: const Text('Chart explanation')),
+            child: TextButton(
+                onPressed: () => activated = true,
+                child: const Text('Chart explanation'))),
         child: const SizedBox(height: 60),
       ),
     ));
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('Test trend'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 30));
+    await tester.tap(find.text('Chart explanation'), warnIfMissed: false);
+    expect(activated, isFalse);
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Chart explanation'), findsOneWidget);
+    await tester.tap(find.text('Chart explanation'));
+    expect(activated, isTrue);
     Navigator.of(tester.element(find.text('Chart explanation'))).pop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Test trend'), findsOneWidget);
   });
+
+  for (final scenario in <String, void Function(BuildContext, AppStore)>{
+    'service duration': showServiceDurationDetail,
+    'daily cost ranking': showDailyCostRankingDetail,
+    'value quadrant': showValueQuadrantDetail,
+  }.entries) {
+    testWidgets('${scenario.key} asset returns to the chart details',
+        (tester) async {
+      final store = _store();
+      await tester.pumpWidget(_harness(
+        store,
+        ChartPanel(
+          title: 'Source chart',
+          subtitle: 'Summary',
+          onTap: (context) => scenario.value(context, store),
+          child: const SizedBox(height: 60),
+        ),
+      ));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.text('Source chart'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      final row = find.byType(ListTile).first;
+      expect(row, findsOneWidget);
+      await tester.ensureVisible(row);
+      await tester.pump();
+      await tester.tap(row);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byType(AssetDetailPage), findsOneWidget);
+
+      Navigator.of(tester.element(find.byType(AssetDetailPage))).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byType(ListTile), findsWidgets);
+      Navigator.of(tester.element(find.byType(ListTile).first)).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.text('Source chart'), findsOneWidget);
+    });
+  }
 
   for (final mode in [MotionMode.reduced, MotionMode.off]) {
     testWidgets('$mode does not create a shared flight', (tester) async {
