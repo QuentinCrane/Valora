@@ -1,12 +1,14 @@
 part of '../main.dart';
 
-enum AppLanguageSetting { system, zhHant, en }
+enum AppLanguageSetting { system, zhHans, zhHant, en }
 
 extension AppLanguageSettingX on AppLanguageSetting {
   Locale? get locale {
     switch (this) {
       case AppLanguageSetting.system:
         return null;
+      case AppLanguageSetting.zhHans:
+        return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans');
       case AppLanguageSetting.zhHant:
         return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
       case AppLanguageSetting.en:
@@ -18,6 +20,8 @@ extension AppLanguageSettingX on AppLanguageSetting {
     switch (this) {
       case AppLanguageSetting.system:
         return tr('language.system.short');
+      case AppLanguageSetting.zhHans:
+        return tr('language.zhHans.short');
       case AppLanguageSetting.zhHant:
         return tr('language.zhHant.short');
       case AppLanguageSetting.en:
@@ -38,22 +42,25 @@ Locale _activeLocale = _normalizeAppLocale(currentPlatformLocale());
 Locale _normalizeAppLocale(Locale locale) {
   final language = locale.languageCode.toLowerCase();
   if (language == 'en') return const Locale('en');
-  return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
+  final script = locale.scriptCode?.toLowerCase();
+  final country = locale.countryCode?.toLowerCase();
+  if (script == 'hant' ||
+      country == 'tw' ||
+      country == 'hk' ||
+      country == 'mo') {
+    return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
+  }
+  return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans');
 }
 
 String _localeKey(Locale locale) {
   final normalized = _normalizeAppLocale(locale);
   if (normalized.languageCode == 'en') return 'en';
   final script = normalized.scriptCode?.toLowerCase();
-  final country = normalized.countryCode?.toLowerCase();
-  if (script == 'hant' ||
-      country == 'tw' ||
-      country == 'hk' ||
-      country == 'mo' ||
-      country == 'hant') {
+  if (script == 'hant') {
     return 'zh_Hant';
   }
-  return 'zh';
+  return 'zh_Hans';
 }
 
 void setActiveLocale(Locale locale) {
@@ -69,7 +76,7 @@ Locale resolveAppLocale(Locale? locale, Iterable<Locale> supportedLocales) {
       return supported;
     }
   }
-  const fallback = Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
+  const fallback = Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans');
   setActiveLocale(fallback);
   return fallback;
 }
@@ -131,12 +138,14 @@ const Map<String, String> _zhHans = {
   'app.name.en': 'Valora',
   'language.system': '跟随系统',
   'language.system.short': '系统',
+  'language.zhHans': '简体中文',
+  'language.zhHans.short': '简中',
   'language.zhHant': '繁体中文',
   'language.zhHant.short': '繁中',
   'language.en': 'English',
   'language.en.short': 'EN',
   'settings.language': '语言',
-  'settings.language.desc': '跟随系统语言，也可在这里固定为繁体中文或英文',
+  'settings.language.desc': '跟随系统语言，也可在这里固定为简体中文、繁体中文或英文',
   'settings.title': '设置',
   'settings.localMode': '本地模式',
   'settings.menu': '设置菜单',
@@ -293,22 +302,28 @@ const Map<String, String> _en = {
   'app.name.en': 'Valora',
   'language.system': 'System',
   'language.system.short': 'Auto',
+  'language.zhHans': 'Simplified Chinese',
+  'language.zhHans.short': '简中',
   'language.zhHant': 'Traditional Chinese',
   'language.zhHant.short': '繁中',
   'language.en': 'English',
   'language.en.short': 'EN',
   'settings.language': 'Language',
-  'settings.language.desc': 'Follow the system language, or pin the app to Traditional Chinese or English',
+  'settings.language.desc':
+      'Follow the system language, or pin the app to Simplified Chinese, Traditional Chinese, or English',
   'settings.title': 'Settings',
   'settings.localMode': 'Local mode',
   'settings.menu': 'Settings',
   'settings.quick': 'Shortcuts',
   'settings.dataBackup': 'Data and backup',
-  'settings.dataBackup.desc': 'Categories, tags, ZIP, JSON, snapshots, and cloud sync',
+  'settings.dataBackup.desc':
+      'Categories, tags, ZIP, JSON, snapshots, and cloud sync',
   'settings.appearanceInteraction': 'Appearance',
-  'settings.appearanceInteraction.desc': 'Theme, home style, money, duration, haptics, snackbars, and stickers',
+  'settings.appearanceInteraction.desc':
+      'Theme, home style, money, duration, haptics, snackbars, and stickers',
   'settings.systemPermissions': 'System',
-  'settings.systemPermissions.desc': 'Native features, widgets, notifications, system settings, and shortcuts',
+  'settings.systemPermissions.desc':
+      'Native features, widgets, notifications, system settings, and shortcuts',
   'settings.onboarding': 'Tutorial',
   'settings.onboarding.desc': 'Replay the full guide and feature tour',
   'settings.start': 'Start',
@@ -320,10 +335,14 @@ const Map<String, String> _en = {
   'settings.tab.data': 'Data and backup',
   'settings.tab.appearance': 'Appearance',
   'settings.tab.system': 'System',
-  'settings.tab.overview.subtitle': 'Common management, format previews, and quick entries',
-  'settings.tab.data.subtitle': 'Manage categories, tags, backup, migration, and cloud sync',
-  'settings.tab.appearance.subtitle': 'Theme, language, display formats, haptics, and sticker effects',
-  'settings.tab.system.subtitle': 'Android native features, permissions, notifications, widgets, and shortcuts',
+  'settings.tab.overview.subtitle':
+      'Common management, format previews, and quick entries',
+  'settings.tab.data.subtitle':
+      'Manage categories, tags, backup, migration, and cloud sync',
+  'settings.tab.appearance.subtitle':
+      'Theme, language, display formats, haptics, and sticker effects',
+  'settings.tab.system.subtitle':
+      'Android native features, permissions, notifications, widgets, and shortcuts',
   'settings.pill.submenu': 'Submenu',
   'settings.commonManagement': 'Common management',
   'settings.categoryTags': 'Categories and tags',
@@ -342,23 +361,29 @@ const Map<String, String> _en = {
   'settings.themeMode.desc': 'Follow system, or pin light or dark mode',
   'settings.glassEffect': 'Glass effect',
   'settings.glassSoftness': 'Glass softness',
-  'settings.glassSoftness.desc': 'Balances translucency and background blur for a softer liquid glass finish',
+  'settings.glassSoftness.desc':
+      'Balances translucency and background blur for a softer liquid glass finish',
   'settings.glassSoftness.clear': 'Clear',
   'settings.glassSoftness.soft': 'Soft',
   'settings.glassSoftness.frosted': 'Frosted',
   'settings.homeStyle': 'Home style',
   'settings.includeRetired': 'Include retired assets',
-  'settings.includeRetired.desc': 'When off, retired assets are excluded from analytics and home totals',
+  'settings.includeRetired.desc':
+      'When off, retired assets are excluded from analytics and home totals',
   'settings.currencySymbol': 'Currency symbol',
-  'settings.currencySymbol.desc': 'Controls the prefix used for all money values',
+  'settings.currencySymbol.desc':
+      'Controls the prefix used for all money values',
   'settings.decimalPlaces': 'Decimal places',
-  'settings.decimalPlaces.desc': 'Calculations still keep their original precision',
+  'settings.decimalPlaces.desc':
+      'Calculations still keep their original precision',
   'settings.thousands': 'Thousands separator',
   'settings.thousands.desc': 'Large asset values become easier to scan',
   'settings.durationDisplay': 'Duration display',
-  'settings.durationDisplay.desc': 'Affects asset cards and analytics duration text',
+  'settings.durationDisplay.desc':
+      'Affects asset cards and analytics duration text',
   'settings.homeMetaScale': 'Home meta text',
-  'settings.homeMetaScale.desc': 'Adjusts small home-card details such as price and usage time',
+  'settings.homeMetaScale.desc':
+      'Adjusts small home-card details such as price and usage time',
   'analytics.countUnit': 'items',
   'theme.light': 'Light',
   'theme.dark': 'Dark',
@@ -410,14 +435,20 @@ const Map<String, String> _en = {
   'StickerEngineMode.balanced': 'Balanced',
   'StickerEngineMode.quality': 'Quality',
   'StickerEngineMode.hqExperimental': 'HQ',
-  'StickerEngineMode.compact.desc': 'Smaller input and fewer candidates for fast, lightweight processing',
-  'StickerEngineMode.balanced.desc': 'The everyday default, balancing speed and result quality',
-  'StickerEngineMode.quality.desc': 'Larger input and more candidates for steadier results, with slower processing',
-  'StickerEngineMode.hqExperimental.desc': 'Uses larger input and more candidates to improve cutout quality, at the cost of speed',
+  'StickerEngineMode.compact.desc':
+      'Smaller input and fewer candidates for fast, lightweight processing',
+  'StickerEngineMode.balanced.desc':
+      'The everyday default, balancing speed and result quality',
+  'StickerEngineMode.quality.desc':
+      'Larger input and more candidates for steadier results, with slower processing',
+  'StickerEngineMode.hqExperimental.desc':
+      'Uses larger input and more candidates to improve cutout quality, at the cost of speed',
   'GlassEffectMode.classic': 'Classic',
   'GlassEffectMode.liquid': 'Liquid',
-  'GlassEffectMode.classic.desc': 'A light Gaussian blur style: stable, efficient, and readable',
-  'GlassEffectMode.liquid.desc': 'Scene-level liquid refraction for the dock, add button, and save button',
+  'GlassEffectMode.classic.desc':
+      'A light Gaussian blur style: stable, efficient, and readable',
+  'GlassEffectMode.liquid.desc':
+      'Scene-level liquid refraction for the dock, add button, and save button',
   'SortMode.dailyCost': 'Daily',
   'SortMode.price': 'Price',
   'SortMode.days': 'Duration',
@@ -865,7 +896,8 @@ const Map<String, String> _zhHansFull = {
   'restore.zipReadFailed': '读取 ZIP 失败',
   'restore.zipNoJson': '资料包中没有找到可用 JSON',
   'restore.confirmTitle': '确认恢复资料包',
-  'restore.confirmContent': '将导入 {assets} 个资产、{wishes} 个心愿、{categories} 个分类、{tags} 个标签、{media} 个媒体文件、{entries} 条记录和 {sqlite} 个数据库文件。恢复前会自动创建快照',
+  'restore.confirmContent':
+      '将导入 {assets} 个资产、{wishes} 个心愿、{categories} 个分类、{tags} 个标签、{media} 个媒体文件、{entries} 条记录和 {sqlite} 个数据库文件。恢复前会自动创建快照',
   'restore.confirm': '确认恢复',
   'restore.autoSnapshot': '恢复前快照',
   'restore.zipSuccess': '已恢复 {a} 个资产和 {m} 个媒体文件',
@@ -1137,61 +1169,80 @@ const Map<String, String> _zhHansFull = {
 
 const Map<String, String> _enFull = {
   'analytics.title': 'Analytics',
-  'analytics.subtitle': 'Use aggregated signals to decide what still deserves a place',
+  'analytics.subtitle':
+      'Use aggregated signals to decide what still deserves a place',
   'analytics.coreMetrics': 'Core metrics',
   'analytics.totalAssetValue': 'Total asset value',
   'analytics.avgDailyCost': 'Average daily cost',
   'analytics.totalInvested': 'Total invested',
   'analytics.wishBudget': 'Wish budget',
   'analytics.valueTrend': 'Long-term value map',
-  'analytics.valueTrendDesc': 'The line estimates net value; the shaded area shows accumulated value over time. Tap for details',
+  'analytics.valueTrendDesc':
+      'The line estimates net value; the shaded area shows accumulated value over time. Tap for details',
   'analytics.dailyCostTrend': 'Daily cost trend',
-  'analytics.dailyCostTrendDesc': 'Tracks how average daily cost changes over time. Tap for each point',
+  'analytics.dailyCostTrendDesc':
+      'Tracks how average daily cost changes over time. Tap for each point',
   'analytics.assetCheckup': 'Asset checkup',
   'analytics.netCost': 'Total net cost',
   'analytics.valueRecovered': 'Value recovered',
   'analytics.categoryValuation': 'Value by category',
-  'analytics.categoryValuationDesc': 'Current asset value grouped by category. Tap for category details',
+  'analytics.categoryValuationDesc':
+      'Current asset value grouped by category. Tap for category details',
   'analytics.noData': 'No data yet',
   'analytics.tagDistribution': 'Tag distribution',
-  'analytics.tagDistributionDesc': 'Tags describe how assets are used. Tap for tag details',
+  'analytics.tagDistributionDesc':
+      'Tags describe how assets are used. Tap for tag details',
   'analytics.noTags': 'No tags yet',
   'analytics.dailyCostRanking': 'Daily cost ranking',
   'analytics.noDailyCostAssets': 'No assets with daily cost yet',
   'analytics.serviceDuration': 'Service duration',
-  'analytics.serviceDurationDesc': 'See which assets have stayed with you the longest. Tap for the ranking',
+  'analytics.serviceDurationDesc':
+      'See which assets have stayed with you the longest. Tap for the ranking',
   'analytics.coreMetricsDetail': 'Core metric details',
-  'analytics.coreMetricsDetailDesc': 'A closer look at calculations beyond the home dashboard',
+  'analytics.coreMetricsDetailDesc':
+      'A closer look at calculations beyond the home dashboard',
   'analytics.assetCount': 'Asset count',
   'analytics.statusBreakdown': 'Active / retired / sold',
-  'analytics.summaryNote': 'Note: total value follows current valuation and inclusion settings; daily cost is estimated from net cost over service days',
+  'analytics.summaryNote':
+      'Note: total value follows current valuation and inclusion settings; daily cost is estimated from net cost over service days',
   'analytics.valueTrendDetail': 'Value map details',
-  'analytics.valueTrendDetailDesc': 'Each point estimates asset net value for a period of time',
+  'analytics.valueTrendDetailDesc':
+      'Each point estimates asset net value for a period of time',
   'analytics.dailyCostTrendDetail': 'Daily cost trend record',
-  'analytics.dailyCostTrendDetailDesc': 'Each point is the average daily cost of calculable assets at that time',
+  'analytics.dailyCostTrendDetailDesc':
+      'Each point is the average daily cost of calculable assets at that time',
   'analytics.noTrendData': 'No trend data yet',
   'analytics.categoryDetail': 'Category value details',
-  'analytics.categoryDetailDesc': 'Use this to see where most of your money is sitting',
+  'analytics.categoryDetailDesc':
+      'Use this to see where most of your money is sitting',
   'analytics.noCategoryData': 'No category data yet',
   'analytics.tagDetail': 'Tag details',
-  'analytics.tagDetailDesc': 'Tags are best for usage scenarios, purchase reasons, and review angles',
+  'analytics.tagDetailDesc':
+      'Tags are best for usage scenarios, purchase reasons, and review angles',
   'analytics.serviceDurationRanking': 'Service duration ranking',
-  'analytics.serviceDurationRankingDesc': 'Find the assets that have genuinely stayed useful over time',
+  'analytics.serviceDurationRankingDesc':
+      'Find the assets that have genuinely stayed useful over time',
   'analytics.noAssets': 'No assets yet',
   'analytics.dailyCostDetail': 'Daily cost details',
-  'analytics.dailyCostDetailDesc': 'Tap any asset to inspect purchase price, service days, daily-cost goals, and more',
+  'analytics.dailyCostDetailDesc':
+      'Tap any asset to inspect purchase price, service days, daily-cost goals, and more',
   'analytics.purchased': 'Purchased',
   'analytics.held': 'Held',
   'analytics.timeMachine': 'Asset time machine',
-  'analytics.timeMachineDesc': 'Recent purchases, retirements, and sales become a review timeline here',
+  'analytics.timeMachineDesc':
+      'Recent purchases, retirements, and sales become a review timeline here',
   'analytics.noEvents': 'No events yet',
   'archive.title': 'Valora full archive',
-  'archive.generated': 'Full archive created with database, JSON, CSV, and report',
-  'archive.generatedWithMedia': 'Full archive created with database, JSON, CSV, report, and {n} media files',
+  'archive.generated':
+      'Full archive created with database, JSON, CSV, and report',
+  'archive.generatedWithMedia':
+      'Full archive created with database, JSON, CSV, report, and {n} media files',
   'auto.title': 'Reminders, notifications, and shortcuts',
-  'auto.subtitle': 'Add system-level entry points with Android notifications, alarms, and shortcuts',
+  'auto.subtitle':
+      'Add system-level entry points with Android notifications, alarms, and shortcuts',
   'auto.notifTitle': 'Valora asset checkup',
-  'auto.notifBody': 'Time to review high daily costs, due-soon items, and idle assets',
+  'auto.notifBody':
+      'Time to review high daily costs, due-soon items, and idle assets',
   'auto.testScheduled': 'Test reminder scheduled for 1 minute from now',
   'auto.testFailed': 'Could not schedule the reminder',
   'auto.testReminder': 'Test reminder in 1 minute',
@@ -1199,11 +1250,13 @@ const Map<String, String> _enFull = {
   'auto.shortcutFailed': 'Dynamic shortcuts are not supported on this system',
   'auto.createShortcut': 'Create long-press shortcut',
   'auto.permRequested': 'Notification permission requested',
-  'auto.permNotNeeded': 'This system does not require runtime notification permission',
+  'auto.permNotNeeded':
+      'This system does not require runtime notification permission',
   'auto.requestPerm': 'Request notification permission',
   'auto.openNotifSettings': 'Open notification settings',
   'clipboard.title': 'Read clipboard',
-  'clipboard.subtitle': 'Restore Valora JSON from the clipboard, or use plain text as an asset-name draft',
+  'clipboard.subtitle':
+      'Restore Valora JSON from the clipboard, or use plain text as an asset-name draft',
   'clipboard.empty': 'Clipboard is empty',
   'clipboard.read': 'Read clipboard',
   'clipboard.copied': 'Current JSON copied to clipboard',
@@ -1241,7 +1294,8 @@ const Map<String, String> _enFull = {
   'compose.addItem': 'Add item',
   'compose.note': 'Note',
   'compose.noteHint': 'Add a note, up to 200 characters',
-  'compose.pricelessHint': 'Priceless items are excluded from value and daily-cost totals. Use this for keepsakes, collections, and things that cannot be priced',
+  'compose.pricelessHint':
+      'Priceless items are excluded from value and daily-cost totals. Use this for keepsakes, collections, and things that cannot be priced',
   'compose.excludeFromTotal': 'Exclude from total value',
   'compose.excludeFromDaily': 'Exclude from daily cost',
   'compose.sold': 'Sold',
@@ -1249,9 +1303,12 @@ const Map<String, String> _enFull = {
   'compose.retired': 'Retired',
   'compose.expiryTime': 'Expiry date',
   'compose.expiryReminder': 'Expiry reminder',
-  'compose.noGoalHintPriceless': 'Priceless items can still have record goals, so you can review how long they have stayed with you',
-  'compose.noGoalHintNormal': 'Set a daily-cost or target-date goal and Valora will estimate progress',
-  'compose.pricelessNoDailyGoal': 'Priceless items do not support daily-cost goals',
+  'compose.noGoalHintPriceless':
+      'Priceless items can still have record goals, so you can review how long they have stayed with you',
+  'compose.noGoalHintNormal':
+      'Set a daily-cost or target-date goal and Valora will estimate progress',
+  'compose.pricelessNoDailyGoal':
+      'Priceless items do not support daily-cost goals',
   'compose.targetDailyCost': 'Target daily cost / day',
   'compose.targetDate': 'Target date',
   'compose.targetDays': 'Target days',
@@ -1270,20 +1327,27 @@ const Map<String, String> _enFull = {
   'compose.ocrNote': 'Receipt OCR text',
   'compose.ocrWrittenToNote': 'OCR text added to note',
   'compose.ocrFilledPrice': 'OCR filled price: {price}',
-  'compose.valueModeSubtitle': 'Choose whether this item participates in money statistics',
-  'compose.valueModePricelessDesc': 'Best for keepsakes, gifts, collections, and items whose value is not monetary',
-  'compose.valueModePricedDesc': 'Best for items included in total value, daily cost, and recovery calculations',
+  'compose.valueModeSubtitle':
+      'Choose whether this item participates in money statistics',
+  'compose.valueModePricelessDesc':
+      'Best for keepsakes, gifts, collections, and items whose value is not monetary',
+  'compose.valueModePricedDesc':
+      'Best for items included in total value, daily cost, and recovery calculations',
   'compose.selectCategory': 'Select category',
-  'compose.selectCategorySubtitle': 'Choose an existing category, or let Valora suggest one from the name',
+  'compose.selectCategorySubtitle':
+      'Choose an existing category, or let Valora suggest one from the name',
   'compose.smartNewCategory': 'Smart new category',
-  'compose.smartNewCategoryHint': 'Infer icon, color, and broad category from the name',
-  'compose.tagsSubtitle': 'Tap to select or remove tags. New tags are added automatically',
+  'compose.smartNewCategoryHint':
+      'Infer icon, color, and broad category from the name',
+  'compose.tagsSubtitle':
+      'Tap to select or remove tags. New tags are added automatically',
   'compose.tagsHint': 'For example: productivity, commute, idle',
   'compose.commonTags': 'Common tags',
   'compose.existingTags': 'Existing tags',
   'compose.newTag': 'New tag',
   'compose.addAddonTitle': 'Add add-on',
-  'compose.addAddonSubtitle': 'Cases, storage bags, repairs, and other extra costs',
+  'compose.addAddonSubtitle':
+      'Cases, storage bags, repairs, and other extra costs',
   'compose.addonName': 'Name',
   'compose.addonPrice': 'Price',
   'compose.addonDateInvalid': 'Add-on purchase date is invalid',
@@ -1292,7 +1356,8 @@ const Map<String, String> _enFull = {
   'compose.purchaseDateInvalid': 'Purchase date is invalid',
   'compose.targetDailyCostRequired': 'Target daily cost must be greater than 0',
   'compose.targetDateRequired': 'Choose a target date for date-based goals',
-  'compose.targetCustomDaysRequired': 'Enter target days greater than 0 for custom goals',
+  'compose.targetCustomDaysRequired':
+      'Enter target days greater than 0 for custom goals',
   'compose.targetModeNone': 'No goal',
   'compose.targetModeDaily': 'By daily cost',
   'compose.targetModeDate': 'By date',
@@ -1319,7 +1384,8 @@ const Map<String, String> _enFull = {
   'date.weekday5Short': 'F',
   'date.weekday6Short': 'S',
   'date.weekday7Short': 'S',
-  'date.wheelHint': 'Scroll to choose year and month, then return to the calendar',
+  'date.wheelHint':
+      'Scroll to choose year and month, then return to the calendar',
   'date.backToCalendar': 'Back to calendar',
   'date.tapToSwitchYearMonth': 'Tap to switch year and month',
   'date.prevMonth': 'Previous month',
@@ -1335,7 +1401,8 @@ const Map<String, String> _enFull = {
   'detail.recordTime': 'Record time',
   'detail.holdingTime': 'Holding time',
   'detail.dailyCostTrend': 'Daily cost trend',
-  'detail.dailyCostTrendDesc': 'Solid line shows actual amortization; dotted line projects from the daily-cost goal. The horizontal guide is the target daily cost',
+  'detail.dailyCostTrendDesc':
+      'Solid line shows actual amortization; dotted line projects from the daily-cost goal. The horizontal guide is the target daily cost',
   'detail.recordGoal': 'Record goal',
   'detail.dailyCostGoal': 'Daily-cost goal',
   'detail.sinceLast': 'Recorded for',
@@ -1385,11 +1452,13 @@ const Map<String, String> _enFull = {
   'editor.targetDays': 'Target days',
   'editor.expiryDate': 'Expiry date',
   'editor.remindBeforeDays': 'Remind days before',
-  'editor.pricelessNote': 'Priceless items stay out of money statistics, while still keeping time, category, tags, and memory records',
+  'editor.pricelessNote':
+      'Priceless items stay out of money statistics, while still keeping time, category, tags, and memory records',
   'editor.includeInTotal': 'Include in total value',
   'editor.includeInDailyCost': 'Include in daily cost',
   'editor.addons': 'Add-ons',
-  'editor.addonHint': 'Track accessories, repairs, cases, and other additional costs here',
+  'editor.addonHint':
+      'Track accessories, repairs, cases, and other additional costs here',
   'editor.addonPurchaseTime': 'Add-on purchase time',
   'editor.saveChanges': 'Save changes',
   'editor.addToAssets': 'Add to assets',
@@ -1405,7 +1474,8 @@ const Map<String, String> _enFull = {
   'editor.barcodeLabel': 'Barcode / QR code',
   'editor.barcodeApplied': 'Scan result added to the editor',
   'editor.tagsTitle': 'Tags',
-  'editor.tagsSubtitle': 'Tap to select or remove tags. New tags are added automatically',
+  'editor.tagsSubtitle':
+      'Tap to select or remove tags. New tags are added automatically',
   'editor.tagHint': 'For example: productivity, commute, idle',
   'editor.presetTags': 'Common tags',
   'editor.existingTags': 'Existing tags',
@@ -1426,14 +1496,17 @@ const Map<String, String> _enFull = {
   'editor.defaultAddonName': 'Add-on',
   'editor.invalidRecordDate': 'Record date is invalid',
   'editor.invalidPurchaseDate': 'Purchase date is invalid',
-  'editor.dateBeforePurchase': 'Status and target dates cannot be before the purchase or record date',
+  'editor.dateBeforePurchase':
+      'Status and target dates cannot be before the purchase or record date',
   'editor.unnamedAsset': 'Unnamed asset',
   'home.durationDetail': 'Holding time details',
   'home.unifiedDisplay': 'Unified display',
   'home.yearMonthConversion': 'Year / month conversion',
   'home.calcCutoff': 'Calculation cutoff',
-  'home.durationHintPriceless': 'Priceless items use record date for their timeline',
-  'home.durationHintNormal': 'Regular assets use purchase date for usage duration',
+  'home.durationHintPriceless':
+      'Priceless items use record date for their timeline',
+  'home.durationHintNormal':
+      'Regular assets use purchase date for usage duration',
   'home.sinceLast': 'Recorded for',
   'home.usedFor': 'Used for',
   'home.emptyTitle': 'Nothing here yet',
@@ -1446,7 +1519,8 @@ const Map<String, String> _enFull = {
   'home.statusRetired': 'Retired',
   'home.statusSold': 'Sold',
   'home.lifecycleLedger': 'Asset lifecycle ledger',
-  'home.lifecycleLedgerDesc': 'See purchase, service, retirement, sale, and recovery on one line',
+  'home.lifecycleLedgerDesc':
+      'See purchase, service, retirement, sale, and recovery on one line',
   'home.recordRecovery': 'Record recovery',
   'home.totalInvested': 'Total invested',
   'home.currentNetValue': 'Current net value',
@@ -1456,34 +1530,42 @@ const Map<String, String> _enFull = {
   'home.timeMachineEmpty': 'Create snapshots to see recent asset changes here',
   'home.timeMachineHasSnapshots': '{n} snapshots. Latest: {label}',
   'home.walletLeakTitle': 'Wallet leak radar',
-  'home.walletLeakDesc': 'Prioritize assets that exceed budget, are due soon, or have stayed idle too long',
+  'home.walletLeakDesc':
+      'Prioritize assets that exceed budget, are due soon, or have stayed idle too long',
   'home.perDay': '/day',
   'home.pricelessTitle': 'Priceless items',
-  'home.pricelessDesc': 'Not counted in money totals, but still worth recording with care',
+  'home.pricelessDesc':
+      'Not counted in money totals, but still worth recording with care',
   'home.dueSoonTitle': 'Due soon',
-  'home.dueSoonDesc': 'Warranty, membership, consumables, and recurring services appear here before they expire',
+  'home.dueSoonDesc':
+      'Warranty, membership, consumables, and recurring services appear here before they expire',
   'home.expiresIn': 'Due in {n} days',
   'home.searchTitle': 'Search assets',
   'home.searchSubtitle': 'Find assets by name, tag, category, or note',
   'home.searchHint': 'Search assets, tags, or notes',
   'home.clearSearch': 'Clear search',
   'home.filterTitle': 'Filters',
-  'home.filterSubtitle': 'Focus on the slice of assets you care about right now',
+  'home.filterSubtitle':
+      'Focus on the slice of assets you care about right now',
   'home.filterTaggedOnly': 'Tagged only',
   'home.filterTaggedOnlyDesc': 'Hide assets without tags',
   'home.filterTargetedOnly': 'With goals only',
-  'home.filterTargetedOnlyDesc': 'Show only assets with daily-cost or cycle goals',
+  'home.filterTargetedOnlyDesc':
+      'Show only assets with daily-cost or cycle goals',
   'home.resetFilters': 'Reset filters',
   'home.sortAndDisplayStyle': 'Sort and view',
-  'home.sortAndDisplayDesc': 'Change the default sort and presentation for the asset list',
+  'home.sortAndDisplayDesc':
+      'Change the default sort and presentation for the asset list',
   'home.sort': 'Sort',
   'home.homeStyle': 'Home style',
   'iconPicker.fromGallery': 'Pick a real cover from gallery',
-  'iconPicker.galleryHint': 'You can still use a character icon. Real images are copied into the app private folder and saved with the asset',
+  'iconPicker.galleryHint':
+      'You can still use a character icon. Real images are copied into the app private folder and saved with the asset',
   'iconPicker.album': 'Album',
   'iconPicker.threeDIcon': '3D icon',
   'media.title': 'Media and recognition',
-  'media.subtitle': 'Choose covers, take photos, create stickers, or use barcode and OCR to speed up entry',
+  'media.subtitle':
+      'Choose covers, take photos, create stickers, or use barcode and OCR to speed up entry',
   'media.noImage': 'No image selected',
   'media.savedCover': 'Cover saved: ',
   'media.openGallery': 'Open gallery',
@@ -1499,32 +1581,42 @@ const Map<String, String> _enFull = {
   'media.ocrNoPrice': 'No price detected',
   'media.ocrPrice': 'Price detected: ',
   'media.ocrReceipt': 'Read receipt',
-  'media.ocrHint': 'Extract name, price, and note clues from receipt or package text',
+  'media.ocrHint':
+      'Extract name, price, and note clues from receipt or package text',
   'native.capabilities': 'Android native features',
   'native.hapticTest': 'Native haptic test',
-  'native.hapticTestDesc': 'Call system vibration effects for tap, success, and warning feedback',
+  'native.hapticTestDesc':
+      'Call system vibration effects for tap, success, and warning feedback',
   'native.hapticTriggered': 'Haptic test triggered',
   'native.mediaAccess': 'Gallery / camera access',
-  'native.mediaAccessDesc': 'Use Android Photo Picker and the system camera intent',
+  'native.mediaAccessDesc':
+      'Use Android Photo Picker and the system camera intent',
   'native.notifications': 'Reminders, notifications, and shortcuts',
-  'native.notificationsDesc': 'Test notifications, notification settings, and launcher long-press shortcuts',
+  'native.notificationsDesc':
+      'Test notifications, notification settings, and launcher long-press shortcuts',
   'native.widgetRefresh': 'Refresh home widgets',
-  'native.widgetRefreshDesc': 'Push latest assets, wishes, and snapshots to home-screen widgets',
+  'native.widgetRefreshDesc':
+      'Push latest assets, wishes, and snapshots to home-screen widgets',
   'native.widgetRefreshed': 'Home widgets refreshed',
   'native.clipboard': 'Read clipboard',
-  'native.clipboardDesc': 'Read the system clipboard and detect JSON or plain text drafts',
+  'native.clipboardDesc':
+      'Read the system clipboard and detect JSON or plain text drafts',
   'native.clipboardPill': 'Clipboard',
   'native.share': 'System share',
-  'native.shareDesc': 'Send asset summaries or reports through the Android share sheet',
+  'native.shareDesc':
+      'Send asset summaries or reports through the Android share sheet',
   'native.backup': 'Native backup and reports',
   'native.exportJson': 'Export JSON to system file',
-  'native.exportJsonDesc': 'Choose a save location with Android Storage Access Framework',
+  'native.exportJsonDesc':
+      'Choose a save location with Android Storage Access Framework',
   'native.restoreZip': 'Restore from ZIP archive',
   'native.restoreZipDesc': 'Restore complete data and media files',
   'native.restoreJson': 'Restore JSON from system file',
-  'native.restoreJsonDesc': 'Restore structured data only, without covers or sticker images',
+  'native.restoreJsonDesc':
+      'Restore structured data only, without covers or sticker images',
   'native.exportCsv': 'Export CSV asset table',
-  'native.exportCsvDesc': 'Continue editing in Excel, WPS, Numbers, or another spreadsheet app',
+  'native.exportCsvDesc':
+      'Continue editing in Excel, WPS, Numbers, or another spreadsheet app',
   'native.exportMd': 'Export Markdown report',
   'native.exportMdDesc': 'Generate a shareable asset review report',
   'report.title': 'Valora asset report',
@@ -1538,7 +1630,8 @@ const Map<String, String> _enFull = {
   'report.walletLeaks': 'Wallet leaks',
   'report.noLeaks': 'No obvious leaks',
   'report.exportTitle': 'Export asset report',
-  'report.exportSubtitle': 'Save a Markdown file or share it through the system share sheet',
+  'report.exportSubtitle':
+      'Save a Markdown file or share it through the system share sheet',
   'report.exported': 'Report exported',
   'report.saveFile': 'Save file',
   'report.shareTitle': 'Share Valora report',
@@ -1550,24 +1643,31 @@ const Map<String, String> _enFull = {
   'restore.zipReadFailed': 'Could not read ZIP archive',
   'restore.zipNoJson': 'No usable JSON found in the archive',
   'restore.confirmTitle': 'Restore archive?',
-  'restore.confirmContent': 'This will import {assets} assets, {wishes} wishes, {categories} categories, {tags} tags, {media} media files, {entries} records, and {sqlite} database files. A snapshot will be created first',
+  'restore.confirmContent':
+      'This will import {assets} assets, {wishes} wishes, {categories} categories, {tags} tags, {media} media files, {entries} records, and {sqlite} database files. A snapshot will be created first',
   'restore.confirm': 'Restore',
   'restore.autoSnapshot': 'Pre-restore snapshot',
   'restore.zipSuccess': 'Restored {a} assets and {m} media files',
   'restore.zipJsonFailed': 'Archive JSON restore failed',
   'review.healthTitle': 'Asset health',
-  'review.healthSubtitle': 'Measure your asset management by goals, tags, risks, and lifecycle flow',
+  'review.healthSubtitle':
+      'Measure your asset management by goals, tags, risks, and lifecycle flow',
   'review.targetCoverage': 'Goal coverage',
   'review.tagCoverage': 'Tag coverage',
   'review.pendingRisk': 'Open risks',
   'review.items': 'items',
   'review.completedFlow': 'Completed flow',
-  'review.suggestionHigh': 'Your asset structure looks steady. Keep the review rhythm',
-  'review.suggestionRisk': 'Start with high-cost or idle assets for the fastest health improvement',
-  'review.suggestionTarget': 'Add goals to high-value assets so future decisions are clearer',
-  'review.suggestionBase': 'Start by adding tags and goals. Valora will understand your assets better',
+  'review.suggestionHigh':
+      'Your asset structure looks steady. Keep the review rhythm',
+  'review.suggestionRisk':
+      'Start with high-cost or idle assets for the fastest health improvement',
+  'review.suggestionTarget':
+      'Add goals to high-value assets so future decisions are clearer',
+  'review.suggestionBase':
+      'Start by adding tags and goals. Valora will understand your assets better',
   'review.quadrantTitle': 'Asset quadrant',
-  'review.quadrantSubtitle': 'Use service days and daily cost to identify long-term value and costly assets',
+  'review.quadrantSubtitle':
+      'Use service days and daily cost to identify long-term value and costly assets',
   'review.noServingAsset': 'No active assets yet',
   'review.quadrantLongLow': 'Long-term low cost',
   'review.quadrantShortHigh': 'Short-term high cost',
@@ -1581,7 +1681,8 @@ const Map<String, String> _enFull = {
   'review.served': 'Served',
   'review.dailyAvg': 'Daily avg',
   'review.snapshotTitle': 'Snapshot review',
-  'review.snapshotSubtitle': 'Use the latest snapshot to review asset count, wishes, and net value changes',
+  'review.snapshotSubtitle':
+      'Use the latest snapshot to review asset count, wishes, and net value changes',
   'review.noSnapshot': 'No snapshots yet',
   'review.latestSnapshot': 'Latest snapshot: ',
   'review.assetCountChange': 'Asset count change',
@@ -1591,42 +1692,64 @@ const Map<String, String> _enFull = {
   'review.dailyCostChange': 'Daily cost change',
   'select.immediateApply': 'Applied immediately after selection',
   'shell.tutorial.promptTitle': 'Take the quick tutorial first?',
-  'shell.tutorial.promptDesc': 'The tutorial points out the key entries for Home, Wishes, Analytics, and Settings inside the real interface',
+  'shell.tutorial.promptDesc':
+      'The tutorial points out the key entries for Home, Wishes, Analytics, and Settings inside the real interface',
   'shell.tutorial.notNow': 'Not now',
   'shell.tutorial.start': 'Start tutorial',
   'shell.tutorial.step1Title': 'Home overview: status at a glance',
-  'shell.tutorial.step1Subtitle': 'See total value, daily cost, active, retired, and sold counts together',
-  'shell.tutorial.step1Hint': 'Start with the overview, then decide whether to add, filter, or review',
+  'shell.tutorial.step1Subtitle':
+      'See total value, daily cost, active, retired, and sold counts together',
+  'shell.tutorial.step1Hint':
+      'Start with the overview, then decide whether to add, filter, or review',
   'shell.tutorial.step2Title': 'Filters and search: narrow things down fast',
-  'shell.tutorial.step2Subtitle': 'Filter assets by status, category, tag, and goal',
-  'shell.tutorial.step2Hint': 'Once you have many assets, filtering is much faster than scrolling',
+  'shell.tutorial.step2Subtitle':
+      'Filter assets by status, category, tag, and goal',
+  'shell.tutorial.step2Hint':
+      'Once you have many assets, filtering is much faster than scrolling',
   'shell.tutorial.step3TitleA': 'Asset cards: value and cost together',
   'shell.tutorial.step3TitleB': 'Empty state: start with one asset',
-  'shell.tutorial.step3SubtitleA': 'Cards show price, holding time, status, and daily cost',
-  'shell.tutorial.step3SubtitleB': 'Tap the add button to create an asset or wish',
+  'shell.tutorial.step3SubtitleA':
+      'Cards show price, holding time, status, and daily cost',
+  'shell.tutorial.step3SubtitleB':
+      'Tap the add button to create an asset or wish',
   'shell.tutorial.step3HintA': 'Open a card to see lifecycle and trend details',
-  'shell.tutorial.step3HintB': 'Record one everyday item and Valora can start calculating',
+  'shell.tutorial.step3HintB':
+      'Record one everyday item and Valora can start calculating',
   'shell.tutorial.step4Title': 'Bottom navigation: four workspaces',
-  'shell.tutorial.step4Subtitle': 'Assets, Wishes, Analytics, and Settings are all in the bottom navigation',
-  'shell.tutorial.step4Hint': 'The Dock responds with liquid-glass feedback when pressed or dragged',
+  'shell.tutorial.step4Subtitle':
+      'Assets, Wishes, Analytics, and Settings are all in the bottom navigation',
+  'shell.tutorial.step4Hint':
+      'The Dock responds with liquid-glass feedback when pressed or dragged',
   'shell.tutorial.step5Title': 'Add button: fastest capture point',
-  'shell.tutorial.step5Subtitle': 'New assets, wishes, and quick actions all start here',
-  'shell.tutorial.step5Hint': 'The easier it is to record, the more useful reviews become',
+  'shell.tutorial.step5Subtitle':
+      'New assets, wishes, and quick actions all start here',
+  'shell.tutorial.step5Hint':
+      'The easier it is to record, the more useful reviews become',
   'shell.tutorial.step6Title': 'Wishes: decide before you buy',
-  'shell.tutorial.step6Subtitle': 'Track budget, reason, and cover before something becomes an asset',
-  'shell.tutorial.step6Hint': 'After purchase, convert a wish into an asset in one tap',
+  'shell.tutorial.step6Subtitle':
+      'Track budget, reason, and cover before something becomes an asset',
+  'shell.tutorial.step6Hint':
+      'After purchase, convert a wish into an asset in one tap',
   'shell.tutorial.step7Title': 'Analytics: understand the structure',
-  'shell.tutorial.step7Subtitle': 'Charts show total value, daily cost, category, and tag distribution',
-  'shell.tutorial.step7Hint': 'Analytics are best for periodic review, not daily staring',
+  'shell.tutorial.step7Subtitle':
+      'Charts show total value, daily cost, category, and tag distribution',
+  'shell.tutorial.step7Hint':
+      'Analytics are best for periodic review, not daily staring',
   'shell.tutorial.step8Title': 'Lifecycle: from purchase to recovery',
-  'shell.tutorial.step8Subtitle': 'Valora connects purchase, retirement, sale, and recovery',
-  'shell.tutorial.step8Hint': 'It helps you decide whether an item still deserves to stay',
+  'shell.tutorial.step8Subtitle':
+      'Valora connects purchase, retirement, sale, and recovery',
+  'shell.tutorial.step8Hint':
+      'It helps you decide whether an item still deserves to stay',
   'shell.tutorial.step9Title': 'Settings: tune the way you record',
-  'shell.tutorial.step9Subtitle': 'Theme, language, formats, haptics, stickers, and backup live here',
-  'shell.tutorial.step9Hint': 'Common entries are grouped so Settings stays navigable',
+  'shell.tutorial.step9Subtitle':
+      'Theme, language, formats, haptics, stickers, and backup live here',
+  'shell.tutorial.step9Hint':
+      'Common entries are grouped so Settings stays navigable',
   'shell.tutorial.step10Title': 'Quick entries: frequent tools first',
-  'shell.tutorial.step10Subtitle': 'Categories, tags, backup, and tutorial replay are easy to reach',
-  'shell.tutorial.step10Hint': 'You can restart the tutorial from here whenever needed',
+  'shell.tutorial.step10Subtitle':
+      'Categories, tags, backup, and tutorial replay are easy to reach',
+  'shell.tutorial.step10Hint':
+      'You can restart the tutorial from here whenever needed',
   'sticker.updating': 'Updating preview',
   'sticker.contain': 'Contain',
   'sticker.fill': 'Fill',
@@ -1634,7 +1757,8 @@ const Map<String, String> _enFull = {
   'sticker.eraseTrim': 'Erase trim',
   'sticker.restoreTrim': 'Restore trim',
   'sticker.repairTitle': 'Edge repair',
-  'sticker.repairDesc': 'Use the brush to fix rough edges left by automatic cutout',
+  'sticker.repairDesc':
+      'Use the brush to fix rough edges left by automatic cutout',
   'sticker.tools': 'Tools',
   'sticker.move': 'Move',
   'sticker.eraser': 'Eraser',
@@ -1644,41 +1768,49 @@ const Map<String, String> _enFull = {
   'sticker.clearTrim': 'Clear trim',
   'sticker.composition': 'Composition',
   'sticker.zoom': 'Zoom',
-  'sticker.moveHint': 'Drag the subject to position it inside the sticker frame',
+  'sticker.moveHint':
+      'Drag the subject to position it inside the sticker frame',
   'sticker.edgeOptimization': 'Edge optimization',
   'sticker.modeBalanced': 'Balanced',
   'sticker.modeSubject': 'Keep subject',
   'sticker.modeEdge': 'Keep edges',
   'sticker.modeAggressive': 'Clean hard',
-  'sticker.edgeOptimizationDesc': 'Tune how much the cutout preserves or cleans the edge',
+  'sticker.edgeOptimizationDesc':
+      'Tune how much the cutout preserves or cleans the edge',
   'sticker.edgePreserve': 'Edge preservation',
   'sticker.edgeMore': 'Preserve more',
   'sticker.edgeCleaner': 'Cleaner edge',
   'sticker.edgeDefault': 'Default',
-  'sticker.edgePreserveHint': 'More preservation reduces accidental removal; stronger cleanup creates a sharper outline',
+  'sticker.edgePreserveHint':
+      'More preservation reduces accidental removal; stronger cleanup creates a sharper outline',
   'sticker.cleanupNone': 'No cleanup',
   'sticker.cleanupWhite': 'Clean white edge',
   'sticker.cleanupBlack': 'Clean black edge',
   'sticker.cleanupCorner': 'Clean corners',
   'sticker.colorTolerance': 'Color tolerance',
-  'sticker.colorToleranceHint': 'Higher tolerance removes a wider range of similar colors',
+  'sticker.colorToleranceHint':
+      'Higher tolerance removes a wider range of similar colors',
   'sticker.useOriginal': 'Use original',
   'sticker.applyAndGenerate': 'Apply and generate',
   'sticker.chooseCover': 'Choose cover',
-  'sticker.chooseCoverHint': 'Pick the candidate that works best as a sticker or cover',
+  'sticker.chooseCoverHint':
+      'Pick the candidate that works best as a sticker or cover',
   'sticker.candidate': 'Candidate {n}',
   'sticker.localEngine': 'Local engine',
   'sticker.directCrop': 'Direct crop',
   'sticker.frameCrop': 'Frame crop',
-  'sticker.frameCropDesc': 'Add padding and rounded corners so the cover feels like a physical sticker',
+  'sticker.frameCropDesc':
+      'Add padding and rounded corners so the cover feels like a physical sticker',
   'sticker.frameStyle': 'Frame style',
   'sticker.frameThickness': 'Frame thickness',
   'sticker.cornerRadius': 'Corner radius',
   'sticker.outerMargin': 'Outer margin',
   'sticker.generateFrame': 'Generate frame',
   'sticker.manualTrace': 'Manual trace',
-  'sticker.manualTraceDesc': 'Tap along the subject edge to create a contour. Useful when automatic cutout is not precise enough',
-  'sticker.traceHint': 'Tap along the subject edge, then close the shape to generate a sticker',
+  'sticker.manualTraceDesc':
+      'Tap along the subject edge to create a contour. Useful when automatic cutout is not precise enough',
+  'sticker.traceHint':
+      'Tap along the subject edge, then close the shape to generate a sticker',
   'sticker.traceSteps': 'At least 3 points are required',
   'sticker.undoPoint': 'Undo point',
   'sticker.clearRedraw': 'Clear and redraw',
@@ -1697,10 +1829,14 @@ const Map<String, String> _enFull = {
   'store.leakHighDaily': 'High daily cost',
   'store.leakTargetSlow': 'Goal progress is slow',
   'store.leakExpiringSoon': 'Due soon',
-  'store.leakSuggestIdle': 'Consider selling, recycling, or putting it back to use before the sunk cost grows',
-  'store.leakSuggestHighDaily': 'If recent usage is low, set a sale or retirement plan',
-  'store.leakSuggestTargetSlow': 'Lower the daily-cost target, extend the usage cycle, or reassess whether to keep it',
-  'store.leakSuggestExpiring': 'Renew, repair, or handle it before the deadline becomes urgent',
+  'store.leakSuggestIdle':
+      'Consider selling, recycling, or putting it back to use before the sunk cost grows',
+  'store.leakSuggestHighDaily':
+      'If recent usage is low, set a sale or retirement plan',
+  'store.leakSuggestTargetSlow':
+      'Lower the daily-cost target, extend the usage cycle, or reassess whether to keep it',
+  'store.leakSuggestExpiring':
+      'Renew, repair, or handle it before the deadline becomes urgent',
   'store.eventRecord': 'Recorded',
   'store.eventBuy': 'Purchased',
   'store.eventRetire': 'Retired',
@@ -1720,7 +1856,8 @@ const Map<String, String> _enFull = {
   'store.insightHighDailyDesc': 'currently costs',
   'store.insightHighDailyAction': ', worth reviewing usage soon',
   'store.insightTargetDone': 'Goal reached',
-  'store.insightTargetDoneDesc': 'has reached its goal. You can keep it active or record recovery',
+  'store.insightTargetDoneDesc':
+      'has reached its goal. You can keep it active or record recovery',
   'store.insightExpiring': 'Due soon',
   'store.insightExpiringDesc': 'is due on',
   'store.insightExpiringAction': '. Handle it ahead of time',
@@ -1731,7 +1868,8 @@ const Map<String, String> _enFull = {
   'store.insightWishBudgetDesc': 'Open wish budget has reached',
   'store.insightWishBudgetAction': '. Prioritize before buying',
   'store.insightStable': 'Asset state is stable',
-  'store.insightStableDesc': 'No obvious wallet leaks found. Keep the current recording rhythm',
+  'store.insightStableDesc':
+      'No obvious wallet leaks found. Keep the current recording rhythm',
   'store.catDigital': 'Digital devices',
   'store.catAudioVideo': 'Audio and video',
   'store.catPhotoCreative': 'Photo and creative',
@@ -1821,13 +1959,16 @@ const Map<String, String> _enFull = {
 };
 
 const Map<String, String> _enLiteral = {
-  'AI 贴纸会从图片中生成更像贴纸的主体效果，并提供边缘、描边、阴影等预览调节，适合做更精致的资产图标。': 'AI stickers create a sticker-like subject from the image, with edge, outline, and shadow adjustments for a more polished asset icon',
+  'AI 贴纸会从图片中生成更像贴纸的主体效果，并提供边缘、描边、阴影等预览调节，适合做更精致的资产图标。':
+      'AI stickers create a sticker-like subject from the image, with edge, outline, and shadow adjustments for a more polished asset icon',
   'AI 贴纸：候选图与实时调整': 'AI sticker: candidates and live tuning',
   'Android 原生震动': 'Android native vibration',
   'JSON 已复制到剪贴板': 'JSON copied to clipboard',
   'JSON 格式不正确': 'Invalid JSON format',
-  'WebDAV 已可直接上传/读取 JSON 备份；坚果云和 Nextcloud 本质也是 WebDAV 端点。': 'WebDAV can now upload and read JSON backups directly. Jianguoyun and Nextcloud are also WebDAV endpoints',
-  'WebDAV、坚果云、Nextcloud 与手动文件备份': 'WebDAV, Jianguoyun, Nextcloud, and manual file backup',
+  'WebDAV 已可直接上传/读取 JSON 备份；坚果云和 Nextcloud 本质也是 WebDAV 端点。':
+      'WebDAV can now upload and read JSON backups directly. Jianguoyun and Nextcloud are also WebDAV endpoints',
+  'WebDAV、坚果云、Nextcloud 与手动文件备份':
+      'WebDAV, Jianguoyun, Nextcloud, and manual file backup',
   '{app} JSON 备份': '{app} JSON backup',
   '{categories} 个分类 · {tags} 个标签': '{categories} categories · {tags} tags',
   '{count} 个': '{count} items',
@@ -1835,23 +1976,28 @@ const Map<String, String> _enLiteral = {
   '{count} 位': '{count} digits',
   '{count} 类': '{count} categories',
   '{name} 带来的收益': 'Income from {name}',
-  '“新手教程”入口会重新播放这一整套真实界面引导。': 'The tutorial entry replays this full guide on the real interface',
+  '“新手教程”入口会重新播放这一整套真实界面引导。':
+      'The tutorial entry replays this full guide on the real interface',
   '上一步': 'Previous',
   '上传当前备份': 'Upload current backup',
   '上次上传：{date}': 'Last upload: {date}',
   '上次读取：{date}': 'Last read: {date}',
   '下一步': 'Next',
-  '不用手动输入颜色或图标，直接点选即可。': 'Pick a color and icon directly instead of entering them by hand',
+  '不用手动输入颜色或图标，直接点选即可。':
+      'Pick a color and icon directly instead of entering them by hand',
   '不用手动输入颜色，直接从色板选择。': 'Choose from the palette instead of typing a color',
   '主题、首页、金额格式、触感和提示条': 'Theme, home, money format, haptics, and snackbars',
-  '主题、首页风格、金额格式、时长显示、首页副信息字号、触感反馈和贴纸引擎都在这里。': 'Theme, home style, money format, duration display, home meta text size, haptics, and the sticker engine all live here',
+  '主题、首页风格、金额格式、时长显示、首页副信息字号、触感反馈和贴纸引擎都在这里。':
+      'Theme, home style, money format, duration display, home meta text size, haptics, and the sticker engine all live here',
   '乐器': 'Instruments',
   '书': 'Books',
   '书籍': 'Books',
   '买入': 'Purchased',
   '二手回收': 'Resale recovery',
-  '二级菜单本身也进入教程，而不是只停留在一级设置页。': 'The submenu itself is included in the guide, instead of stopping at the top-level settings page',
-  '二级菜单进入时不会再触发行项目闪动，预测式返回只在真正返回时生效。': 'Entering a submenu no longer causes row flicker, and predictive back only runs on an actual back action',
+  '二级菜单本身也进入教程，而不是只停留在一级设置页。':
+      'The submenu itself is included in the guide, instead of stopping at the top-level settings page',
+  '二级菜单进入时不会再触发行项目闪动，预测式返回只在真正返回时生效。':
+      'Entering a submenu no longer causes row flicker, and predictive back only runs on an actual back action',
   '二级菜单：外观与交互': 'Submenu: appearance and interaction',
   '二级菜单：数据与备份': 'Submenu: data and backup',
   '二级菜单：系统与权限': 'Submenu: system and permissions',
@@ -1873,11 +2019,15 @@ const Map<String, String> _enLiteral = {
   '价值': 'Value',
   '价值回收': 'Value recovery',
   '价格、购买日期、分类和标签': 'Price, purchase date, category, and tags',
-  '价格会参与总价值和日均成本计算；购买日期支持自然语言输入和日期选择。': 'Price feeds total value and daily cost. Purchase date supports natural-language entry and date picking',
-  '会删除当前资产、心愿、分类、标签和快照，保留一个完全空白的 App。': 'This removes current assets, wishes, categories, tags, and snapshots, leaving a blank app',
-  '你提到的小字完整显示、首页副信息字号，就属于这一组。': 'The full small-text display and home meta text size you mentioned are part of this group',
+  '价格会参与总价值和日均成本计算；购买日期支持自然语言输入和日期选择。':
+      'Price feeds total value and daily cost. Purchase date supports natural-language entry and date picking',
+  '会删除当前资产、心愿、分类、标签和快照，保留一个完全空白的 App。':
+      'This removes current assets, wishes, categories, tags, and snapshots, leaving a blank app',
+  '你提到的小字完整显示、首页副信息字号，就属于这一组。':
+      'The full small-text display and home meta text size you mentioned are part of this group',
   '使用 Android 本地通知能力': 'Uses Android local notifications',
-  '使用 PROPFIND 检查 WebDAV 端点和账号': 'Uses PROPFIND to check the WebDAV endpoint and account',
+  '使用 PROPFIND 检查 WebDAV 端点和账号':
+      'Uses PROPFIND to check the WebDAV endpoint and account',
   '使用收益': 'Usage income',
   '例如 ¥ / \$ / RMB': 'For example ¥ / \$ / RMB',
   '保存 JSON': 'Save JSON',
@@ -1895,7 +2045,8 @@ const Map<String, String> _enLiteral = {
   '全部': 'All',
   '公文包': 'Briefcase',
   '关闭后不再调用原生 Vibrator': 'When off, the native Vibrator is no longer called',
-  '关闭后自动删除未选贴纸候选，避免缓存积累': 'When off, unselected sticker candidates are deleted automatically to avoid cache buildup',
+  '关闭后自动删除未选贴纸候选，避免缓存积累':
+      'When off, unselected sticker candidates are deleted automatically to avoid cache buildup',
   '其他云端入口': 'Other cloud entries',
   '冰箱': 'Fridge',
   '净消耗 {value}': 'Net spent {value}',
@@ -1904,15 +2055,20 @@ const Map<String, String> _enLiteral = {
   '分享 JSON': 'Share JSON',
   '分享完整资料包 ZIP': 'Share full ZIP archive',
   '分摊 {value}': 'Allocated {value}',
-  '分析页会汇总资产总值、平均日耗、累计投入和心愿预算。': 'Analytics summarizes total asset value, average daily cost, total invested, and wish budget',
+  '分析页会汇总资产总值、平均日耗、累计投入和心愿预算。':
+      'Analytics summarizes total asset value, average daily cost, total invested, and wish budget',
   '分析页：健康度与生命周期': 'Analytics: health and lifecycle',
   '分析页：核心指标': 'Analytics: core metrics',
   '分类': 'Category',
   '分类名称': 'Category name',
-  '分类名称，例如 电子数码 / 学习办公 / 家居生活': 'Category name, such as Digital devices / Study and work / Home and living',
-  '分类建议按大类管理，例如电子数码、影音娱乐、学习办公，而不是为每个手机/电脑单独建类。': 'Categories work best as broad groups, such as digital devices, media, and study or work, instead of one category for every phone or computer',
-  '分类管理、备份恢复、新手教程等高频操作仍保留在设置首页。': 'Common actions such as category management, backup and restore, and tutorial replay stay on the settings home',
-  '切到心愿模式后，表单会变成心愿名称、预计价格、分类、标签、备注和封面。': 'In wish mode, the form changes to wish name, expected price, category, tags, note, and cover',
+  '分类名称，例如 电子数码 / 学习办公 / 家居生活':
+      'Category name, such as Digital devices / Study and work / Home and living',
+  '分类建议按大类管理，例如电子数码、影音娱乐、学习办公，而不是为每个手机/电脑单独建类。':
+      'Categories work best as broad groups, such as digital devices, media, and study or work, instead of one category for every phone or computer',
+  '分类管理、备份恢复、新手教程等高频操作仍保留在设置首页。':
+      'Common actions such as category management, backup and restore, and tutorial replay stay on the settings home',
+  '切到心愿模式后，表单会变成心愿名称、预计价格、分类、标签、备注和封面。':
+      'In wish mode, the form changes to wish name, expected price, category, tags, note, and cover',
   '创建并加入': 'Create and add',
   '创建并选中': 'Create and select',
   '创建快照': 'Create snapshot',
@@ -1925,7 +2081,8 @@ const Map<String, String> _enLiteral = {
   '到期提醒': 'Expiry reminders',
   '刷新桌面小组件': 'Refresh home widgets',
   '办公': 'Office',
-  '加号会根据当前页打开新增资产或新增心愿。教程下一步会进入真实新增页。': 'The add button opens a new asset or wish based on the current page. The next step enters the real create page',
+  '加号会根据当前页打开新增资产或新增心愿。教程下一步会进入真实新增页。':
+      'The add button opens a new asset or wish based on the current page. The next step enters the real create page',
   '医药': 'Medical',
   '千位分隔': 'Thousands separator',
   '单车': 'Bike',
@@ -1940,13 +2097,16 @@ const Map<String, String> _enLiteral = {
   '可以输入任意 Emoji，例如 🧪 / 🏎️ / 🪴': 'Enter any emoji, such as 🧪 / 🏎️ / 🪴',
   '可在目标里设置日期或天数': 'Set a date or day count in goals',
   '可测试': 'Ready to test',
-  '可选择 WebDAV、坚果云、Nextcloud 或手动文件备份': 'Choose WebDAV, Jianguoyun, Nextcloud, or manual file backup',
+  '可选择 WebDAV、坚果云、Nextcloud 或手动文件备份':
+      'Choose WebDAV, Jianguoyun, Nextcloud, or manual file backup',
   '吃灰': 'Idle',
   '同步方式': 'Sync method',
   '同步方案': 'Sync provider',
   '同步资产、心愿、日均和风险数据': 'Sync assets, wishes, daily cost, and risk data',
-  '后续可以继续把每张分析卡片拆成单独的首次进入引导。': 'Each analytics card can later become its own first-run guide',
-  '后续详情页教程会继续使用这条真实资产数据。': 'Later detail-page steps will keep using this real asset',
+  '后续可以继续把每张分析卡片拆成单独的首次进入引导。':
+      'Each analytics card can later become its own first-run guide',
+  '后续详情页教程会继续使用这条真实资产数据。':
+      'Later detail-page steps will keep using this real asset',
   '启动时尝试拉取': 'Try pulling on launch',
   '咖啡': 'Coffee',
   '回收 {value}': 'Recovered {value}',
@@ -1958,12 +2118,14 @@ const Map<String, String> _enLiteral = {
   '大': 'Large',
   '天': 'day',
   '奖杯': 'Trophy',
-  '如果当前还没有资产，教程会指向真实空状态，引导用户从底部加号开始添加。': 'If there are no assets yet, the guide points at the real empty state and leads the user to the bottom add button',
+  '如果当前还没有资产，教程会指向真实空状态，引导用户从底部加号开始添加。':
+      'If there are no assets yet, the guide points at the real empty state and leads the user to the bottom add button',
   '娱乐': 'Entertainment',
   '学习': 'Study',
   '学习办公': 'Study and work',
   '完成教程': 'Finish tutorial',
-  '完整 ZIP、JSON、快照、CSV 和 Markdown': 'Full ZIP, JSON, snapshots, CSV, and Markdown',
+  '完整 ZIP、JSON、快照、CSV 和 Markdown':
+      'Full ZIP, JSON, snapshots, CSV, and Markdown',
   '宝石': 'Gem',
   '实验': 'Lab',
   '宠物': 'Pets',
@@ -1972,21 +2134,25 @@ const Map<String, String> _enLiteral = {
   '家电': 'Appliances',
   '家具': 'Furniture',
   '密码 / 应用专用密码': 'Password / app password',
-  '导出到任意网盘同步文件夹，或从系统文件恢复': 'Export to any cloud-drive sync folder, or restore from system files',
+  '导出到任意网盘同步文件夹，或从系统文件恢复':
+      'Export to any cloud-drive sync folder, or restore from system files',
   '封面、条码、小票 OCR 与贴纸': 'Covers, barcodes, receipt OCR, and stickers',
   '小': 'Small',
-  '小组件、权限、通知、原生接口和同步': 'Widgets, permissions, notifications, native APIs, and sync',
+  '小组件、权限、通知、原生接口和同步':
+      'Widgets, permissions, notifications, native APIs, and sync',
   '工具': 'Tools',
   '工具箱': 'Toolbox',
   '工具维修': 'Tools and repairs',
   '已刷新所有桌面小组件': 'Home widgets refreshed',
   '已回收 {value}': 'Recovered {value}',
   '已导出到系统文件': 'Exported to system files',
-  '已应用推荐大类，并迁移手机/电脑等旧小类': 'Recommended broad categories applied, and old small categories such as phone and computer were migrated',
+  '已应用推荐大类，并迁移手机/电脑等旧小类':
+      'Recommended broad categories applied, and old small categories such as phone and computer were migrated',
   '已恢复为服役中': 'Restored to active',
   '已恢复快照': 'Snapshot restored',
   '已恢复记录': 'Record restored',
-  '已按页面类型区分详情/编辑/设置/弹层/分析的过渡动画和边缘返回反馈': 'Transitions and edge-back feedback are now separated for detail, edit, settings, sheet, and analytics pages',
+  '已按页面类型区分详情/编辑/设置/弹层/分析的过渡动画和边缘返回反馈':
+      'Transitions and edge-back feedback are now separated for detail, edit, settings, sheet, and analytics pages',
   '已暂停记录': 'Record paused',
   '已有分类': 'Existing categories',
   '已有标签': 'Existing tags',
@@ -1999,17 +2165,21 @@ const Map<String, String> _enLiteral = {
   '应用推荐分类体系': 'Apply recommended category system',
   '底部 Dock：四个一级页面': 'Bottom dock: four top-level pages',
   '底部加号：新增资产 / 心愿': 'Bottom add button: new asset / wish',
-  '建议使用电子数码、学习办公等大类': 'Use broad groups such as digital devices or study and work',
+  '建议使用电子数码、学习办公等大类':
+      'Use broad groups such as digital devices or study and work',
   '当前': 'Current',
   '当前日耗': 'Current daily cost',
   '当前显示：{duration}': 'Current display: {duration}',
   '影像创作': 'Imaging and creation',
   '影音': 'Media',
   '影音娱乐': 'Audio and video',
-  '心愿不是简单列表，也有归档、转资产和预算统计，所以教程单独覆盖。': 'Wishes are more than a simple list: they include archiving, conversion to assets, and budget statistics, so the guide covers them separately',
+  '心愿不是简单列表，也有归档、转资产和预算统计，所以教程单独覆盖。':
+      'Wishes are more than a simple list: they include archiving, conversion to assets, and budget statistics, so the guide covers them separately',
   '心愿封面与贴纸入口': 'Wish covers and sticker entry',
-  '心愿模式也可以选择封面、裁切白框、手动勾勒或生成 AI 贴纸。': 'Wish mode can also pick a cover, crop a frame, trace manually, or generate an AI sticker',
-  '心愿页会统计未归档心愿的总预算，也可以从心愿转为资产。': 'The wish page totals the budget for active wishes and can convert a wish into an asset',
+  '心愿模式也可以选择封面、裁切白框、手动勾勒或生成 AI 贴纸。':
+      'Wish mode can also pick a cover, crop a frame, trace manually, or generate an AI sticker',
+  '心愿页会统计未归档心愿的总预算，也可以从心愿转为资产。':
+      'The wish page totals the budget for active wishes and can convert a wish into an asset',
   '心愿页：预算和待购清单': 'Wish page: budget and shopping list',
   '快捷流转': 'Quick lifecycle actions',
   '快照': 'Snapshots',
@@ -2027,42 +2197,55 @@ const Map<String, String> _enLiteral = {
   '手动勾勒：自己圈出主体': 'Manual trace: outline the subject yourself',
   '手机': 'Phone',
   '手表': 'Watch',
-  '打包 SQLite、JSON、CSV、报告和封面/贴纸图片': 'Package SQLite, JSON, CSV, reports, and cover/sticker images',
-  '打包 SQLite、JSON、报告和封面/贴纸图片': 'Package SQLite, JSON, reports, and cover/sticker images',
+  '打包 SQLite、JSON、CSV、报告和封面/贴纸图片':
+      'Package SQLite, JSON, CSV, reports, and cover/sticker images',
+  '打包 SQLite、JSON、报告和封面/贴纸图片':
+      'Package SQLite, JSON, reports, and cover/sticker images',
   '打印机': 'Printer',
-  '打开 App 后自动读取云端备份；建议单设备使用时关闭': 'Read the cloud backup automatically after opening the app. Turn this off for single-device use',
+  '打开 App 后自动读取云端备份；建议单设备使用时关闭':
+      'Read the cloud backup automatically after opening the app. Turn this off for single-device use',
   '把当前 JSON 备份写入云端路径': 'Write the current JSON backup to the cloud path',
   '把当前数据保存到已配置云端': 'Save current data to the configured cloud location',
-  '把资产从“服役—退役—卖出”串成闭环，日耗和复盘会自动更新。': 'Move an asset through active, retired, and sold states; daily cost and review update automatically',
+  '把资产从“服役—退役—卖出”串成闭环，日耗和复盘会自动更新。':
+      'Move an asset through active, retired, and sold states; daily cost and review update automatically',
   '持有': 'Holding',
   '持有 {duration}': 'Held for {duration}',
   '持有时间说明': 'Holding time explanation',
-  '按钮位置也由真实 GlassAddButton 注册，不再手算。': 'The button position is registered by the real GlassAddButton, no manual coordinates',
+  '按钮位置也由真实 GlassAddButton 注册，不再手算。':
+      'The button position is registered by the real GlassAddButton, no manual coordinates',
   '掌机': 'Handheld',
-  '控制 App 内点击、保存、切换等轻触感反馈': 'Controls light haptic feedback for taps, saves, and switches inside the app',
-  '推荐使用完整资料包 ZIP 迁移；JSON 只包含文字数据，不包含封面/贴纸图片。': 'Use the full ZIP archive for migration. JSON contains text data only, without cover or sticker images',
+  '控制 App 内点击、保存、切换等轻触感反馈':
+      'Controls light haptic feedback for taps, saves, and switches inside the app',
+  '推荐使用完整资料包 ZIP 迁移；JSON 只包含文字数据，不包含封面/贴纸图片。':
+      'Use the full ZIP archive for migration. JSON contains text data only, without cover or sticker images',
   '提前 {days} 天提醒': 'Remind {days} days early',
-  '提示条会上移并带关闭按钮，避免挡住底部操作': 'Snackbars move upward and include a close button so bottom actions stay clear',
-  '提示：坚果云通常要使用“应用密码”；Nextcloud 地址一般类似 /remote.php/dav/files/用户名/。当前版本会把配置保存在本机 JSON 中，正式发布前建议再接入 Android Keystore 加密。': 'Tip: Jianguoyun usually requires an app password. Nextcloud URLs often look like /remote.php/dav/files/username/. This version stores the configuration in local JSON; Android Keystore encryption is recommended before release',
+  '提示条会上移并带关闭按钮，避免挡住底部操作':
+      'Snackbars move upward and include a close button so bottom actions stay clear',
+  '提示：坚果云通常要使用“应用密码”；Nextcloud 地址一般类似 /remote.php/dav/files/用户名/。当前版本会把配置保存在本机 JSON 中，正式发布前建议再接入 Android Keystore 加密。':
+      'Tip: Jianguoyun usually requires an app password. Nextcloud URLs often look like /remote.php/dav/files/username/. This version stores the configuration in local JSON; Android Keystore encryption is recommended before release',
   '收益名称': 'Income name',
   '收益日期': 'Income date',
   '收益日期格式不正确': 'Income date is invalid',
   '收益金额': 'Income amount',
   '收藏': 'Collection',
   '收藏纪念': 'Collections and keepsakes',
-  '教程没有复制一个假表单，而是直接把新增页放到背景里。': 'The guide does not copy a fake form; it places the real create page in the background',
-  '数据与备份、外观与交互、系统与权限被收束成三个二级菜单，避免一层堆满开关。': 'Data and backup, appearance and interaction, and system and permissions are grouped into three submenus so settings are not a wall of switches',
+  '教程没有复制一个假表单，而是直接把新增页放到背景里。':
+      'The guide does not copy a fake form; it places the real create page in the background',
+  '数据与备份、外观与交互、系统与权限被收束成三个二级菜单，避免一层堆满开关。':
+      'Data and backup, appearance and interaction, and system and permissions are grouped into three submenus so settings are not a wall of switches',
   '数码': 'Digital',
   '新分类': 'New category',
   '新增分类': 'New category',
   '新增心愿：同一张真实新增页': 'New wish: the same real create page',
   '新增标签': 'New tag',
-  '新增页的保存按钮固定在底部，方便单手操作。': 'The create page save button stays fixed at the bottom for easier one-handed use',
+  '新增页的保存按钮固定在底部，方便单手操作。':
+      'The create page save button stays fixed at the bottom for easier one-handed use',
   '新增页：资产 / 心愿切换': 'Create page: asset / wish switch',
   '新标签': 'New tag',
   '旅行': 'Travel',
   '无人机': 'Drone',
-  '无价之宝用于记录对自己有价值的时间节点，不参与卖出和日耗复盘。': 'Priceless items record personally meaningful time points and stay out of sale and daily-cost reviews',
+  '无价之宝用于记录对自己有价值的时间节点，不参与卖出和日耗复盘。':
+      'Priceless items record personally meaningful time points and stay out of sale and daily-cost reviews',
   '无千位分隔': 'No thousands separator',
   '日均': 'Daily',
   '日期': 'Date',
@@ -2089,7 +2272,8 @@ const Map<String, String> _enLiteral = {
   '标签名称': 'Tag name',
   '标签名称，例如 通勤 / 收藏 / 办公': 'Tag name, such as Commute / Collection / Office',
   '标签名称，例如 通勤 / 收藏 / 维修': 'Tag name, such as Commute / Collection / Repair',
-  '标签适合描述场景，例如通勤、收藏、办公、长期持有。现在可以直接选颜色。': 'Tags are best for contexts such as commute, collection, office, or long-term holding. You can now pick the color directly',
+  '标签适合描述场景，例如通勤、收藏、办公、长期持有。现在可以直接选颜色。':
+      'Tags are best for contexts such as commute, collection, office, or long-term holding. You can now pick the color directly',
   '标记退役': 'Mark retired',
   '椅子': 'Chair',
   '正在连接云端…': 'Connecting to cloud...',
@@ -2097,20 +2281,25 @@ const Map<String, String> _enLiteral = {
   '沙发': 'Sofa',
   '洗衣': 'Laundry',
   '测试连接': 'Test connection',
-  '添加第一个资产后，首页卡片和详情页会自动变成可讲解的真实内容。': 'After the first asset is added, the home card and detail page become real content the guide can explain',
+  '添加第一个资产后，首页卡片和详情页会自动变成可讲解的真实内容。':
+      'After the first asset is added, the home card and detail page become real content the guide can explain',
   '清洁': 'Cleaning',
   '游戏': 'Games',
   '游戏兴趣': 'Games and hobbies',
   '游戏机': 'Game console',
   '滑雪': 'Skiing',
   '灯具': 'Lighting',
-  '点击核心指标可以进入更细的统计解释。': 'Tap core metrics to open deeper statistical explanations',
+  '点击核心指标可以进入更细的统计解释。':
+      'Tap core metrics to open deeper statistical explanations',
   '玩具': 'Toys',
   '现在 {value}/天': 'Now {value}/day',
-  '现在高亮的是“裁切白框”真实按钮，不再只笼统指向整条导入栏。': 'This highlights the real frame-crop button instead of pointing vaguely at the whole import bar',
-  '理解方式：实线表示已经发生的摊薄，虚线会按目标日耗/目标天数推算未来趋势。横向绿色虚线是目标日耗，蓝线到达它时说明这件物品已经达到你设定的心理成本。': 'Read it this way: the solid line is actual amortization; the dashed line projects from target daily cost or target days. The green horizontal guide is the target daily cost. When the blue line reaches it, the item has met your mental cost target',
+  '现在高亮的是“裁切白框”真实按钮，不再只笼统指向整条导入栏。':
+      'This highlights the real frame-crop button instead of pointing vaguely at the whole import bar',
+  '理解方式：实线表示已经发生的摊薄，虚线会按目标日耗/目标天数推算未来趋势。横向绿色虚线是目标日耗，蓝线到达它时说明这件物品已经达到你设定的心理成本。':
+      'Read it this way: the solid line is actual amortization; the dashed line projects from target daily cost or target days. The green horizontal guide is the target daily cost. When the blue line reaches it, the item has met your mental cost target',
   '生活': 'Daily life',
-  '用户完成录入后，从这里保存为真实资产或心愿。': 'After entry is complete, save it here as a real asset or wish',
+  '用户完成录入后，从这里保存为真实资产或心愿。':
+      'After entry is complete, save it here as a real asset or wish',
   '电器': 'Appliances',
   '电子': 'Electronics',
   '电子数码': 'Digital devices',
@@ -2120,7 +2309,8 @@ const Map<String, String> _enLiteral = {
   '目标': 'Goal',
   '目标 {days} 天': 'Target {days} days',
   '目标 {days}天': 'Target {days} days',
-  '直接点选图标和颜色，不需要手动输入十六进制色值。': 'Pick the icon and color directly, no hex value required',
+  '直接点选图标和颜色，不需要手动输入十六进制色值。':
+      'Pick the icon and color directly, no hex value required',
   '直接选图标': 'Pick icon directly',
   '直接选择颜色即可。': 'Just choose a color',
   '直接选颜色': 'Pick color directly',
@@ -2129,7 +2319,8 @@ const Map<String, String> _enLiteral = {
   '眼镜': 'Glasses',
   '知道了': 'Got it',
   '硬币': 'Coin',
-  '确定删除「{label}」吗？这个操作不会影响当前资产数据。': 'Delete "{label}"? This will not affect current asset data',
+  '确定删除「{label}」吗？这个操作不会影响当前资产数据。':
+      'Delete "{label}"? This will not affect current asset data',
   '确认删除「{name}」吗？': 'Delete "{name}"?',
   '示例心愿': 'Sample wish',
   '示例资产': 'Sample asset',
@@ -2142,7 +2333,8 @@ const Map<String, String> _enLiteral = {
   '第 1 天 {value}/天': 'Day 1 {value}/day',
   '第 1 天日耗': 'Day-one daily cost',
   '第 {index} / {total} 步': 'Step {index} / {total}',
-  '第一张真实资产卡片会展示名称、状态、总价值、已使用天数和日均成本。': 'The first real asset card shows name, status, total value, days used, and daily cost',
+  '第一张真实资产卡片会展示名称、状态、总价值、已使用天数和日均成本。':
+      'The first real asset card shows name, status, total value, days used, and daily cost',
   '筛选、排序和首页视图': 'Filters, sorting, and home view',
   '篮球': 'Basketball',
   '粘贴 JSON 后覆盖恢复（不含图片）': 'Paste JSON to restore and overwrite (no images)',
@@ -2151,7 +2343,8 @@ const Map<String, String> _enLiteral = {
   '紧凑': 'Compact',
   '紧凑提示条': 'Compact snackbars',
   '纸箱': 'Box',
-  '细分通勤、收藏、维修、吃灰等状态': 'Break down contexts such as commute, collection, repair, and idle',
+  '细分通勤、收藏、维修、吃灰等状态':
+      'Break down contexts such as commute, collection, repair, and idle',
   '继续': 'Continue',
   '维修': 'Repair',
   '绿植': 'Plants',
@@ -2170,8 +2363,10 @@ const Map<String, String> _enLiteral = {
   '裁切白框：快速生成统一封面': 'Frame crop: quickly create consistent covers',
   '覆盖恢复': 'Restore and overwrite',
   '触感反馈': 'Haptic feedback',
-  '计算方式：从记录日期到当前日期或退役日期，按包含首尾日期的方式统计。你可以在“设置 - 外观交互 - 时长显示”里切换天、周、月或年/月显示。': 'Calculation: from record date to today or retirement date, counting both start and end dates. Change days, weeks, months, or year/month display in Settings > Appearance > Duration display',
-  '计算方式：从购买日期到当前日期、退役日期或卖出日期，按包含首尾日期的方式统计。你可以在“设置 - 外观交互 - 时长显示”里切换天、周、月或年/月显示。': 'Calculation: from purchase date to today, retirement date, or sold date, counting both start and end dates. Change days, weeks, months, or year/month display in Settings > Appearance > Duration display',
+  '计算方式：从记录日期到当前日期或退役日期，按包含首尾日期的方式统计。你可以在“设置 - 外观交互 - 时长显示”里切换天、周、月或年/月显示。':
+      'Calculation: from record date to today or retirement date, counting both start and end dates. Change days, weeks, months, or year/month display in Settings > Appearance > Duration display',
+  '计算方式：从购买日期到当前日期、退役日期或卖出日期，按包含首尾日期的方式统计。你可以在“设置 - 外观交互 - 时长显示”里切换天、周、月或年/月显示。':
+      'Calculation: from purchase date to today, retirement date, or sold date, counting both start and end dates. Change days, weeks, months, or year/month display in Settings > Appearance > Duration display',
   '记录': 'Record',
   '记录价值回收': 'Record value recovery',
   '记录卖出': 'Record sale',
@@ -2179,11 +2374,14 @@ const Map<String, String> _enLiteral = {
   '记录收益': 'Record income',
   '记录时间说明': 'Record time explanation',
   '记录状态': 'Record status',
-  '设置项小字会完整折行，不再强行省略。': 'Setting descriptions wrap fully instead of being forcibly truncated',
+  '设置项小字会完整折行，不再强行省略。':
+      'Setting descriptions wrap fully instead of being forcibly truncated',
   '设置首页：二级菜单入口': 'Settings home: submenu entry points',
   '设置首页：快速入口和教程重播': 'Settings home: shortcuts and tutorial replay',
-  '详情、编辑、设置、弹层、分析页采用不同入场和返回手势反馈': 'Detail, edit, settings, sheets, and analytics use distinct entry and back-gesture feedback',
-  '详情页顶部展示资产图标、分类、状态、当前总价值、持有时间和日均成本。': 'The top of the detail page shows asset icon, category, status, current total value, holding time, and daily cost',
+  '详情、编辑、设置、弹层、分析页采用不同入场和返回手势反馈':
+      'Detail, edit, settings, sheets, and analytics use distinct entry and back-gesture feedback',
+  '详情页顶部展示资产图标、分类、状态、当前总价值、持有时间和日均成本。':
+      'The top of the detail page shows asset icon, category, status, current total value, holding time, and daily cost',
   '详情页：快捷流转': 'Detail page: quick lifecycle actions',
   '详情页：日均成本趋势': 'Detail page: daily cost trend',
   '详情页：资产概览': 'Detail page: asset overview',
@@ -2194,14 +2392,19 @@ const Map<String, String> _enLiteral = {
   '质感': 'Texture',
   '购买时间：{date}': 'Purchase time: {date}',
   '贴纸与封面': 'Stickers and covers',
-  '资产、心愿、分析、设置都从这里切换，Dock 的滑动和震动反馈也在真实组件里完成。': 'Assets, wishes, analytics, and settings switch here. Dock sliding and haptic feedback happen in the real component',
-  '资产与心愿记录保存在当前设备，备份后可随时恢复。': 'Asset and wish records are stored on this device and can be restored after backup',
+  '资产、心愿、分析、设置都从这里切换，Dock 的滑动和震动反馈也在真实组件里完成。':
+      'Assets, wishes, analytics, and settings switch here. Dock sliding and haptic feedback happen in the real component',
+  '资产与心愿记录保存在当前设备，备份后可随时恢复。':
+      'Asset and wish records are stored on this device and can be restored after backup',
   '资产列表：空状态也是真实界面': 'Asset list: the empty state is real too',
   '资产卡片：点击进入详情': 'Asset card: tap into details',
-  '资产可以在服役、退役、卖出之间流转，复盘、净值和日耗会跟着更新。': 'Assets can move between active, retired, and sold. Review, net value, and daily cost update along with them',
-  '资产新增页的导入栏支持选封面、裁切白框、手动勾勒、AI 贴纸、扫条码和小票 OCR。': 'The asset create import bar supports cover picking, frame crop, manual trace, AI stickers, barcode scanning, and receipt OCR',
+  '资产可以在服役、退役、卖出之间流转，复盘、净值和日耗会跟着更新。':
+      'Assets can move between active, retired, and sold. Review, net value, and daily cost update along with them',
+  '资产新增页的导入栏支持选封面、裁切白框、手动勾勒、AI 贴纸、扫条码和小票 OCR。':
+      'The asset create import bar supports cover picking, frame crop, manual trace, AI stickers, barcode scanning, and receipt OCR',
   '资产时间线': 'Asset timeline',
-  '趋势图会显示已发生摊薄和目标日耗预测，适合判断一件东西是否已经用值。': 'The trend chart shows actual amortization and target daily-cost projection, helping judge whether an item has earned its cost',
+  '趋势图会显示已发生摊薄和目标日耗预测，适合判断一件东西是否已经用值。':
+      'The trend chart shows actual amortization and target daily-cost projection, helping judge whether an item has earned its cost',
   '跟随父资产：{date}': 'Follows parent asset: {date}',
   '路由器': 'Router',
   '跳过': 'Skip',
@@ -2211,32 +2414,56 @@ const Map<String, String> _enLiteral = {
   '运动': 'Sports',
   '还差 {days} 天': '{days} days remaining',
   '还没有分类。': 'No categories yet',
-  '还没有快照。创建后可以在这里恢复、重命名或删除。': 'No snapshots yet. After creating one, you can restore, rename, or delete it here',
+  '还没有快照。创建后可以在这里恢复、重命名或删除。':
+      'No snapshots yet. After creating one, you can restore, rename, or delete it here',
   '还没有标签。': 'No tags yet',
-  '这一步不再使用估算坐标，而是绑定真实 AssetOverviewCard 的位置。': 'This step no longer uses estimated coordinates; it binds to the real AssetOverviewCard position',
-  '这一步仍然绑定真实 CoverImportBar。': 'This step is still bound to the real CoverImportBar',
-  '这一步指向 AssetLifecycleQuickActions 的真实位置。': 'This step points to the real AssetLifecycleQuickActions position',
-  '这一步指向真实 SmartAssetImportBar，后续你扩展按钮时教程也能跟着组件位置走。': 'This step points to the real SmartAssetImportBar, so the guide follows the component when buttons are added later',
-  '这一步绑定“AI 贴纸”入口，用户能明确知道它和选封面、裁切白框、手动勾勒的区别。': 'This step binds to the AI sticker entry so users understand how it differs from cover picking, frame crop, and manual trace',
-  '这一步绑定“手动勾勒”按钮，并说明它不是普通裁剪，而是按路径生成主体轮廓。': 'This step binds to the manual trace button and explains that it builds a subject contour from a path, not a normal crop',
-  '这不是只展示一级页面，而是开始说明每个模块内部的功能块。': 'This goes beyond top-level pages and starts explaining the functional blocks inside each module',
-  '这会用云端备份覆盖当前本机数据。建议先导出一份本机 JSON。': 'This will overwrite local data with the cloud backup. Export a local JSON first',
-  '这就是你之前强调的“附加项目不是只记录，而是要参与资产价值计算”。': 'This is the point you emphasized earlier: add-ons are not just notes; they participate in asset value calculations',
-  '这张图不是涨跌行情，而是“买入成本被使用天数摊薄”的过程。': 'This chart is not a market price chart; it shows purchase cost being amortized by days used',
-  '这类“页面内部功能”不应该被省略，所以现在也纳入教程链路。': 'These in-page features should not be skipped, so they are now part of the tutorial path',
-  '这类信息是后续分析页、详情页、日耗目标和资产复盘的基础。': 'This information powers analytics, detail pages, daily-cost goals, and asset reviews later',
-  '这里会基于目标、标签、闲置、二手流转等生成资产健康度和生命周期账本。': 'This generates asset health and lifecycle ledgers from goals, tags, idle status, and resale flow',
-  '这里使用你的第一条真实资产数据，不再用一张教程卡片代替详情页。': 'This uses your first real asset, instead of replacing the detail page with a tutorial card',
-  '这里可以切换服役 / 退役 / 卖出，也可以进入排序、筛选和首页展示方式。': 'Here you can switch active / retired / sold, and open sorting, filtering, and home display options',
-  '这里是 ComposePage 的真实分段入口，可以在新增资产和新增心愿之间切换。': 'This is the real segmented entry on ComposePage, where you switch between new asset and new wish',
-  '这里管理 Android 原生能力、权限、通知、小组件、系统设置和云端快捷操作。': 'This manages Android native features, permissions, notifications, widgets, system settings, and cloud shortcuts',
-  '这里管理分类、标签、备份恢复、云端同步和完整资料包导出。': 'This manages categories, tags, backup and restore, cloud sync, and full archive export',
-  '这里高亮的是 LiquidDock 本体，不是教程页临时画出来的导航栏。': 'The highlighted target is the LiquidDock itself, not a temporary navigation bar drawn by the tutorial',
+  '这一步不再使用估算坐标，而是绑定真实 AssetOverviewCard 的位置。':
+      'This step no longer uses estimated coordinates; it binds to the real AssetOverviewCard position',
+  '这一步仍然绑定真实 CoverImportBar。':
+      'This step is still bound to the real CoverImportBar',
+  '这一步指向 AssetLifecycleQuickActions 的真实位置。':
+      'This step points to the real AssetLifecycleQuickActions position',
+  '这一步指向真实 SmartAssetImportBar，后续你扩展按钮时教程也能跟着组件位置走。':
+      'This step points to the real SmartAssetImportBar, so the guide follows the component when buttons are added later',
+  '这一步绑定“AI 贴纸”入口，用户能明确知道它和选封面、裁切白框、手动勾勒的区别。':
+      'This step binds to the AI sticker entry so users understand how it differs from cover picking, frame crop, and manual trace',
+  '这一步绑定“手动勾勒”按钮，并说明它不是普通裁剪，而是按路径生成主体轮廓。':
+      'This step binds to the manual trace button and explains that it builds a subject contour from a path, not a normal crop',
+  '这不是只展示一级页面，而是开始说明每个模块内部的功能块。':
+      'This goes beyond top-level pages and starts explaining the functional blocks inside each module',
+  '这会用云端备份覆盖当前本机数据。建议先导出一份本机 JSON。':
+      'This will overwrite local data with the cloud backup. Export a local JSON first',
+  '这就是你之前强调的“附加项目不是只记录，而是要参与资产价值计算”。':
+      'This is the point you emphasized earlier: add-ons are not just notes; they participate in asset value calculations',
+  '这张图不是涨跌行情，而是“买入成本被使用天数摊薄”的过程。':
+      'This chart is not a market price chart; it shows purchase cost being amortized by days used',
+  '这类“页面内部功能”不应该被省略，所以现在也纳入教程链路。':
+      'These in-page features should not be skipped, so they are now part of the tutorial path',
+  '这类信息是后续分析页、详情页、日耗目标和资产复盘的基础。':
+      'This information powers analytics, detail pages, daily-cost goals, and asset reviews later',
+  '这里会基于目标、标签、闲置、二手流转等生成资产健康度和生命周期账本。':
+      'This generates asset health and lifecycle ledgers from goals, tags, idle status, and resale flow',
+  '这里使用你的第一条真实资产数据，不再用一张教程卡片代替详情页。':
+      'This uses your first real asset, instead of replacing the detail page with a tutorial card',
+  '这里可以切换服役 / 退役 / 卖出，也可以进入排序、筛选和首页展示方式。':
+      'Here you can switch active / retired / sold, and open sorting, filtering, and home display options',
+  '这里是 ComposePage 的真实分段入口，可以在新增资产和新增心愿之间切换。':
+      'This is the real segmented entry on ComposePage, where you switch between new asset and new wish',
+  '这里管理 Android 原生能力、权限、通知、小组件、系统设置和云端快捷操作。':
+      'This manages Android native features, permissions, notifications, widgets, system settings, and cloud shortcuts',
+  '这里管理分类、标签、备份恢复、云端同步和完整资料包导出。':
+      'This manages categories, tags, backup and restore, cloud sync, and full archive export',
+  '这里高亮的是 LiquidDock 本体，不是教程页临时画出来的导航栏。':
+      'The highlighted target is the LiquidDock itself, not a temporary navigation bar drawn by the tutorial',
   '退役日期': 'Retired date',
-  '适合商品图、票据图或背景比较干净的照片。用户裁好主体区域后，系统会生成统一白框封面，让首页卡片更整齐。': 'Best for product photos, receipts, or clean-background images. After the subject is cropped, the app creates a consistent framed cover so home cards feel tidier',
-  '适合稳定 WebDAV；网络较慢时可关闭，改用手动上传': 'Good for stable WebDAV. Turn it off on slow networks and upload manually instead',
-  '适合自动识别不准、背景复杂或想保留特殊轮廓的图片。实时预览会跟着你的勾勒更新，最后生成贴纸感封面。': 'Best when automatic recognition is imprecise, the background is complex, or you want to preserve a special outline. The live preview follows your trace and creates a sticker-like cover',
-  '选择参与产生收益的资产，并记录它们实际赚回来的金额。多件资产会在详情页里均摊显示。': 'Choose the assets that helped earn income and record the amount actually recovered. Multiple assets are split evenly on their detail pages',
+  '适合商品图、票据图或背景比较干净的照片。用户裁好主体区域后，系统会生成统一白框封面，让首页卡片更整齐。':
+      'Best for product photos, receipts, or clean-background images. After the subject is cropped, the app creates a consistent framed cover so home cards feel tidier',
+  '适合稳定 WebDAV；网络较慢时可关闭，改用手动上传':
+      'Good for stable WebDAV. Turn it off on slow networks and upload manually instead',
+  '适合自动识别不准、背景复杂或想保留特殊轮廓的图片。实时预览会跟着你的勾勒更新，最后生成贴纸感封面。':
+      'Best when automatic recognition is imprecise, the background is complex, or you want to preserve a special outline. The live preview follows your trace and creates a sticker-like cover',
+  '选择参与产生收益的资产，并记录它们实际赚回来的金额。多件资产会在详情页里均摊显示。':
+      'Choose the assets that helped earn income and record the amount actually recovered. Multiple assets are split evenly on their detail pages',
   '通勤': 'Commute',
   '通知、相机、文件、分享入口': 'Notifications, camera, files, and share entries',
   '配件': 'Accessories',
@@ -2252,20 +2479,24 @@ const Map<String, String> _enLiteral = {
   '长期持有': 'Long-term',
   '闹钟': 'Alarm',
   '附加项目': 'Add-ons',
-  '附加项目可以记录配件、维修、升级等费用，并支持购买时间跟随父资产。': 'Add-ons can record accessories, repairs, upgrades, and other costs, and can follow the parent asset purchase time',
+  '附加项目可以记录配件、维修、升级等费用，并支持购买时间跟随父资产。':
+      'Add-ons can record accessories, repairs, upgrades, and other costs, and can follow the parent asset purchase time',
   '附加项目：会影响总价值和日均成本': 'Add-ons: included in total value and daily cost',
-  '除了二手卖出，也可以把一组资产实际带来的收入记入回收，例如拍摄接单、游戏设备直播收益、工具维修收入等。': 'Besides resale, you can count income generated by a group of assets, such as paid shoots, streaming income from game gear, or repair revenue from tools',
+  '除了二手卖出，也可以把一组资产实际带来的收入记入回收，例如拍摄接单、游戏设备直播收益、工具维修收入等。':
+      'Besides resale, you can count income generated by a group of assets, such as paid shoots, streaming income from game gear, or repair revenue from tools',
   '露营': 'Camping',
   '鞋': 'Shoes',
   '音乐': 'Music',
-  '顶部资产总览会实时显示资产数量、总资产、日均成本和服役状态比例。': 'The top asset overview shows asset count, total value, daily cost, and active-status ratio in real time',
+  '顶部资产总览会实时显示资产数量、总资产、日均成本和服役状态比例。':
+      'The top asset overview shows asset count, total value, daily cost, and active-status ratio in real time',
   '预测 {days} 天': 'Projected {days} days',
   '预计节点': 'Estimated point',
   '颜色': 'Color',
   '风景': 'Scenery',
   '食品': 'Food',
   '首页总览：直接指向真实卡片': 'Home overview: points to the real card',
-  '高亮框会跟着这一整行真实控件走，不会因为屏幕尺寸变化而偏移。': 'The highlight follows this real control row and will not drift when the screen size changes',
+  '高亮框会跟着这一整行真实控件走，不会因为屏幕尺寸变化而偏移。':
+      'The highlight follows this real control row and will not drift when the screen size changes',
   '魔法': 'Magic',
   '麦克风': 'Microphone',
   '鼠标': 'Mouse',
@@ -2303,12 +2534,9 @@ String _englishFallbackForKey(String key) {
 
 List<String> _splitKeyToken(String segment) {
   final normalized = segment
-      .replaceAllMapped(
-          RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}')
-      .replaceAllMapped(
-          RegExp(r'([A-Za-z])([0-9])'), (m) => '${m[1]} ${m[2]}')
-      .replaceAllMapped(
-          RegExp(r'([0-9])([A-Za-z])'), (m) => '${m[1]} ${m[2]}')
+      .replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}')
+      .replaceAllMapped(RegExp(r'([A-Za-z])([0-9])'), (m) => '${m[1]} ${m[2]}')
+      .replaceAllMapped(RegExp(r'([0-9])([A-Za-z])'), (m) => '${m[1]} ${m[2]}')
       .replaceAll('_', ' ')
       .replaceAll('-', ' ');
   return normalized
