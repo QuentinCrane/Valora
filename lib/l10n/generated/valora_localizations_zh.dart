@@ -2254,6 +2254,81 @@ class ValoraLocalizationsZh extends ValoraLocalizations {
   String get message_shell_tutorial_step10Hint => '以后想重看教程，也可以从这里启动';
 
   @override
+  String get message_onboarding_skip => '跳过';
+
+  @override
+  String get message_onboarding_next => '下一页';
+
+  @override
+  String get message_onboarding_back => '上一页';
+
+  @override
+  String get message_onboarding_start => '开始使用';
+
+  @override
+  String get message_onboarding_pageIndicator => '欢迎引导，共三页';
+
+  @override
+  String get message_onboarding_welcome_title => '欢迎来到值谱';
+
+  @override
+  String get message_onboarding_welcome_slogan => '把每一次购买，变成一条看得见的价值轨迹';
+
+  @override
+  String get message_onboarding_welcome_desc =>
+      '值谱是本地优先的个人资产生命周期管理工具，所有数据都保存在你的设备上，不注册账号，也不上传云端。';
+
+  @override
+  String get message_onboarding_pill_local => '本地优先';
+
+  @override
+  String get message_onboarding_pill_noAccount => '无需注册';
+
+  @override
+  String get message_onboarding_pill_private => '数据不出设备';
+
+  @override
+  String get message_onboarding_concept_title => '不是记账，而是看懂价值';
+
+  @override
+  String get message_onboarding_concept_desc =>
+      '值谱把价格、使用时间和生命周期放进同一条时间线，帮你判断一件东西今天是否仍然值得。';
+
+  @override
+  String get message_onboarding_concept_chart => '日均成本随使用时间下降';
+
+  @override
+  String get message_onboarding_concept_example =>
+      '一件 8,000 元的手机用了四年，日均成本可能不到 6 元；一件 500 元的配件三天后闲置，反而值得重新审视。';
+
+  @override
+  String get message_onboarding_features_title => '四个工作区，各管一段';
+
+  @override
+  String get message_onboarding_features_assets => '资产';
+
+  @override
+  String get message_onboarding_features_assetsDesc => '记录买入、服役、退役与卖出';
+
+  @override
+  String get message_onboarding_features_wishes => '心愿';
+
+  @override
+  String get message_onboarding_features_wishesDesc => '先放进清单，购买后一键转为资产';
+
+  @override
+  String get message_onboarding_features_analytics => '分析';
+
+  @override
+  String get message_onboarding_features_analyticsDesc => '总值、日均与结构，适合定期复盘';
+
+  @override
+  String get message_onboarding_features_settings => '设置';
+
+  @override
+  String get message_onboarding_features_settingsDesc => '主题、语言、格式与备份';
+
+  @override
   String get message_sticker_modelStatus => '主体分割模型';
 
   @override
@@ -6573,6 +6648,81 @@ class ValoraLocalizationsZhHans extends ValoraLocalizationsZh {
 
   @override
   String get message_shell_tutorial_step10Hint => '以后想重看教程，也可以从这里启动';
+
+  @override
+  String get message_onboarding_skip => '跳过';
+
+  @override
+  String get message_onboarding_next => '下一页';
+
+  @override
+  String get message_onboarding_back => '上一页';
+
+  @override
+  String get message_onboarding_start => '开始使用';
+
+  @override
+  String get message_onboarding_pageIndicator => '欢迎引导，共三页';
+
+  @override
+  String get message_onboarding_welcome_title => '欢迎来到值谱';
+
+  @override
+  String get message_onboarding_welcome_slogan => '把每一次购买，变成一条看得见的价值轨迹';
+
+  @override
+  String get message_onboarding_welcome_desc =>
+      '值谱是本地优先的个人资产生命周期管理工具，所有数据都保存在你的设备上，不注册账号，也不上传云端。';
+
+  @override
+  String get message_onboarding_pill_local => '本地优先';
+
+  @override
+  String get message_onboarding_pill_noAccount => '无需注册';
+
+  @override
+  String get message_onboarding_pill_private => '数据不出设备';
+
+  @override
+  String get message_onboarding_concept_title => '不是记账，而是看懂价值';
+
+  @override
+  String get message_onboarding_concept_desc =>
+      '值谱把价格、使用时间和生命周期放进同一条时间线，帮你判断一件东西今天是否仍然值得。';
+
+  @override
+  String get message_onboarding_concept_chart => '日均成本随使用时间下降';
+
+  @override
+  String get message_onboarding_concept_example =>
+      '一件 8,000 元的手机用了四年，日均成本可能不到 6 元；一件 500 元的配件三天后闲置，反而值得重新审视。';
+
+  @override
+  String get message_onboarding_features_title => '四个工作区，各管一段';
+
+  @override
+  String get message_onboarding_features_assets => '资产';
+
+  @override
+  String get message_onboarding_features_assetsDesc => '记录买入、服役、退役与卖出';
+
+  @override
+  String get message_onboarding_features_wishes => '心愿';
+
+  @override
+  String get message_onboarding_features_wishesDesc => '先放进清单，购买后一键转为资产';
+
+  @override
+  String get message_onboarding_features_analytics => '分析';
+
+  @override
+  String get message_onboarding_features_analyticsDesc => '总值、日均与结构，适合定期复盘';
+
+  @override
+  String get message_onboarding_features_settings => '设置';
+
+  @override
+  String get message_onboarding_features_settingsDesc => '主题、语言、格式与备份';
 
   @override
   String get message_sticker_modelStatus => '主体分割模型';
@@ -10897,6 +11047,81 @@ class ValoraLocalizationsZhHant extends ValoraLocalizationsZh {
 
   @override
   String get message_shell_tutorial_step10Hint => '以後想重看教學，也可以從這裡啟動';
+
+  @override
+  String get message_onboarding_skip => '跳過';
+
+  @override
+  String get message_onboarding_next => '下一頁';
+
+  @override
+  String get message_onboarding_back => '上一頁';
+
+  @override
+  String get message_onboarding_start => '開始使用';
+
+  @override
+  String get message_onboarding_pageIndicator => '歡迎引導，共三頁';
+
+  @override
+  String get message_onboarding_welcome_title => '歡迎來到值譜';
+
+  @override
+  String get message_onboarding_welcome_slogan => '把每一次購買，變成一條看得見的價值軌跡';
+
+  @override
+  String get message_onboarding_welcome_desc =>
+      '值譜是本地優先的個人資產生命週期管理工具，所有資料都保存在你的裝置上，不註冊帳號，也不上傳雲端。';
+
+  @override
+  String get message_onboarding_pill_local => '本地優先';
+
+  @override
+  String get message_onboarding_pill_noAccount => '無需註冊';
+
+  @override
+  String get message_onboarding_pill_private => '資料不出裝置';
+
+  @override
+  String get message_onboarding_concept_title => '不是記賬，而是看懂價值';
+
+  @override
+  String get message_onboarding_concept_desc =>
+      '值譜把價格、使用時間和生命週期放進同一條時間線，幫你判斷一件東西今天是否仍然值得。';
+
+  @override
+  String get message_onboarding_concept_chart => '日均成本隨使用時間下降';
+
+  @override
+  String get message_onboarding_concept_example =>
+      '一件 8,000 元的手機用了四年，日均成本可能不到 6 元；一件 500 元的配件三天後閒置，反而值得重新審視。';
+
+  @override
+  String get message_onboarding_features_title => '四個工作區，各管一段';
+
+  @override
+  String get message_onboarding_features_assets => '資產';
+
+  @override
+  String get message_onboarding_features_assetsDesc => '記錄買入、服役、退役與賣出';
+
+  @override
+  String get message_onboarding_features_wishes => '願望';
+
+  @override
+  String get message_onboarding_features_wishesDesc => '先放進清單，購買後一鍵轉為資產';
+
+  @override
+  String get message_onboarding_features_analytics => '分析';
+
+  @override
+  String get message_onboarding_features_analyticsDesc => '總值、日均與結構，適合定期複盤';
+
+  @override
+  String get message_onboarding_features_settings => '設定';
+
+  @override
+  String get message_onboarding_features_settingsDesc => '主題、語言、格式與備份';
 
   @override
   String get message_sticker_modelStatus => '主體分割模型';

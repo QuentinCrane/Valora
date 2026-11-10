@@ -99,6 +99,15 @@ class _ValoraAppState extends State<ValoraApp> {
     setState(_startBoot);
   }
 
+  bool shouldShowWelcomeFlow(StorageLoadResult loadResult) {
+    // Fresh installs have an unset completion flag; saved settings from older
+    // versions are migrated as completed, including stores with no assets.
+    return !store.settings.welcomeCompleted &&
+        !loadResult.isFailure &&
+        store.assets.isEmpty &&
+        store.wishes.isEmpty;
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
@@ -158,7 +167,9 @@ class _ValoraAppState extends State<ValoraApp> {
                             result: loadResult,
                             onRetry: _retryBoot,
                           )
-                        : const ShellPage(),
+                        : shouldShowWelcomeFlow(loadResult)
+                            ? const OnboardingFlowPage()
+                            : const ShellPage(),
               );
             },
           ),
@@ -1050,13 +1061,15 @@ Color parseColor(String raw, {Color fallback = kBrand}) {
   return Color(parsed);
 }
 
+// 每张资产卡片和滚动数字动画都会高频调用 money()，正则对象提前编译一次。
+final RegExp _moneyThousandsPattern = RegExp(r'\B(?=(\d{3})+(?!\d))');
+
 String money(double value, AppSettings settings) {
   final fixed = value.toStringAsFixed(settings.decimalPlaces);
   final parts = fixed.split('.');
   var integer = parts.first;
   if (settings.useThousandsSeparator) {
-    integer =
-        integer.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',');
+    integer = integer.replaceAllMapped(_moneyThousandsPattern, (m) => ',');
   }
   if (settings.decimalPlaces == 0) return '${settings.currencyUnit}$integer';
   return '${settings.currencyUnit}$integer.${parts.length > 1 ? parts.last : ''.padRight(settings.decimalPlaces, '0')}';

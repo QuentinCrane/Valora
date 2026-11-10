@@ -2,9 +2,13 @@
 
 ## 0.80.2
 
+- Added a three-page first-launch welcome flow for fresh installs that introduces the brand, the daily-cost concept, and the four workspaces, then hands over to the existing tutorial prompt on the home screen.
+- Added the `welcomeCompleted` setting so upgraded users and users who already saw the flow are never interrupted by it.
 - Added local boot repair for legacy assets, wishes, and recovery records that reference removed categories, tags, or assets.
 - Preserved affected records and removed only dangling relationships so a signed update can open the existing local database safely.
 - Added regression coverage for the `data_invalid_reference` recovery path.
+- Reduced main-thread work without behavior changes: per-asset day metrics (`serviceDays`, `dailyCost`) are cached per calendar day, empty home queries skip search-haystack construction, invariant localization lookups were hoisted out of per-asset loops, and the money formatter reuses a compiled thousands-separator pattern.
+- Added guard tests that keep filtering, sorting, and cached day-metric results numerically identical to the eager computations.
 
 ## 0.80.1
 

@@ -42,6 +42,13 @@ void main() {
     expect(AppLanguageSettingX.fromValue('unknown'), AppLanguageSetting.system);
   });
 
+  test('application name follows its requested locale independently', () {
+    setActiveLocale(const Locale('en'));
+    expect(localizedAppName(const Locale('zh', 'CN')), '值谱');
+    expect(localizedAppName(const Locale('zh', 'TW')), '值譜');
+    expect(localizedAppName(const Locale('en')), 'Valora');
+  });
+
   test('generated localization classes expose all three locale variants', () {
     final hans = lookupValoraLocalizations(
       const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),

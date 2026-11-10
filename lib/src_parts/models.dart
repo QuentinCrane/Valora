@@ -242,6 +242,18 @@ class Tag {
       );
 }
 
+/// Asset 不可变（全 final 字段 + copyWith 生成新实例），因此 serviceDays/dailyCost
+/// 这类只依赖资产字段与“当前日期”的派生值可以按天缓存：排序比较器、聚合统计和
+/// 每张卡片的 build 都会反复读取它们，逐次重算日期运算在大数据量下会造成可感知卡顿。
+/// Expando 以资产实例为键，缓存随实例一起被回收，不延长生命周期。
+class _AssetDayMetrics {
+  int? day;
+  int? serviceDays;
+  double? dailyCost;
+}
+
+final Expando<_AssetDayMetrics> _assetDayMetrics = Expando<_AssetDayMetrics>();
+
 class Asset {
   final String id;
   final String name;
@@ -315,7 +327,19 @@ class Asset {
     return diffDaysInclusive(purchaseDate, serviceEndDateAt(cursor));
   }
 
-  int get serviceDays => serviceDaysAt(DateTime.now());
+  int get serviceDays {
+    final now = DateTime.now();
+    final day = dateEpochDay(now);
+    final cache = _assetDayMetrics[this] ??= _AssetDayMetrics();
+    if (cache.day == day && cache.serviceDays != null) {
+      return cache.serviceDays!;
+    }
+    final value = serviceDaysAt(now);
+    cache
+      ..day = day
+      ..serviceDays = value;
+    return value;
+  }
   bool get isPriceless => valueMode == AssetValueMode.priceless;
   double get addonTotal => addons.fold(
       0.0, (sum, item) => sum + (item.includeInTotal ? item.price : 0));
@@ -362,7 +386,19 @@ class Asset {
     return cost / days;
   }
 
-  double get dailyCost => dailyCostAt(DateTime.now());
+  double get dailyCost {
+    final now = DateTime.now();
+    final day = dateEpochDay(now);
+    final cache = _assetDayMetrics[this] ??= _AssetDayMetrics();
+    if (cache.day == day && cache.dailyCost != null) {
+      return cache.dailyCost!;
+    }
+    final value = dailyCostAt(now);
+    cache
+      ..day = day
+      ..dailyCost = value;
+    return value;
+  }
   double get assetValue {
     if (isPriceless) return 0;
     if (!includeInTotal) return 0;
@@ -541,9 +577,10 @@ class Asset {
       soldAt: normalizedStatus == AssetStatus.sold
           ? parseOptionalPersistedDate(map['soldAt'])
           : null,
-      soldPrice: normalizedStatus != AssetStatus.sold || map['soldPrice'] == null
-          ? null
-          : asDouble(map['soldPrice']),
+      soldPrice:
+          normalizedStatus != AssetStatus.sold || map['soldPrice'] == null
+              ? null
+              : asDouble(map['soldPrice']),
       targetMode: priceless && targetMode == TargetMode.daily
           ? TargetMode.none
           : targetMode,
@@ -962,6 +999,7 @@ class AppSettings {
   final bool keepStickerCandidates;
   final double homeMetaFontScale;
   final bool onboardingCompleted;
+  final bool welcomeCompleted;
   final CloudSyncSettings cloudSync;
 
   const AppSettings({
@@ -984,6 +1022,7 @@ class AppSettings {
     this.keepStickerCandidates = false,
     this.homeMetaFontScale = 1.0,
     this.onboardingCompleted = false,
+    this.welcomeCompleted = false,
     this.cloudSync = const CloudSyncSettings(),
   });
 
@@ -1007,6 +1046,7 @@ class AppSettings {
           bool? keepStickerCandidates,
           double? homeMetaFontScale,
           bool? onboardingCompleted,
+          bool? welcomeCompleted,
           CloudSyncSettings? cloudSync}) =>
       AppSettings(
         currencyUnit: currencyUnit ?? this.currencyUnit,
@@ -1031,6 +1071,7 @@ class AppSettings {
             keepStickerCandidates ?? this.keepStickerCandidates,
         homeMetaFontScale: homeMetaFontScale ?? this.homeMetaFontScale,
         onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+        welcomeCompleted: welcomeCompleted ?? this.welcomeCompleted,
         cloudSync: cloudSync ?? this.cloudSync,
       );
 
@@ -1054,6 +1095,7 @@ class AppSettings {
         'keepStickerCandidates': keepStickerCandidates,
         'homeMetaFontScale': homeMetaFontScale,
         'onboardingCompleted': onboardingCompleted,
+        'welcomeCompleted': welcomeCompleted,
         'cloudSync': cloudSync.toMap(),
       };
 
@@ -1093,6 +1135,10 @@ class AppSettings {
             .clamp(0.82, 1.12)
             .toDouble(),
         onboardingCompleted: map['onboardingCompleted'] == true,
+        // Existing saved settings predate the welcome flow. Treat the missing
+        // flag as completed; a new install uses the constructor's false default.
+        welcomeCompleted: !map.containsKey('welcomeCompleted') ||
+            map['welcomeCompleted'] == true,
         cloudSync: CloudSyncSettings.fromMap(map['cloudSync'] is Map
             ? Map<String, dynamic>.from(map['cloudSync'])
             : null),

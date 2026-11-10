@@ -4472,6 +4472,150 @@ abstract class ValoraLocalizations {
   /// **'以后想重看教程，也可以从这里启动'**
   String get message_shell_tutorial_step10Hint;
 
+  /// No description provided for @message_onboarding_skip.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'跳过'**
+  String get message_onboarding_skip;
+
+  /// No description provided for @message_onboarding_next.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'下一页'**
+  String get message_onboarding_next;
+
+  /// No description provided for @message_onboarding_back.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'上一页'**
+  String get message_onboarding_back;
+
+  /// No description provided for @message_onboarding_start.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'开始使用'**
+  String get message_onboarding_start;
+
+  /// No description provided for @message_onboarding_pageIndicator.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'欢迎引导，共三页'**
+  String get message_onboarding_pageIndicator;
+
+  /// No description provided for @message_onboarding_welcome_title.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'欢迎来到值谱'**
+  String get message_onboarding_welcome_title;
+
+  /// No description provided for @message_onboarding_welcome_slogan.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'把每一次购买，变成一条看得见的价值轨迹'**
+  String get message_onboarding_welcome_slogan;
+
+  /// No description provided for @message_onboarding_welcome_desc.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'值谱是本地优先的个人资产生命周期管理工具，所有数据都保存在你的设备上，不注册账号，也不上传云端。'**
+  String get message_onboarding_welcome_desc;
+
+  /// No description provided for @message_onboarding_pill_local.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'本地优先'**
+  String get message_onboarding_pill_local;
+
+  /// No description provided for @message_onboarding_pill_noAccount.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'无需注册'**
+  String get message_onboarding_pill_noAccount;
+
+  /// No description provided for @message_onboarding_pill_private.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'数据不出设备'**
+  String get message_onboarding_pill_private;
+
+  /// No description provided for @message_onboarding_concept_title.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'不是记账，而是看懂价值'**
+  String get message_onboarding_concept_title;
+
+  /// No description provided for @message_onboarding_concept_desc.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'值谱把价格、使用时间和生命周期放进同一条时间线，帮你判断一件东西今天是否仍然值得。'**
+  String get message_onboarding_concept_desc;
+
+  /// No description provided for @message_onboarding_concept_chart.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'日均成本随使用时间下降'**
+  String get message_onboarding_concept_chart;
+
+  /// No description provided for @message_onboarding_concept_example.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'一件 8,000 元的手机用了四年，日均成本可能不到 6 元；一件 500 元的配件三天后闲置，反而值得重新审视。'**
+  String get message_onboarding_concept_example;
+
+  /// No description provided for @message_onboarding_features_title.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'四个工作区，各管一段'**
+  String get message_onboarding_features_title;
+
+  /// No description provided for @message_onboarding_features_assets.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'资产'**
+  String get message_onboarding_features_assets;
+
+  /// No description provided for @message_onboarding_features_assetsDesc.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'记录买入、服役、退役与卖出'**
+  String get message_onboarding_features_assetsDesc;
+
+  /// No description provided for @message_onboarding_features_wishes.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'心愿'**
+  String get message_onboarding_features_wishes;
+
+  /// No description provided for @message_onboarding_features_wishesDesc.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'先放进清单，购买后一键转为资产'**
+  String get message_onboarding_features_wishesDesc;
+
+  /// No description provided for @message_onboarding_features_analytics.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'分析'**
+  String get message_onboarding_features_analytics;
+
+  /// No description provided for @message_onboarding_features_analyticsDesc.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'总值、日均与结构，适合定期复盘'**
+  String get message_onboarding_features_analyticsDesc;
+
+  /// No description provided for @message_onboarding_features_settings.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'设置'**
+  String get message_onboarding_features_settings;
+
+  /// No description provided for @message_onboarding_features_settingsDesc.
+  ///
+  /// In zh_Hans, this message translates to:
+  /// **'主题、语言、格式与备份'**
+  String get message_onboarding_features_settingsDesc;
+
   /// No description provided for @message_sticker_modelStatus.
   ///
   /// In zh_Hans, this message translates to:

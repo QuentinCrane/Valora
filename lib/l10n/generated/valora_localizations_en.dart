@@ -2431,6 +2431,89 @@ class ValoraLocalizationsEn extends ValoraLocalizations {
       'You can restart the tutorial from here whenever needed';
 
   @override
+  String get message_onboarding_skip => 'Skip';
+
+  @override
+  String get message_onboarding_next => 'Next';
+
+  @override
+  String get message_onboarding_back => 'Back';
+
+  @override
+  String get message_onboarding_start => 'Get started';
+
+  @override
+  String get message_onboarding_pageIndicator => 'Welcome guide, 3 pages';
+
+  @override
+  String get message_onboarding_welcome_title => 'Welcome to Valora';
+
+  @override
+  String get message_onboarding_welcome_slogan =>
+      'Turn every purchase into a visible value trail';
+
+  @override
+  String get message_onboarding_welcome_desc =>
+      'Valora is a local-first manager for the lifecycle of your belongings. Everything stays on your device — no account, no cloud.';
+
+  @override
+  String get message_onboarding_pill_local => 'Local-first';
+
+  @override
+  String get message_onboarding_pill_noAccount => 'No sign-up';
+
+  @override
+  String get message_onboarding_pill_private => 'Data stays on device';
+
+  @override
+  String get message_onboarding_concept_title =>
+      'Not bookkeeping — understanding value';
+
+  @override
+  String get message_onboarding_concept_desc =>
+      'Valora puts price, usage time and lifecycle on one timeline, so you can judge whether something is still worth keeping today.';
+
+  @override
+  String get message_onboarding_concept_chart =>
+      'Daily cost falls as usage time grows';
+
+  @override
+  String get message_onboarding_concept_example =>
+      'A ¥8,000 phone used for four years can average under ¥6 a day; a ¥500 gadget idle after three days is the one worth rethinking.';
+
+  @override
+  String get message_onboarding_features_title =>
+      'Four workspaces, each with a job';
+
+  @override
+  String get message_onboarding_features_assets => 'Assets';
+
+  @override
+  String get message_onboarding_features_assetsDesc =>
+      'Record buying, active use, retirement and resale';
+
+  @override
+  String get message_onboarding_features_wishes => 'Wishes';
+
+  @override
+  String get message_onboarding_features_wishesDesc =>
+      'Plan first, then turn into an asset with one tap';
+
+  @override
+  String get message_onboarding_features_analytics => 'Analytics';
+
+  @override
+  String get message_onboarding_features_analyticsDesc =>
+      'Totals, daily cost and structure for regular reviews';
+
+  @override
+  String get message_onboarding_features_settings => 'Settings';
+
+  @override
+  String get message_onboarding_features_settingsDesc =>
+      'Theme, language, formats and backups';
+
+  @override
   String get message_sticker_modelStatus => 'Subject segmentation model';
 
   @override
