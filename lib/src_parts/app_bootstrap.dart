@@ -18,8 +18,12 @@ const double kRadiusMd = 20;
 const double kRadiusLg = 28;
 const double kPagePad = 10;
 
-String localizedAppName(Locale locale) =>
-    _localeKey(locale) == 'en' ? tr('app.name.en') : tr('app.name');
+String localizedAppName(Locale locale) {
+  final key = _localeKey(locale);
+  if (key == 'en') return 'Valora';
+  if (key == 'zh_Hant') return '值譜';
+  return '值谱';
+}
 
 Locale currentPlatformLocale() {
   final locales = WidgetsBinding.instance.platformDispatcher.locales;

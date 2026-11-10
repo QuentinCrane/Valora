@@ -37,8 +37,8 @@ android {
             }
         }
 
-        // The app only ships Chinese and English resources, so strip unused transitive locales.
-        resConfigs "zh", "zh-rTW", "b+zh+Hant", "en"
+        // The app ships Chinese and English resources, so strip unused transitive locales.
+        resConfigs "zh", "zh-rCN", "zh-rTW", "b+zh+Hans", "b+zh+Hant", "en"
     }
 
 
