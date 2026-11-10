@@ -145,7 +145,7 @@ jobs:
           path: release-artifacts
 
       - name: Attach verified assets to GitHub Release
-        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3
         with:
           files: |
             release-artifacts/app-release.apk
