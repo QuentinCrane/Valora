@@ -34,5 +34,6 @@ part 'src_parts/features_asset_editor.dart';
 part 'src_parts/features_wishes.dart';
 part 'src_parts/features_analytics.dart';
 part 'src_parts/features_review.dart';
+part 'src_parts/features_onboarding.dart';
 part 'src_parts/features_settings.dart';
 part 'src_parts/common_widgets.dart';

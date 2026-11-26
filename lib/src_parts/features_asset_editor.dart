@@ -114,12 +114,12 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
     super.dispose();
   }
 
-  lge.LiquidGlass _buildAssetEditorSaveGlass(
+  Widget _buildAssetEditorSaveGlass(
       Widget saveContent, MediaQueryData media, double saveWidth, bool dark) {
     final spring = _savePressed ? 1.0 : 0.0;
     final w = saveWidth * (1.0 + .038 * spring);
     final h = 58.0 * (1.0 + .038 * spring);
-    return lge.LiquidGlass(
+    return ValoraPositionedGlass(
       width: w,
       height: h,
       position: lge.LiquidGlassAlignPosition(
@@ -127,28 +127,25 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
         margin:
             EdgeInsets.only(bottom: 16 + media.padding.bottom - (h - 58.0) / 2),
       ),
-      shape: lge.RoundedRectangleShape(
-        cornerRadius: 999,
-        borderWidth: 1.65 + .30 * spring,
-        borderColor: Colors.white.withOpacity(dark ? .30 : .66),
-        lightColor: Colors.white.withOpacity(dark ? .76 : .92),
-        lightIntensity: 1.55 + .34 * spring,
-        lightDirection: 132,
-        borderType: lge.OpticalBorder(
-            borderSaturation: 1.55 + .24 * spring,
-            ambientIntensity: 1.08 + .22 * spring,
-            borderSolidity: 0.0),
+      style: lge.LiquidGlassStyle(
+        shape: const lge.LiquidGlassShape.roundedRectangle(cornerRadius: 999),
+        specular: lge.LiquidGlassLight.specular(
+            thickness: (1.65 + .30 * spring) * 5.4,
+            intensity: 1.55 + .34 * spring,
+            angle: 132,
+            sharpness: 0),
+        glow: lge.LiquidGlassLight.glow(
+            thickness: (1.65 + .30 * spring) * 29.4,
+            intensity: 1.08 + .22 * spring,
+            angle: 222),
+        blur: liquidGlassBlurSigma(context),
+        refractionIndex: 1.0 + (.096 + .026 * spring) * .22,
+        refractionWidth: 32 + 7 * spring,
+        magnification: 1.044 + .030 * spring,
+        dispersion: (.00052 + .00014 * spring) * 660,
+        saturation: 1.055,
+        color: liquidGlassTint(context),
       ),
-      blur: lge.LiquidGlassBlur(
-          sigmaX: liquidGlassBlurSigma(context),
-          sigmaY: liquidGlassBlurSigma(context)),
-      distortion: .096 + .026 * spring,
-      distortionWidth: 32 + 7 * spring,
-      magnification: 1.044 + .030 * spring,
-      chromaticAberration: .00052 + .00014 * spring,
-      saturation: 1.055,
-      refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-      color: liquidGlassTint(context),
       child: saveContent,
     );
   }
@@ -523,9 +520,9 @@ class _AssetEditorPageState extends State<AssetEditorPage> {
             duringInteraction: _savePressed),
         backgroundWidget:
             ValoraGlassSceneBackground(child: RepaintBoundary(child: pageBody)),
-        children: [
+        child: Stack(children: [
           _buildAssetEditorSaveGlass(saveContent, media, saveWidth, dark),
-        ],
+        ]),
       ),
     );
   }

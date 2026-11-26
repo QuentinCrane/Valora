@@ -88,92 +88,89 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
       barrierDismissible: false,
       builder: (dialogContext) {
         final dark = Theme.of(dialogContext).brightness == Brightness.dark;
+        final glass = valoraUseSceneLiquidGlass(dialogContext);
         return Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 22),
           backgroundColor: Colors.transparent,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-                decoration: BoxDecoration(
-                  color: dark
-                      ? kCardDark.withOpacity(.94)
-                      : Colors.white.withOpacity(.94),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                      color: dark
-                          ? Colors.white.withOpacity(.10)
-                          : Colors.white.withOpacity(.78)),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(dark ? .28 : .10),
-                        blurRadius: 28,
-                        offset: const Offset(0, 14))
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: kBrand.withOpacity(dark ? .22 : .16),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Icon(Icons.school_rounded,
-                            color: dark ? Colors.white : kText),
+          child: ValoraGlassBackdrop(
+            radius: 30,
+            blur: 14,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+              decoration: BoxDecoration(
+                color: dark
+                    ? kCardDark.withOpacity(glass ? .72 : .94)
+                    : Colors.white.withOpacity(glass ? .70 : .94),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                    color: dark
+                        ? Colors.white.withOpacity(.10)
+                        : Colors.white.withOpacity(.78)),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withOpacity(dark ? .28 : .10),
+                      blurRadius: 28,
+                      offset: const Offset(0, 14))
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: kBrand.withOpacity(dark ? .22 : .16),
+                        borderRadius: BorderRadius.circular(18),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: Text(tr('shell.tutorial.promptTitle'),
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: dark ? Colors.white : kText))),
-                    ]),
-                    const SizedBox(height: 12),
-                    Text(
-                      tr('shell.tutorial.promptDesc'),
-                      style: TextStyle(
-                          fontSize: 13.5,
-                          height: 1.45,
-                          color: dark ? Colors.white.withOpacity(.72) : kMuted),
+                      child: Icon(Icons.school_rounded,
+                          color: dark ? Colors.white : kText),
                     ),
-                    const SizedBox(height: 18),
-                    Row(children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () =>
-                              Navigator.of(dialogContext).pop(false),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18)),
-                          ),
-                          child: Text(tr('shell.tutorial.notNow')),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Text(tr('shell.tutorial.promptTitle'),
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: dark ? Colors.white : kText))),
+                  ]),
+                  const SizedBox(height: 12),
+                  Text(
+                    tr('shell.tutorial.promptDesc'),
+                    style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: dark ? Colors.white.withOpacity(.72) : kMuted),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18)),
                         ),
+                        child: Text(tr('shell.tutorial.notNow')),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () =>
-                              Navigator.of(dialogContext).pop(true),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18)),
-                          ),
-                          child: Text(tr('shell.tutorial.start')),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18)),
                         ),
+                        child: Text(tr('shell.tutorial.start')),
                       ),
-                    ]),
-                  ],
-                ),
+                    ),
+                  ]),
+                ],
               ),
             ),
           ),
@@ -470,130 +467,6 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     }
   }
 
-  lge.LiquidGlass _buildDockLiquidGlass(BuildContext context, Widget dock,
-      EdgeInsets safe, bool dark, double dockWidth, double dockHeight) {
-    final raw = _dockGlassController.value.clamp(0.0, 1.0).toDouble();
-    final spring = raw == 0
-        ? 0.0
-        : Curves.easeOutBack.transform(raw).clamp(0.0, 1.18).toDouble();
-    final w = dockWidth * (1.0 + .155 * spring);
-    final h = dockHeight * (1.0 + .205 * spring);
-    final left = math.max(14.0, 24 - (w - dockWidth) / 2);
-    final bottom = 14 + safe.bottom - (h - dockHeight) * .18;
-    return lge.LiquidGlass(
-      key: const ValueKey('valora.shell.dock.lens'),
-      width: w,
-      height: h,
-      position: lge.LiquidGlassAlignPosition(
-        alignment: Alignment.bottomLeft,
-        margin: EdgeInsets.only(left: left, bottom: bottom),
-      ),
-      shape: lge.RoundedRectangleShape(
-        cornerRadius: 999,
-        borderWidth: 1.35 + .42 * spring,
-        borderColor: Colors.white.withOpacity(dark ? .32 : .70),
-        lightColor: Colors.white.withOpacity(dark ? .78 : .94),
-        lightIntensity: 1.55 + .42 * spring,
-        lightDirection: 132,
-        borderType: lge.OpticalBorder(
-          borderSaturation: 1.55 + .26 * spring,
-          ambientIntensity: 1.08 + .24 * spring,
-          borderSolidity: 0.0,
-        ),
-      ),
-      blur: lge.LiquidGlassBlur(
-          sigmaX: liquidGlassBlurSigma(context),
-          sigmaY: liquidGlassBlurSigma(context)),
-      distortion: .112 + .030 * spring,
-      distortionWidth: 44 + 10 * spring,
-      magnification: 1.052 + .036 * spring,
-      chromaticAberration: .00056 + .00014 * spring,
-      saturation: 1.065,
-      refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-      color: liquidGlassTint(context),
-      child: dock,
-    );
-  }
-
-  lge.LiquidGlass _buildAddLiquidGlass(BuildContext context, Widget addButton,
-      EdgeInsets safe, bool dark, double addSize) {
-    final raw = _addGlassController.value.clamp(0.0, 1.0).toDouble();
-    final spring = raw == 0
-        ? 0.0
-        : Curves.easeOutBack.transform(raw).clamp(0.0, 1.12).toDouble();
-    final size = addSize * (1.0 + .105 * spring);
-    return lge.LiquidGlass(
-      key: const ValueKey('valora.shell.add.lens'),
-      width: size,
-      height: size,
-      position: lge.LiquidGlassAlignPosition(
-        alignment: Alignment.bottomRight,
-        margin: EdgeInsets.only(
-            right: 24 - (size - addSize) / 2,
-            bottom: 19 + safe.bottom - (size - addSize) / 2),
-      ),
-      shape: lge.RoundedRectangleShape(
-        cornerRadius: 999,
-        borderWidth: 1.32 + .26 * spring,
-        borderColor: Colors.white.withOpacity(dark ? .28 : .64),
-        lightColor: Colors.white.withOpacity(dark ? .74 : .90),
-        lightIntensity: 1.48 + .34 * spring,
-        lightDirection: 132,
-        borderType: lge.OpticalBorder(
-          borderSaturation: 1.54 + .24 * spring,
-          ambientIntensity: 1.08 + .22 * spring,
-          borderSolidity: 0.0,
-        ),
-      ),
-      blur: lge.LiquidGlassBlur(
-          sigmaX: liquidGlassBlurSigma(context),
-          sigmaY: liquidGlassBlurSigma(context)),
-      distortion: .096 + .026 * spring,
-      distortionWidth: 34 + 7 * spring,
-      magnification: 1.044 + .030 * spring,
-      chromaticAberration: .00052 + .00014 * spring,
-      saturation: 1.055,
-      refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-      color: liquidGlassTint(context),
-      child: addButton,
-    );
-  }
-
-  Widget _buildAnimatedLiquidGlassView({
-    required BuildContext context,
-    required Widget shellBackground,
-    required Widget dock,
-    required Widget addButton,
-    required EdgeInsets safe,
-    required bool dark,
-    required double dockWidth,
-    required double dockHeight,
-    required double addSize,
-  }) {
-    final background = ValoraGlassSceneBackground(
-        child: RepaintBoundary(child: shellBackground));
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: Listenable.merge(
-            <Listenable>[_dockGlassController, _addGlassController]),
-        child: background,
-        builder: (context, child) => lge.LiquidGlassView(
-          realTimeCapture: valoraLiquidGlassRealtimeCapture(context),
-          useSync: valoraLiquidGlassUseSync(context),
-          refreshRate: valoraLiquidGlassRefreshRate(context),
-          pixelRatio: liquidGlassCapturePixelRatio(context,
-              duringInteraction: _dockMagicActive || _addMagicActive),
-          backgroundWidget: child!,
-          children: [
-            _buildDockLiquidGlass(
-                context, dock, safe, dark, dockWidth, dockHeight),
-            _buildAddLiquidGlass(context, addButton, safe, dark, addSize),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final store = context.readStore;
@@ -606,10 +479,8 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
     final media = MediaQuery.of(context);
     final safe = media.padding;
     final screen = media.size;
-    final dark = context.isDark;
-    final dockWidth = valoraIsCompact(context)
-        ? (screen.width - 112).clamp(208.0, 278.0).toDouble()
-        : math.min(screen.width - 158, 404.0).clamp(238.0, 404.0).toDouble();
+    final dockWidth =
+        math.min(screen.width - 124, 404.0).clamp(192.0, 404.0).toDouble();
     final dockHeight = 76.0;
     final dockMagicScale = _dockMagicActive ? 1.135 : 1.0;
     final dockGlassWidth = dockWidth * dockMagicScale;
@@ -669,16 +540,23 @@ class _ShellPageState extends State<ShellPage> with TickerProviderStateMixin {
 
     Widget shellLayer;
     if (useLiquidGlass) {
-      shellLayer = _buildAnimatedLiquidGlassView(
-        context: context,
-        shellBackground: shellBackground,
-        dock: dock,
-        addButton: addButton,
-        safe: safe,
-        dark: dark,
-        dockWidth: dockWidth,
-        dockHeight: dockHeight,
-        addSize: addSize,
+      shellLayer = lge.LiquidGlassView(
+        realTimeCapture: valoraLiquidGlassRealtimeCapture(context),
+        useSync: valoraLiquidGlassUseSync(context),
+        refreshRate: valoraLiquidGlassRefreshRate(context),
+        pixelRatio: liquidGlassCapturePixelRatio(context),
+        backgroundWidget: ValoraGlassSceneBackground(
+            child: RepaintBoundary(child: shellBackground)),
+        child: ValoraGlassNavigation(
+          index: index,
+          onChanged: _goToTab,
+          onAdd: () => openCompose(
+              context, index == 1 ? ComposeTab.wish : ComposeTab.asset),
+          dockWidth: dockWidth,
+          dockHeight: dockHeight,
+          addSize: addSize,
+          safeBottom: safe.bottom,
+        ),
       );
     } else {
       shellLayer = Stack(children: [
@@ -878,6 +756,195 @@ class _ShellOnboardingOverlay extends StatelessWidget {
       onNext: onNext,
       onSkip: onSkip,
     );
+  }
+}
+
+/// Library-backed navigation and action, layered over a LiquidGlassView.
+class ValoraGlassNavigation extends StatefulWidget {
+  const ValoraGlassNavigation(
+      {super.key,
+      required this.index,
+      required this.onChanged,
+      required this.onAdd,
+      required this.dockWidth,
+      required this.dockHeight,
+      required this.addSize,
+      required this.safeBottom});
+
+  final int index;
+  final ValueChanged<int> onChanged;
+  final VoidCallback onAdd;
+  final double dockWidth, dockHeight, addSize, safeBottom;
+
+  @override
+  State<ValoraGlassNavigation> createState() => _ValoraGlassNavigationState();
+}
+
+class _ValoraGlassNavigationState extends State<ValoraGlassNavigation> {
+  int? _dragIndex;
+
+  void _previewDrag(double x) {
+    final next = (x / (widget.dockWidth / 4)).floor().clamp(0, 3);
+    if (_dragIndex != next) {
+      setState(() => _dragIndex = next);
+      selectionHaptic();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = context.isDark;
+    final fullMotion = valoraMotionTier(context) == ValoraMotionTier.full;
+    // On a live shader backend the library places its morphing bar itself.
+    // In its capture fallback (and in reduced motion), place the plain bar.
+    final morph = fullMotion && ui.ImageFilter.isShaderFilterSupported;
+    final labels = [
+      tr('dock.assets'),
+      tr('dock.wishes'),
+      tr('dock.analytics'),
+      tr('dock.settings')
+    ];
+    const icons = [
+      Icons.home_rounded,
+      Icons.shopping_bag_rounded,
+      Icons.pie_chart_rounded,
+      Icons.settings_rounded
+    ];
+    final tint = dark ? const Color(0x88252E3B) : const Color(0x90FFFFFF);
+    final bar = lge.LiquidGlassTabBar(
+      key: const ValueKey('valora.shell.library-tab-bar'),
+      items: [for (final icon in icons) lge.LiquidGlassTabBarItem(icon: icon)],
+      selectedIndex: _dragIndex ?? widget.index,
+      onChanged: widget.onChanged,
+      width: widget.dockWidth,
+      height: widget.dockHeight,
+      alignment: Alignment.bottomLeft,
+      margin: const EdgeInsets.only(left: 24, bottom: 14),
+      itemPadding: 6,
+      itemStyle: lge.LiquidGlassTabItemStyle(
+        selectedColor: dark ? Colors.white : kText,
+        unselectedColor:
+            dark ? const Color(0xFFA8B5C4) : const Color(0xFF748391),
+        iconSize: 23,
+        underGlassIconSize: 27,
+      ),
+      style: lge.LiquidGlassStyle(
+        shape: const lge.LiquidGlassShape.continuousRoundedRectangle(
+            cornerRadius: 999),
+        color: tint,
+        blur: liquidGlassBlurSigma(context),
+        refractionIndex: 1.025,
+        refractionWidth: 32,
+        saturation: 1.08,
+        specular: const lge.LiquidGlassLight.specular(
+            thickness: 6, angle: 132, intensity: 1.2, sharpness: .35),
+        glow: const lge.LiquidGlassLight.glow(
+            thickness: 18, angle: 222, intensity: .65),
+      ),
+      pillStyle: lge.LiquidGlassTabPillStyle(
+        mode:
+            morph ? lge.LiquidGlassPillMode.both : lge.LiquidGlassPillMode.none,
+        animated: true,
+        animationDuration:
+            valoraMotionDuration(context, const Duration(milliseconds: 320)),
+        confineToBar: true,
+        color: dark ? const Color(0x44FFFFFF) : const Color(0x77FFFFFF),
+        glassStyle: lge.LiquidGlassStyle(
+          shape: const lge.LiquidGlassShape.continuousRoundedRectangle(
+              cornerRadius: 999),
+          color: dark ? const Color(0x1FFFFFFF) : const Color(0x30FFFFFF),
+          blur: 1.5,
+          refractionIndex: 1.035,
+          refractionWidth: 22,
+          specular:
+              const lge.LiquidGlassLight.specular(thickness: 5, angle: 132),
+        ),
+      ),
+    );
+    final Widget positionedBar = morph
+        ? Positioned.fill(child: ExcludeSemantics(child: bar))
+        : Positioned(
+            left: 24,
+            bottom: widget.safeBottom + 14,
+            width: widget.dockWidth,
+            height: widget.dockHeight,
+            child: ExcludeSemantics(
+                child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragStart: (d) => _previewDrag(d.localPosition.dx),
+              onHorizontalDragUpdate: (d) => _previewDrag(d.localPosition.dx),
+              onHorizontalDragEnd: (_) {
+                final target = _dragIndex;
+                setState(() => _dragIndex = null);
+                if (target != null) widget.onChanged(target);
+              },
+              onHorizontalDragCancel: () => setState(() => _dragIndex = null),
+              child: bar,
+            )),
+          );
+    return Stack(children: [
+      positionedBar,
+      // The library's animated bar uses a raw pointer listener, so provide
+      // explicit, individually actionable accessibility nodes as well.
+      Positioned(
+        left: 24,
+        bottom: widget.safeBottom + 14,
+        width: widget.dockWidth,
+        height: widget.dockHeight,
+        child: TutorialTargetAnchor(
+            id: 'shell.dock',
+            child: Row(
+              children: [
+                for (var i = 0; i < labels.length; i++)
+                  Expanded(
+                    child: Semantics(
+                      container: true,
+                      button: true,
+                      label: labels[i],
+                      selected: i == widget.index,
+                      onTap: () => widget.onChanged(i),
+                      child: const SizedBox.expand(),
+                    ),
+                  )
+              ],
+            )),
+      ),
+      Positioned(
+        right: 24,
+        bottom: widget.safeBottom + 19,
+        width: widget.addSize,
+        height: widget.addSize,
+        child: TutorialTargetAnchor(
+          id: 'shell.addButton',
+          child: Semantics(
+            button: true,
+            label: tr('common.add'),
+            onTap: widget.onAdd,
+            child: ExcludeSemantics(
+                child: lge.LiquidGlassBatch.exclude(
+              child: lge.LiquidGlassTabBarAction(
+                key: const ValueKey('valora.shell.library-add'),
+                icon: Icons.add_rounded,
+                onTap: widget.onAdd,
+                size: widget.addSize,
+                foregroundColor: dark ? Colors.white : kText,
+                touch: fullMotion
+                    ? const lge.LiquidGlassTouch.flexing(lge.LiquidGlassFlex())
+                    : null,
+                style: lge.LiquidGlassStyle(
+                  color: tint,
+                  blur: liquidGlassBlurSigma(context),
+                  refractionIndex: 1.025,
+                  refractionWidth: 26,
+                  specular: const lge.LiquidGlassLight.specular(
+                      thickness: 6, angle: 132),
+                ),
+              ),
+            )),
+          ),
+        ),
+      ),
+    ]);
   }
 }
 

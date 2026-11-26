@@ -42,7 +42,7 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 当前版本 | `0.80.2+82` |
+| 当前版本 | `0.80.3+83` |
 | 平台 | Android，Flutter 构建 |
 | 最低 Android 版本 | Android 7.0 / API 24 |
 | 数据策略 | 本地优先，云同步按需开启 |
@@ -196,7 +196,7 @@ docs/                          # 使用、构建、产品与发布文档
 
 ## 第三方声明
 
-运行时的液态玻璃效果使用 [`liquid_glass_easy`](https://pub.dev/packages/liquid_glass_easy) `2.0.1`；日期/数字格式和哈希能力分别使用 `intl` 与 `crypto`。开发门禁还使用 `flutter_lints`。版权和许可文本保留在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，可用 `dart run tooling/check_supply_chain.dart` 检查直接依赖声明是否同步
+运行时的液态玻璃效果使用 [`liquid_glass_easy`](https://pub.dev/packages/liquid_glass_easy) `5.2.0`；日期/数字格式和哈希能力分别使用 `intl` 与 `crypto`。开发门禁还使用 `flutter_lints`。版权和许可文本保留在 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，可用 `dart run tooling/check_supply_chain.dart` 检查直接依赖声明是否同步
 
 ## 参与贡献
 

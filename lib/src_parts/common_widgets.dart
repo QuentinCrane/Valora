@@ -920,6 +920,9 @@ Duration valoraMotionDuration(
 }
 
 bool valoraUseSceneLiquidGlass(BuildContext context) {
+  if (context.dependOnInheritedWidgetOfExactType<AppScope>() == null) {
+    return false;
+  }
   return context.store.settings.glassEffectMode == GlassEffectMode.liquid &&
       valoraMotionTier(context) != ValoraMotionTier.off;
 }
@@ -934,6 +937,40 @@ lge.LiquidGlassRefreshRate valoraLiquidGlassRefreshRate(BuildContext context) {
   return valoraMotionTier(context) == ValoraMotionTier.full
       ? lge.LiquidGlassRefreshRate.deviceRefreshRate
       : lge.LiquidGlassRefreshRate.medium;
+}
+
+/// Positions a layout-driven lens using the same alignment and margins as the
+/// former position-driven API, including animated negative margins.
+class ValoraPositionedGlass extends StatelessWidget {
+  const ValoraPositionedGlass(
+      {super.key,
+      required this.width,
+      required this.height,
+      required this.position,
+      required this.style,
+      required this.child});
+
+  final double width;
+  final double height;
+  final lge.LiquidGlassAlignPosition position;
+  final lge.LiquidGlassStyle style;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Positioned.fill(
+        child: LayoutBuilder(builder: (context, constraints) {
+          final offset =
+              position.resolve(constraints.biggest, Size(width, height));
+          return Stack(clipBehavior: Clip.none, children: [
+            Positioned(
+                left: offset.dx,
+                top: offset.dy,
+                width: width,
+                height: height,
+                child: lge.LiquidGlassLens(style: style, child: child)),
+          ]);
+        }),
+      );
 }
 
 class ValoraLiquidGlassSurface extends StatelessWidget {
@@ -975,19 +1012,208 @@ class ValoraLiquidGlassSurface extends StatelessWidget {
           (constraints.maxWidth.isFinite ? constraints.maxWidth : height);
       final h = height;
       final effectiveRadius = circular ? h / 2 : radius;
+      final content = Padding(
+        padding: padding,
+        child: Center(child: child),
+      );
       return SizedBox(
         width: width,
         height: h,
-        child: _StaticValoraGlassSurface(
-          radius: effectiveRadius,
-          tintOpacity: tintOpacity,
-          blurSigma: math.min(blurSigma, .75),
-          widthHint: w,
-          child: Padding(
-            padding: padding,
-            child: Center(child: child),
-          ),
-        ),
+        child: valoraUseSceneLiquidGlass(context)
+            ? ValoraGlassMaterial(
+                radius: effectiveRadius,
+                tintOpacity: tintOpacity,
+                blur: math.max(1.0, blurSigma * 4),
+                refractionIndex: 1 + distortion * .22,
+                refractionWidth: distortionWidth,
+                magnification: magnification,
+                // Small controls inside scrolling content use the library's
+                // lightweight surface to avoid a shader for every row.
+                lite: Scrollable.maybeOf(context) != null,
+                child: content,
+              )
+            : _StaticValoraGlassSurface(
+                radius: effectiveRadius,
+                tintOpacity: tintOpacity,
+                blurSigma: math.min(blurSigma, .75),
+                widthHint: w,
+                child: content,
+              ),
+      );
+    });
+  }
+}
+
+/// Shared library-backed glass for controls and flexible-height panels.
+class ValoraGlassMaterial extends StatelessWidget {
+  const ValoraGlassMaterial(
+      {super.key,
+      required this.child,
+      required this.radius,
+      this.tintOpacity = .18,
+      this.blur = 3,
+      this.refractionIndex = 1.02,
+      this.refractionWidth = 24,
+      this.magnification = 1,
+      this.lite = false,
+      this.tint});
+
+  final Widget child;
+  final double radius,
+      tintOpacity,
+      blur,
+      refractionIndex,
+      refractionWidth,
+      magnification;
+  final bool lite;
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final shape = lge.LiquidGlassShape.roundedRectangle(cornerRadius: radius);
+    final color = tint ??
+        (context.isDark
+            ? const Color(0xFF202938).withOpacity(.30 + tintOpacity * .25)
+            : Colors.white.withOpacity(.24 + tintOpacity * .4));
+    const light = lge.LiquidGlassLight.specular(
+        thickness: 5, angle: 132, intensity: 1.0, sharpness: .35);
+    if (lite) {
+      return lge.LiquidGlassLite(
+          shape: shape,
+          specular: light,
+          color: color,
+          blur: blur,
+          child: child);
+    }
+    // A control can overlap another glass surface; it must not share a batch
+    // with its parent, or the two surfaces will sample the wrong backdrop.
+    return lge.LiquidGlassBatch.exclude(
+      child: lge.LiquidGlassLens(
+        style: lge.LiquidGlassStyle(
+            shape: shape,
+            specular: light,
+            color: color,
+            blur: blur,
+            refractionIndex: refractionIndex,
+            refractionWidth: refractionWidth,
+            magnification: magnification),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Keeps classic blur when glass is disabled, and uses the package for glass.
+class ValoraGlassBackdrop extends StatelessWidget {
+  const ValoraGlassBackdrop(
+      {super.key,
+      required this.child,
+      required this.radius,
+      required this.blur});
+  final Widget child;
+  final double radius, blur;
+
+  @override
+  Widget build(BuildContext context) {
+    if (valoraUseSceneLiquidGlass(context)) {
+      return ValoraGlassMaterial(radius: radius, blur: blur * .4, child: child);
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+        child: child,
+      ),
+    );
+  }
+}
+
+class ValoraGlassSheetSurface extends StatelessWidget {
+  const ValoraGlassSheetSurface(
+      {super.key, required this.child, this.radius = 34});
+  final Widget child;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!valoraUseSceneLiquidGlass(context)) return child;
+    return ValoraGlassMaterial(
+      radius: radius,
+      blur: 7,
+      tint: context.isDark ? const Color(0xE00D2434) : const Color(0xE6FFFFFF),
+      child: child,
+    );
+  }
+}
+
+/// A glass slider in full-motion mode, with Material's accessible fallback.
+class ValoraAdaptiveSlider extends StatelessWidget {
+  const ValoraAdaptiveSlider(
+      {super.key,
+      required this.value,
+      required this.onChanged,
+      this.onChangeStart,
+      this.onChangeEnd,
+      this.min = 0,
+      this.max = 1,
+      this.semanticLabel});
+  final double value, min, max;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double>? onChangeStart, onChangeEnd;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = context.getInheritedWidgetOfExactType<AppScope>();
+    final enabled = scope != null &&
+        valoraUseSceneLiquidGlass(context) &&
+        valoraMotionTier(context) == ValoraMotionTier.full;
+    return LayoutBuilder(builder: (context, constraints) {
+      if (!enabled ||
+          !constraints.maxWidth.isFinite ||
+          constraints.maxWidth < 110) {
+        return Slider(
+            value: value,
+            min: min,
+            max: max,
+            onChanged: onChanged,
+            onChangeStart: onChangeStart,
+            onChangeEnd: onChangeEnd,
+            semanticFormatterCallback: (v) =>
+                '${((v - min) / (max - min) * 100).round()}%');
+      }
+      void changeBy(double delta) {
+        final next = (value + delta * (max - min)).clamp(min, max).toDouble();
+        onChanged(next);
+        onChangeEnd?.call(next);
+      }
+
+      return Semantics(
+        container: true,
+        slider: true,
+        label: semanticLabel,
+        value: '${((value - min) / (max - min) * 100).round()}%',
+        increasedValue:
+            '${(((value - min) / (max - min) + .05).clamp(0.0, 1.0) * 100).round()}%',
+        decreasedValue:
+            '${(((value - min) / (max - min) - .05).clamp(0.0, 1.0) * 100).round()}%',
+        onIncrease: () => changeBy(.05),
+        onDecrease: () => changeBy(-.05),
+        child: ExcludeSemantics(
+            child: lge.LiquidGlassSlider(
+          width: constraints.maxWidth,
+          value: value,
+          minimumValue: min,
+          maximumValue: max,
+          onChanged: onChanged,
+          onChangeStart: onChangeStart,
+          onChangeEnd: onChangeEnd,
+          activeColor: kBrandStrong,
+          inactiveColor: context.isDark
+              ? const Color(0x55FFFFFF)
+              : const Color(0x22000000),
+          pixelRatio: .75,
+        )),
       );
     });
   }
@@ -2318,10 +2544,14 @@ class _IconPickerSheetState extends State<IconPickerSheet> {
     if (!library.containsKey(group)) group = library.keys.first;
     final groups = library.keys.toList();
     final icons = library[group] ?? library.values.first;
-    return Container(
+    final glass = valoraUseSceneLiquidGlass(context);
+    return ValoraGlassSheetSurface(
+        child: Container(
       height: MediaQuery.sizeOf(context).height * .90,
       decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF151515) : Colors.white,
+        color: glass
+            ? Colors.transparent
+            : (context.isDark ? const Color(0xFF151515) : Colors.white),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
       ),
       child: Column(
@@ -2415,7 +2645,7 @@ class _IconPickerSheetState extends State<IconPickerSheet> {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -3235,12 +3465,16 @@ class _ValoraDatePickerSheetState extends State<_ValoraDatePickerSheet> {
   Widget build(BuildContext context) {
     final dark = context.isDark;
     final bottom = MediaQuery.paddingOf(context).bottom;
-    return Container(
+    final glass = valoraUseSceneLiquidGlass(context);
+    return ValoraGlassSheetSurface(
+        child: Container(
       constraints:
           BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .86),
       padding: EdgeInsets.fromLTRB(16, 8, 16, 14 + bottom),
       decoration: BoxDecoration(
-        color: dark ? const Color(0xFF0D2434) : Colors.white,
+        color: glass
+            ? Colors.transparent
+            : (dark ? const Color(0xFF0D2434) : Colors.white),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
         boxShadow: [
           BoxShadow(
@@ -3317,7 +3551,7 @@ class _ValoraDatePickerSheetState extends State<_ValoraDatePickerSheet> {
           ]),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildCalendarMode(BuildContext context) {

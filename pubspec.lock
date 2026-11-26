@@ -45,12 +45,12 @@ packages:
     dependency: "direct main"
     description:
       name: crypto
-      sha256: c8ea0233063ba03258fbcf2ca4d6dadfefe14f02fab57702265467a19f27fadf
+      sha256: e3626ae6270383c9e3a549f34c9e4cd26c09ae6a9adaab2bf4737a00340efdc4
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.7"
+    version: "3.0.8"
   fake_async:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: fake_async
       sha256: "5368f224a74523e8d2e7399ea1638b37aecfca824a3cc4dfdf77bf1fa905ac44"
@@ -124,10 +124,10 @@ packages:
     dependency: "direct main"
     description:
       name: liquid_glass_easy
-      sha256: "07f7fc2d59aa6058c71db879d918e0995cb9902a96d63c08884c8af4049dde5e"
+      sha256: f8beffcd26f942216c9427be94d28030c12cdcd2c334232a1f2869915ad3bb0f
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.1"
+    version: "5.2.0"
   matcher:
     dependency: transitive
     description:
@@ -213,14 +213,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.11"
-  typed_data:
-    dependency: transitive
-    description:
-      name: typed_data
-      sha256: f9049c039ebfeb4cf7a7104a675823cd72dba8297f264b6637062516699fa006
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.4.0"
   vector_math:
     dependency: transitive
     description:
@@ -233,10 +225,10 @@ packages:
     dependency: transitive
     description:
       name: vm_service
-      sha256: "0016aef94fc66495ac78af5859181e3f3bf2026bd8eecc72b9565601e19ab360"
+      sha256: "89b11d62e1040ee681af3b4f1c97a803ecbf010c6e8b9c5896ee5b08c3bf7b78"
       url: "https://pub.dev"
     source: hosted
-    version: "15.2.0"
+    version: "15.4.0"
 sdks:
   dart: ">=3.10.0-0 <4.0.0"
   flutter: ">=3.18.0-18.0.pre.54"

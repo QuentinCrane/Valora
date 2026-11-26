@@ -691,93 +691,98 @@ Future<bool?> showDestructiveActionSheet(
           scopesRoute: true,
           explicitChildNodes: true,
           label: title,
-          child: Container(
-            padding: EdgeInsets.fromLTRB(
-                18, 12, 18, 18 + MediaQuery.viewInsetsOf(context).bottom),
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(30)),
-              border: Border.all(
-                  color: Theme.of(context).dividerColor.withOpacity(.35)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                    child: Container(
+          child: ValoraGlassSheetSurface(
+              radius: 30,
+              child: Container(
+                padding: EdgeInsets.fromLTRB(
+                    18, 12, 18, 18 + MediaQuery.viewInsetsOf(context).bottom),
+                decoration: BoxDecoration(
+                  color: valoraUseSceneLiquidGlass(context)
+                      ? Colors.transparent
+                      : Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(30)),
+                  border: Border.all(
+                      color: Theme.of(context).dividerColor.withOpacity(.35)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                        child: Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                                color: kMuted.withOpacity(.45),
+                                borderRadius: BorderRadius.circular(99)))),
+                    const SizedBox(height: 18),
+                    Row(children: [
+                      Container(
                         width: 42,
-                        height: 4,
+                        height: 42,
                         decoration: BoxDecoration(
-                            color: kMuted.withOpacity(.45),
-                            borderRadius: BorderRadius.circular(99)))),
-                const SizedBox(height: 18),
-                Row(children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                        color: const Color(0xFFFF6B5E).withOpacity(.15),
-                        borderRadius: BorderRadius.circular(15)),
-                    child: const Icon(Icons.warning_amber_rounded,
-                        color: Color(0xFFD84A3A)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Text(title,
+                            color: const Color(0xFFFF6B5E).withOpacity(.15),
+                            borderRadius: BorderRadius.circular(15)),
+                        child: const Icon(Icons.warning_amber_rounded,
+                            color: Color(0xFFD84A3A)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Text(title,
+                              style: const TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.normal))),
+                    ]),
+                    const SizedBox(height: 12),
+                    Text(message, style: const TextStyle(height: 1.45)),
+                    if (impactSummary != null &&
+                        impactSummary.trim().isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text(tr('destructive.impact'),
                           style: const TextStyle(
-                              fontSize: 19, fontWeight: FontWeight.normal))),
-                ]),
-                const SizedBox(height: 12),
-                Text(message, style: const TextStyle(height: 1.45)),
-                if (impactSummary != null &&
-                    impactSummary.trim().isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Text(tr('destructive.impact'),
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.normal)),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFFFF6B5E).withOpacity(.08),
-                        borderRadius: BorderRadius.circular(16)),
-                    child: Text(impactSummary,
-                        style: const TextStyle(color: kMuted, height: 1.4)),
-                  ),
-                ],
-                const SizedBox(height: 10),
-                Text(tr('destructive.cancelNoChange'),
-                    style: const TextStyle(color: kMuted, fontSize: 12)),
-                const SizedBox(height: 16),
-                Row(children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: submitting
-                          ? null
-                          : () => Navigator.pop(sheetContext, false),
-                      child: Text(tr('common.cancel')),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFD84A3A)),
-                      onPressed: submitting
-                          ? null
-                          : () {
-                              setLocalState(() => submitting = true);
-                              Navigator.pop(sheetContext, true);
-                            },
-                      child: Text(actionLabel),
-                    ),
-                  ),
-                ]),
-              ],
-            ),
-          ),
+                              fontSize: 13, fontWeight: FontWeight.normal)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFFF6B5E).withOpacity(.08),
+                            borderRadius: BorderRadius.circular(16)),
+                        child: Text(impactSummary,
+                            style: const TextStyle(color: kMuted, height: 1.4)),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Text(tr('destructive.cancelNoChange'),
+                        style: const TextStyle(color: kMuted, fontSize: 12)),
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: submitting
+                              ? null
+                              : () => Navigator.pop(sheetContext, false),
+                          child: Text(tr('common.cancel')),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFD84A3A)),
+                          onPressed: submitting
+                              ? null
+                              : () {
+                                  setLocalState(() => submitting = true);
+                                  Navigator.pop(sheetContext, true);
+                                },
+                          child: Text(actionLabel),
+                        ),
+                      ),
+                    ]),
+                  ],
+                ),
+              )),
         ),
       );
     },
@@ -1754,413 +1759,508 @@ Future<String?> adjustStickerCover(
                 child: child,
               );
 
-          return Container(
-            margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            decoration: BoxDecoration(
-              color: context.isDark ? const Color(0xFF111316) : Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(.16),
-                    blurRadius: 30,
-                    offset: const Offset(0, 16))
-              ],
-            ),
-            child: SafeArea(
-              child: SizedBox(
-                height: MediaQuery.sizeOf(context).height * 0.94,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 12, 8),
-                      child: Row(children: [
-                        Expanded(
-                            child: Text(tr('sticker.repairTitle'),
-                                style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700))),
-                        TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: Text(tr('common.cancel'))),
-                      ]),
+          return Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: ValoraGlassSheetSurface(
+                  radius: 28,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: valoraUseSceneLiquidGlass(context)
+                          ? Colors.transparent
+                          : (context.isDark
+                              ? const Color(0xFF111316)
+                              : Colors.white),
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(.16),
+                            blurRadius: 30,
+                            offset: const Offset(0, 16))
+                      ],
                     ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(tr('sticker.repairDesc'),
-                              style: TextStyle(fontSize: 12, color: kMuted))),
-                    ),
-                    const SizedBox(height: 10),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: _StickerAdjustPreview(
-                          uri: sourceUri,
-                          contain: contain,
-                          scale: scale,
-                          offsetXFactor: offsetXFactor,
-                          offsetYFactor: offsetYFactor,
-                          edgeTune: edgeTune,
-                          cleanupMode: cleanupMode,
-                          colorTolerance: colorTolerance,
-                          recognitionMode: recognitionMode,
-                          strokes: strokes,
-                          activeStroke: activeStroke,
-                          toolMode: toolMode,
-                          brushRadiusFactor: brushRadiusFactor,
-                          onPanMove: (delta) => setState(() {
-                            offsetXFactor = (offsetXFactor + delta.dx)
-                                .clamp(-0.8, 0.8)
-                                .toDouble();
-                            offsetYFactor = (offsetYFactor + delta.dy)
-                                .clamp(-0.8, 0.8)
-                                .toDouble();
-                          }),
-                          onStrokeStart: startStroke,
-                          onStrokeAppend: appendStroke,
-                          onStrokeEnd: endStroke,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              sectionCard(
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                    Text(tr('sticker.tools'),
-                                        style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700)),
-                                    const SizedBox(height: 10),
-                                    SegmentedButton<String>(
-                                      segments: [
-                                        ButtonSegment<String>(
-                                            value: 'move',
-                                            icon: Icon(Icons.open_with_rounded),
-                                            label: Text(tr('sticker.move'))),
-                                        ButtonSegment<String>(
-                                            value: 'erase',
-                                            icon: Icon(
-                                                Icons.auto_fix_off_rounded),
-                                            label: Text(tr('sticker.eraser'))),
-                                        ButtonSegment<String>(
-                                            value: 'restore',
-                                            icon: Icon(Icons.brush_rounded),
-                                            label: Text(tr('sticker.restore'))),
-                                      ],
-                                      selected: {toolMode},
-                                      onSelectionChanged: (v) =>
-                                          setState(() => toolMode = v.first),
-                                    ),
-                                    if (toolMode != 'move') ...[
-                                      const SizedBox(height: 12),
-                                      Row(children: [
-                                        const Icon(Icons.circle_outlined,
-                                            size: 18, color: kMuted),
-                                        const SizedBox(width: 8),
-                                        Text(tr('sticker.brushSize'),
-                                            style: TextStyle(
-                                                fontSize: 13, color: kMuted)),
-                                        Expanded(
-                                            child: Slider(
-                                                min: 0.008,
-                                                max: 0.065,
-                                                value: brushRadiusFactor,
-                                                onChanged: (v) => setState(() =>
-                                                    brushRadiusFactor = v))),
-                                        SizedBox(
-                                            width: 46,
-                                            child: Text(
-                                                '${(brushRadiusFactor * 1000).round()}',
-                                                textAlign: TextAlign.right,
-                                                style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: kMuted))),
-                                      ]),
-                                      Row(children: [
-                                        OutlinedButton.icon(
-                                            onPressed: strokes.isEmpty
-                                                ? null
-                                                : () => setState(() {
-                                                      if (strokes.isNotEmpty)
-                                                        strokes.removeLast();
-                                                    }),
-                                            icon:
-                                                const Icon(Icons.undo_rounded),
-                                            label:
-                                                Text(tr('sticker.undoTrim'))),
-                                        const SizedBox(width: 8),
-                                        OutlinedButton.icon(
-                                            onPressed: strokes.isEmpty
-                                                ? null
-                                                : () => setState(
-                                                    () => strokes.clear()),
-                                            icon: const Icon(
-                                                Icons.layers_clear_rounded),
-                                            label:
-                                                Text(tr('sticker.clearTrim'))),
-                                      ]),
-                                    ],
-                                  ])),
-                              const SizedBox(height: 12),
-                              sectionCard(
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                    Text(tr('sticker.composition'),
-                                        style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700)),
-                                    const SizedBox(height: 10),
-                                    SegmentedButton<bool>(
-                                        segments: [
-                                          ButtonSegment<bool>(
-                                              value: true,
-                                              label:
-                                                  Text(tr('sticker.contain'))),
-                                          ButtonSegment<bool>(
-                                              value: false,
-                                              label: Text(tr('sticker.fill'))),
-                                        ],
-                                        selected: {
-                                          contain
-                                        },
-                                        onSelectionChanged: (v) =>
-                                            setState(() => contain = v.first)),
-                                    const SizedBox(height: 10),
-                                    Row(children: [
-                                      const Icon(Icons.zoom_out_map_rounded,
-                                          size: 18, color: kMuted),
-                                      const SizedBox(width: 8),
-                                      Text(tr('sticker.zoom'),
-                                          style: TextStyle(
-                                              fontSize: 13, color: kMuted)),
-                                      Expanded(
-                                          child: Slider(
-                                              min: 0.7,
-                                              max: 1.55,
-                                              value: scale,
-                                              onChanged: (v) =>
-                                                  setState(() => scale = v))),
-                                      SizedBox(
-                                          width: 44,
-                                          child: Text(scale.toStringAsFixed(2),
-                                              textAlign: TextAlign.right,
-                                              style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: kMuted))),
-                                    ]),
-                                    Text(tr('sticker.moveHint'),
-                                        style: TextStyle(
-                                            fontSize: 11, color: kMuted)),
-                                  ])),
-                              const SizedBox(height: 12),
-                              sectionCard(
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                    Text(tr('sticker.edgeOptimization'),
-                                        style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700)),
-                                    const SizedBox(height: 10),
-                                    Wrap(spacing: 8, runSpacing: 8, children: [
-                                      ChoiceChip(
-                                          label:
-                                              Text(tr('sticker.modeBalanced')),
-                                          selected:
-                                              recognitionMode == 'balanced',
-                                          onSelected: (_) => setState(() =>
-                                              recognitionMode = 'balanced')),
-                                      ChoiceChip(
-                                          label:
-                                              Text(tr('sticker.modeSubject')),
-                                          selected:
-                                              recognitionMode == 'subject',
-                                          onSelected: (_) => setState(() =>
-                                              recognitionMode = 'subject')),
-                                      ChoiceChip(
-                                          label: Text(tr('sticker.modeEdge')),
-                                          selected: recognitionMode == 'edge',
-                                          onSelected: (_) => setState(
-                                              () => recognitionMode = 'edge')),
-                                      ChoiceChip(
-                                          label: Text(
-                                              tr('sticker.modeAggressive')),
-                                          selected:
-                                              recognitionMode == 'aggressive',
-                                          onSelected: (_) => setState(() =>
-                                              recognitionMode = 'aggressive')),
-                                    ]),
-                                    const SizedBox(height: 8),
-                                    Text(tr('sticker.edgeOptimizationDesc'),
-                                        style: TextStyle(
-                                            fontSize: 11, color: kMuted)),
-                                    const SizedBox(height: 10),
-                                    Row(children: [
-                                      const Icon(Icons.auto_fix_high_rounded,
-                                          size: 18, color: kMuted),
-                                      const SizedBox(width: 8),
-                                      Text(tr('sticker.edgePreserve'),
-                                          style: TextStyle(
-                                              fontSize: 13, color: kMuted)),
-                                      Expanded(
-                                          child: Slider(
-                                              min: -1.0,
-                                              max: 1.0,
-                                              value: edgeTune,
-                                              onChanged: (v) => setState(
-                                                  () => edgeTune = v))),
-                                      SizedBox(
-                                          width: 56,
-                                          child: Text(
-                                              edgeTune > 0.05
-                                                  ? tr('sticker.edgeMore')
-                                                  : edgeTune < -0.05
-                                                      ? tr(
-                                                          'sticker.edgeCleaner')
-                                                      : tr(
-                                                          'sticker.edgeDefault'),
-                                              textAlign: TextAlign.right,
-                                              style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: kMuted))),
-                                    ]),
-                                    Text(tr('sticker.edgePreserveHint'),
-                                        style: TextStyle(
-                                            fontSize: 11, color: kMuted)),
-                                    const SizedBox(height: 12),
-                                    Wrap(spacing: 8, runSpacing: 8, children: [
-                                      ChoiceChip(
-                                          label:
-                                              Text(tr('sticker.cleanupNone')),
-                                          selected: cleanupMode == 'none',
-                                          onSelected: (_) => setState(
-                                              () => cleanupMode = 'none')),
-                                      ChoiceChip(
-                                          label:
-                                              Text(tr('sticker.cleanupWhite')),
-                                          selected: cleanupMode == 'white',
-                                          onSelected: (_) => setState(
-                                              () => cleanupMode = 'white')),
-                                      ChoiceChip(
-                                          label:
-                                              Text(tr('sticker.cleanupBlack')),
-                                          selected: cleanupMode == 'black',
-                                          onSelected: (_) => setState(
-                                              () => cleanupMode = 'black')),
-                                      ChoiceChip(
-                                          label:
-                                              Text(tr('sticker.cleanupCorner')),
-                                          selected: cleanupMode == 'corner',
-                                          onSelected: (_) => setState(
-                                              () => cleanupMode = 'corner')),
-                                    ]),
-                                    if (cleanupMode != 'none') ...[
-                                      const SizedBox(height: 10),
-                                      Row(children: [
-                                        const Icon(Icons.color_lens_outlined,
-                                            size: 18, color: kMuted),
-                                        const SizedBox(width: 8),
-                                        Text(tr('sticker.colorTolerance'),
-                                            style: TextStyle(
-                                                fontSize: 13, color: kMuted)),
-                                        Expanded(
-                                            child: Slider(
-                                                min: 4,
-                                                max: 90,
-                                                value: colorTolerance,
-                                                onChanged: (v) => setState(
-                                                    () => colorTolerance = v))),
-                                        SizedBox(
-                                            width: 44,
-                                            child: Text(
-                                                colorTolerance
-                                                    .toStringAsFixed(0),
-                                                textAlign: TextAlign.right,
-                                                style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: kMuted))),
-                                      ]),
-                                      Text(tr('sticker.colorToleranceHint'),
-                                          style: TextStyle(
-                                              fontSize: 11, color: kMuted)),
-                                    ],
-                                  ])),
-                            ]),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      child: Row(children: [
-                        OutlinedButton.icon(
-                            onPressed: () => setState(() {
-                                  scale = 0.92;
-                                  offsetXFactor = 0;
-                                  offsetYFactor = 0;
-                                  contain = true;
-                                  edgeTune = 0.0;
-                                  cleanupMode = 'none';
-                                  colorTolerance = 28.0;
-                                  recognitionMode = 'balanced';
-                                  toolMode = 'move';
-                                  brushRadiusFactor = 0.024;
-                                  strokes.clear();
-                                  activeStroke = null;
-                                }),
-                            icon: const Icon(Icons.refresh_rounded),
-                            label: Text(tr('common.resetAll'))),
-                        const SizedBox(width: 8),
-                        Expanded(
-                            child: FilledButton.icon(
-                                onPressed: () =>
-                                    Navigator.pop(context, '__use_direct__'),
-                                icon: const Icon(
-                                    Icons.check_circle_outline_rounded),
-                                label: Text(tr('sticker.useOriginal')))),
-                      ]),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: SafeArea(
                       child: SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () async {
-                            final out = await saveAdjustedStickerImage(
-                                sourceUri,
-                                contain: contain,
-                                scale: scale,
-                                offsetXFactor: offsetXFactor,
-                                offsetYFactor: offsetYFactor,
-                                edgeTune: edgeTune,
-                                cleanupMode: cleanupMode,
-                                colorTolerance: colorTolerance,
-                                recognitionMode: recognitionMode,
-                                brushStrokes: strokes);
-                            if (context.mounted) Navigator.pop(context, out);
-                          },
-                          icon: const Icon(Icons.tune_rounded),
-                          label: Text(tr('sticker.applyAndGenerate')),
+                        height: MediaQuery.sizeOf(context).height * 0.94,
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 14, 12, 8),
+                              child: Row(children: [
+                                Expanded(
+                                    child: Text(tr('sticker.repairTitle'),
+                                        style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700))),
+                                TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: Text(tr('common.cancel'))),
+                              ]),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16),
+                              child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(tr('sticker.repairDesc'),
+                                      style: TextStyle(
+                                          fontSize: 12, color: kMuted))),
+                            ),
+                            const SizedBox(height: 10),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: AspectRatio(
+                                aspectRatio: 1,
+                                child: _StickerAdjustPreview(
+                                  uri: sourceUri,
+                                  contain: contain,
+                                  scale: scale,
+                                  offsetXFactor: offsetXFactor,
+                                  offsetYFactor: offsetYFactor,
+                                  edgeTune: edgeTune,
+                                  cleanupMode: cleanupMode,
+                                  colorTolerance: colorTolerance,
+                                  recognitionMode: recognitionMode,
+                                  strokes: strokes,
+                                  activeStroke: activeStroke,
+                                  toolMode: toolMode,
+                                  brushRadiusFactor: brushRadiusFactor,
+                                  onPanMove: (delta) => setState(() {
+                                    offsetXFactor = (offsetXFactor + delta.dx)
+                                        .clamp(-0.8, 0.8)
+                                        .toDouble();
+                                    offsetYFactor = (offsetYFactor + delta.dy)
+                                        .clamp(-0.8, 0.8)
+                                        .toDouble();
+                                  }),
+                                  onStrokeStart: startStroke,
+                                  onStrokeAppend: appendStroke,
+                                  onStrokeEnd: endStroke,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                physics: const BouncingScrollPhysics(),
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      sectionCard(
+                                          child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                            Text(tr('sticker.tools'),
+                                                style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                            const SizedBox(height: 10),
+                                            SegmentedButton<String>(
+                                              segments: [
+                                                ButtonSegment<String>(
+                                                    value: 'move',
+                                                    icon: Icon(Icons
+                                                        .open_with_rounded),
+                                                    label: Text(
+                                                        tr('sticker.move'))),
+                                                ButtonSegment<String>(
+                                                    value: 'erase',
+                                                    icon: Icon(Icons
+                                                        .auto_fix_off_rounded),
+                                                    label: Text(
+                                                        tr('sticker.eraser'))),
+                                                ButtonSegment<String>(
+                                                    value: 'restore',
+                                                    icon: Icon(
+                                                        Icons.brush_rounded),
+                                                    label: Text(
+                                                        tr('sticker.restore'))),
+                                              ],
+                                              selected: {toolMode},
+                                              onSelectionChanged: (v) =>
+                                                  setState(
+                                                      () => toolMode = v.first),
+                                            ),
+                                            if (toolMode != 'move') ...[
+                                              const SizedBox(height: 12),
+                                              Row(children: [
+                                                const Icon(
+                                                    Icons.circle_outlined,
+                                                    size: 18,
+                                                    color: kMuted),
+                                                const SizedBox(width: 8),
+                                                Text(tr('sticker.brushSize'),
+                                                    style: TextStyle(
+                                                        fontSize: 13,
+                                                        color: kMuted)),
+                                                Expanded(
+                                                    child: ValoraAdaptiveSlider(
+                                                        min: 0.008,
+                                                        max: 0.065,
+                                                        value:
+                                                            brushRadiusFactor,
+                                                        semanticLabel: tr(
+                                                            'sticker.brushSize'),
+                                                        onChanged: (v) =>
+                                                            setState(() =>
+                                                                brushRadiusFactor =
+                                                                    v))),
+                                                SizedBox(
+                                                    width: 46,
+                                                    child: Text(
+                                                        '${(brushRadiusFactor * 1000).round()}',
+                                                        textAlign:
+                                                            TextAlign.right,
+                                                        style: const TextStyle(
+                                                            fontSize: 12,
+                                                            color: kMuted))),
+                                              ]),
+                                              Row(children: [
+                                                OutlinedButton.icon(
+                                                    onPressed: strokes.isEmpty
+                                                        ? null
+                                                        : () => setState(() {
+                                                              if (strokes
+                                                                  .isNotEmpty)
+                                                                strokes
+                                                                    .removeLast();
+                                                            }),
+                                                    icon: const Icon(
+                                                        Icons.undo_rounded),
+                                                    label: Text(tr(
+                                                        'sticker.undoTrim'))),
+                                                const SizedBox(width: 8),
+                                                OutlinedButton.icon(
+                                                    onPressed: strokes.isEmpty
+                                                        ? null
+                                                        : () => setState(() =>
+                                                            strokes.clear()),
+                                                    icon: const Icon(Icons
+                                                        .layers_clear_rounded),
+                                                    label: Text(tr(
+                                                        'sticker.clearTrim'))),
+                                              ]),
+                                            ],
+                                          ])),
+                                      const SizedBox(height: 12),
+                                      sectionCard(
+                                          child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                            Text(tr('sticker.composition'),
+                                                style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                            const SizedBox(height: 10),
+                                            SegmentedButton<bool>(
+                                                segments: [
+                                                  ButtonSegment<bool>(
+                                                      value: true,
+                                                      label: Text(tr(
+                                                          'sticker.contain'))),
+                                                  ButtonSegment<bool>(
+                                                      value: false,
+                                                      label: Text(
+                                                          tr('sticker.fill'))),
+                                                ],
+                                                selected: {
+                                                  contain
+                                                },
+                                                onSelectionChanged: (v) =>
+                                                    setState(() =>
+                                                        contain = v.first)),
+                                            const SizedBox(height: 10),
+                                            Row(children: [
+                                              const Icon(
+                                                  Icons.zoom_out_map_rounded,
+                                                  size: 18,
+                                                  color: kMuted),
+                                              const SizedBox(width: 8),
+                                              Text(tr('sticker.zoom'),
+                                                  style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: kMuted)),
+                                              Expanded(
+                                                  child: ValoraAdaptiveSlider(
+                                                      min: 0.7,
+                                                      max: 1.55,
+                                                      value: scale,
+                                                      semanticLabel:
+                                                          tr('sticker.zoom'),
+                                                      onChanged: (v) =>
+                                                          setState(() =>
+                                                              scale = v))),
+                                              SizedBox(
+                                                  width: 44,
+                                                  child: Text(
+                                                      scale.toStringAsFixed(2),
+                                                      textAlign:
+                                                          TextAlign.right,
+                                                      style: const TextStyle(
+                                                          fontSize: 12,
+                                                          color: kMuted))),
+                                            ]),
+                                            Text(tr('sticker.moveHint'),
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: kMuted)),
+                                          ])),
+                                      const SizedBox(height: 12),
+                                      sectionCard(
+                                          child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                            Text(tr('sticker.edgeOptimization'),
+                                                style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                            const SizedBox(height: 10),
+                                            Wrap(
+                                                spacing: 8,
+                                                runSpacing: 8,
+                                                children: [
+                                                  ChoiceChip(
+                                                      label: Text(tr(
+                                                          'sticker.modeBalanced')),
+                                                      selected:
+                                                          recognitionMode ==
+                                                              'balanced',
+                                                      onSelected: (_) =>
+                                                          setState(() =>
+                                                              recognitionMode =
+                                                                  'balanced')),
+                                                  ChoiceChip(
+                                                      label: Text(tr(
+                                                          'sticker.modeSubject')),
+                                                      selected:
+                                                          recognitionMode ==
+                                                              'subject',
+                                                      onSelected: (_) =>
+                                                          setState(() =>
+                                                              recognitionMode =
+                                                                  'subject')),
+                                                  ChoiceChip(
+                                                      label: Text(tr(
+                                                          'sticker.modeEdge')),
+                                                      selected:
+                                                          recognitionMode ==
+                                                              'edge',
+                                                      onSelected: (_) =>
+                                                          setState(() =>
+                                                              recognitionMode =
+                                                                  'edge')),
+                                                  ChoiceChip(
+                                                      label: Text(tr(
+                                                          'sticker.modeAggressive')),
+                                                      selected:
+                                                          recognitionMode ==
+                                                              'aggressive',
+                                                      onSelected: (_) =>
+                                                          setState(() =>
+                                                              recognitionMode =
+                                                                  'aggressive')),
+                                                ]),
+                                            const SizedBox(height: 8),
+                                            Text(tr('sticker.edgeOptimizationDesc'),
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: kMuted)),
+                                            const SizedBox(height: 10),
+                                            Row(children: [
+                                              const Icon(
+                                                  Icons.auto_fix_high_rounded,
+                                                  size: 18,
+                                                  color: kMuted),
+                                              const SizedBox(width: 8),
+                                              Text(tr('sticker.edgePreserve'),
+                                                  style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: kMuted)),
+                                              Expanded(
+                                                  child: ValoraAdaptiveSlider(
+                                                      min: -1.0,
+                                                      max: 1.0,
+                                                      value: edgeTune,
+                                                      semanticLabel: tr(
+                                                          'sticker.edgePreserve'),
+                                                      onChanged: (v) =>
+                                                          setState(() =>
+                                                              edgeTune = v))),
+                                              SizedBox(
+                                                  width: 56,
+                                                  child: Text(
+                                                      edgeTune > 0.05
+                                                          ? tr(
+                                                              'sticker.edgeMore')
+                                                          : edgeTune < -0.05
+                                                              ? tr(
+                                                                  'sticker.edgeCleaner')
+                                                              : tr(
+                                                                  'sticker.edgeDefault'),
+                                                      textAlign:
+                                                          TextAlign.right,
+                                                      style: const TextStyle(
+                                                          fontSize: 12,
+                                                          color: kMuted))),
+                                            ]),
+                                            Text(tr('sticker.edgePreserveHint'),
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: kMuted)),
+                                            const SizedBox(height: 12),
+                                            Wrap(
+                                                spacing: 8,
+                                                runSpacing: 8,
+                                                children: [
+                                                  ChoiceChip(
+                                                      label: Text(tr(
+                                                          'sticker.cleanupNone')),
+                                                      selected:
+                                                          cleanupMode == 'none',
+                                                      onSelected: (_) =>
+                                                          setState(() =>
+                                                              cleanupMode =
+                                                                  'none')),
+                                                  ChoiceChip(
+                                                      label: Text(tr(
+                                                          'sticker.cleanupWhite')),
+                                                      selected: cleanupMode ==
+                                                          'white',
+                                                      onSelected: (_) =>
+                                                          setState(() =>
+                                                              cleanupMode =
+                                                                  'white')),
+                                                  ChoiceChip(
+                                                      label: Text(tr(
+                                                          'sticker.cleanupBlack')),
+                                                      selected: cleanupMode ==
+                                                          'black',
+                                                      onSelected: (_) =>
+                                                          setState(() =>
+                                                              cleanupMode =
+                                                                  'black')),
+                                                  ChoiceChip(
+                                                      label: Text(tr(
+                                                          'sticker.cleanupCorner')),
+                                                      selected: cleanupMode ==
+                                                          'corner',
+                                                      onSelected: (_) =>
+                                                          setState(() =>
+                                                              cleanupMode =
+                                                                  'corner')),
+                                                ]),
+                                            if (cleanupMode != 'none') ...[
+                                              const SizedBox(height: 10),
+                                              Row(children: [
+                                                const Icon(
+                                                    Icons.color_lens_outlined,
+                                                    size: 18,
+                                                    color: kMuted),
+                                                const SizedBox(width: 8),
+                                                Text(tr('sticker.colorTolerance'),
+                                                    style: TextStyle(
+                                                        fontSize: 13,
+                                                        color: kMuted)),
+                                                Expanded(
+                                                    child: ValoraAdaptiveSlider(
+                                                        min: 4,
+                                                        max: 90,
+                                                        value: colorTolerance,
+                                                        semanticLabel: tr(
+                                                            'sticker.colorTolerance'),
+                                                        onChanged: (v) =>
+                                                            setState(() =>
+                                                                colorTolerance =
+                                                                    v))),
+                                                SizedBox(
+                                                    width: 44,
+                                                    child: Text(
+                                                        colorTolerance
+                                                            .toStringAsFixed(0),
+                                                        textAlign:
+                                                            TextAlign.right,
+                                                        style: const TextStyle(
+                                                            fontSize: 12,
+                                                            color: kMuted))),
+                                              ]),
+                                              Text(tr('sticker.colorToleranceHint'),
+                                                  style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: kMuted)),
+                                            ],
+                                          ])),
+                                    ]),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                              child: Row(children: [
+                                OutlinedButton.icon(
+                                    onPressed: () => setState(() {
+                                          scale = 0.92;
+                                          offsetXFactor = 0;
+                                          offsetYFactor = 0;
+                                          contain = true;
+                                          edgeTune = 0.0;
+                                          cleanupMode = 'none';
+                                          colorTolerance = 28.0;
+                                          recognitionMode = 'balanced';
+                                          toolMode = 'move';
+                                          brushRadiusFactor = 0.024;
+                                          strokes.clear();
+                                          activeStroke = null;
+                                        }),
+                                    icon: const Icon(Icons.refresh_rounded),
+                                    label: Text(tr('common.resetAll'))),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                    child: FilledButton.icon(
+                                        onPressed: () => Navigator.pop(
+                                            context, '__use_direct__'),
+                                        icon: const Icon(
+                                            Icons.check_circle_outline_rounded),
+                                        label:
+                                            Text(tr('sticker.useOriginal')))),
+                              ]),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                  onPressed: () async {
+                                    final out = await saveAdjustedStickerImage(
+                                        sourceUri,
+                                        contain: contain,
+                                        scale: scale,
+                                        offsetXFactor: offsetXFactor,
+                                        offsetYFactor: offsetYFactor,
+                                        edgeTune: edgeTune,
+                                        cleanupMode: cleanupMode,
+                                        colorTolerance: colorTolerance,
+                                        recognitionMode: recognitionMode,
+                                        brushStrokes: strokes);
+                                    if (context.mounted)
+                                      Navigator.pop(context, out);
+                                  },
+                                  icon: const Icon(Icons.tune_rounded),
+                                  label: Text(tr('sticker.applyAndGenerate')),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          );
+                  )));
         },
       );
     },
@@ -2204,156 +2304,180 @@ Future<String?> chooseStickerCandidate(
     backgroundColor: Colors.transparent,
     builder: (context) {
       return SafeArea(
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-          decoration: BoxDecoration(
-            color: context.isDark ? const Color(0xFF111316) : Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(.15),
-                  blurRadius: 32,
-                  offset: const Offset(0, 18))
-            ],
-          ),
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Expanded(
-                      child: Text(tr('sticker.chooseCover'),
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w700))),
-                  TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(tr('common.cancel'))),
-                ]),
-                const SizedBox(height: 4),
-                Text(tr('sticker.chooseCoverHint'),
-                    style: TextStyle(color: kMuted, fontSize: 12)),
-                const SizedBox(height: 14),
-                Flexible(
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    itemCount: candidates.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: .84),
-                    itemBuilder: (context, index) {
-                      final item = candidates[index];
-                      final uri = (item['uri'] ?? '').toString();
-                      final label = (item['label'] ??
-                              tr('sticker.candidate')
-                                  .replaceAll('{n}', '${index + 1}'))
-                          .toString();
-                      final engine = (item['engine'] ?? '').toString();
-                      final scoreValue = item['score'];
-                      final scoreText = scoreValue is num
-                          ? '${(scoreValue * 100).toStringAsFixed(0)}${tr('common.scoreSuffix').replaceAll('{s}', '${(scoreValue * 100).toStringAsFixed(0)}')}'
-                          : '';
-                      final isSuggested = uri.isNotEmpty && uri == direct;
-                      final file = File(filePathFromUriText(uri));
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(22),
-                        onTap: () => Navigator.pop(context, uri),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: context.isDark
-                                ? Colors.white.withOpacity(.05)
-                                : const Color(0xFFF8F9FB),
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(
-                                color: isSuggested
-                                    ? const Color(0xFF7CC6F2)
-                                    : (context.isDark
-                                        ? Colors.white12
-                                        : Colors.black12),
-                                width: isSuggested ? 1.6 : 1),
-                          ),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(
-                                      color: context.isDark
-                                          ? Colors.black.withOpacity(.18)
-                                          : Colors.white,
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                    child: file.existsSync()
-                                        ? ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(18),
-                                            child: RepaintBoundary(
-                                              child: Image.file(
-                                                file,
-                                                fit: BoxFit.contain,
-                                                cacheWidth: _previewCacheSide(
-                                                    context,
-                                                    logicalSide: 260),
-                                                cacheHeight: _previewCacheSide(
-                                                    context,
-                                                    logicalSide: 260),
-                                                gaplessPlayback: true,
-                                                filterQuality:
-                                                    FilterQuality.medium,
-                                              ),
-                                            ),
-                                          )
-                                        : const Center(
-                                            child: Icon(
-                                                Icons
-                                                    .image_not_supported_outlined,
-                                                color: kMuted)),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(children: [
-                                  Expanded(
-                                      child: Text(label,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600))),
-                                  if (isSuggested)
-                                    const Icon(Icons.auto_awesome_rounded,
-                                        size: 16, color: Color(0xFF7CC6F2))
-                                ]),
-                                const SizedBox(height: 2),
-                                Text(
-                                    engine.isEmpty
-                                        ? tr('sticker.localEngine')
-                                        : engine,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontSize: 11, color: kMuted)),
-                                if (scoreText.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Text(scoreText,
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF7CC6F2),
-                                            fontWeight: FontWeight.w600)),
-                                  ),
-                              ]),
-                        ),
-                      );
-                    },
+        child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: ValoraGlassSheetSurface(
+                radius: 28,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  decoration: BoxDecoration(
+                    color: valoraUseSceneLiquidGlass(context)
+                        ? Colors.transparent
+                        : (context.isDark
+                            ? const Color(0xFF111316)
+                            : Colors.white),
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(.15),
+                          blurRadius: 32,
+                          offset: const Offset(0, 18))
+                    ],
                   ),
-                ),
-              ]),
-        ),
+                  child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Expanded(
+                              child: Text(tr('sticker.chooseCover'),
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700))),
+                          TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(tr('common.cancel'))),
+                        ]),
+                        const SizedBox(height: 4),
+                        Text(tr('sticker.chooseCoverHint'),
+                            style: TextStyle(color: kMuted, fontSize: 12)),
+                        const SizedBox(height: 14),
+                        Flexible(
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            itemCount: candidates.length,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: .84),
+                            itemBuilder: (context, index) {
+                              final item = candidates[index];
+                              final uri = (item['uri'] ?? '').toString();
+                              final label = (item['label'] ??
+                                      tr('sticker.candidate')
+                                          .replaceAll('{n}', '${index + 1}'))
+                                  .toString();
+                              final engine = (item['engine'] ?? '').toString();
+                              final scoreValue = item['score'];
+                              final scoreText = scoreValue is num
+                                  ? '${(scoreValue * 100).toStringAsFixed(0)}${tr('common.scoreSuffix').replaceAll('{s}', '${(scoreValue * 100).toStringAsFixed(0)}')}'
+                                  : '';
+                              final isSuggested =
+                                  uri.isNotEmpty && uri == direct;
+                              final file = File(filePathFromUriText(uri));
+                              return InkWell(
+                                borderRadius: BorderRadius.circular(22),
+                                onTap: () => Navigator.pop(context, uri),
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: context.isDark
+                                        ? Colors.white.withOpacity(.05)
+                                        : const Color(0xFFF8F9FB),
+                                    borderRadius: BorderRadius.circular(22),
+                                    border: Border.all(
+                                        color: isSuggested
+                                            ? const Color(0xFF7CC6F2)
+                                            : (context.isDark
+                                                ? Colors.white12
+                                                : Colors.black12),
+                                        width: isSuggested ? 1.6 : 1),
+                                  ),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Container(
+                                            width: double.infinity,
+                                            decoration: BoxDecoration(
+                                              color: context.isDark
+                                                  ? Colors.black
+                                                      .withOpacity(.18)
+                                                  : Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(18),
+                                            ),
+                                            child: file.existsSync()
+                                                ? ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            18),
+                                                    child: RepaintBoundary(
+                                                      child: Image.file(
+                                                        file,
+                                                        fit: BoxFit.contain,
+                                                        cacheWidth:
+                                                            _previewCacheSide(
+                                                                context,
+                                                                logicalSide:
+                                                                    260),
+                                                        cacheHeight:
+                                                            _previewCacheSide(
+                                                                context,
+                                                                logicalSide:
+                                                                    260),
+                                                        gaplessPlayback: true,
+                                                        filterQuality:
+                                                            FilterQuality
+                                                                .medium,
+                                                      ),
+                                                    ),
+                                                  )
+                                                : const Center(
+                                                    child: Icon(
+                                                        Icons
+                                                            .image_not_supported_outlined,
+                                                        color: kMuted)),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(children: [
+                                          Expanded(
+                                              child: Text(label,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w600))),
+                                          if (isSuggested)
+                                            const Icon(
+                                                Icons.auto_awesome_rounded,
+                                                size: 16,
+                                                color: Color(0xFF7CC6F2))
+                                        ]),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                            engine.isEmpty
+                                                ? tr('sticker.localEngine')
+                                                : engine,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                fontSize: 11, color: kMuted)),
+                                        if (scoreText.isNotEmpty)
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 4),
+                                            child: Text(scoreText,
+                                                style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: Color(0xFF7CC6F2),
+                                                    fontWeight:
+                                                        FontWeight.w600)),
+                                          ),
+                                      ]),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ]),
+                ))),
       );
     },
   );
@@ -2725,205 +2849,241 @@ Future<String?> editFramedCover(BuildContext context, String sourceUri) async {
                 ),
                 child: child,
               );
-          return Container(
-            margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            decoration: BoxDecoration(
-              color: context.isDark ? const Color(0xFF111316) : Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(.16),
-                    blurRadius: 30,
-                    offset: const Offset(0, 16))
-              ],
-            ),
-            child: SafeArea(
-              child: SizedBox(
-                height: MediaQuery.sizeOf(context).height * 0.92,
-                child: Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 12, 8),
-                    child: Row(children: [
-                      Expanded(
-                          child: Text(tr('sticker.frameCrop'),
-                              style: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.w700))),
-                      TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(tr('common.cancel'))),
-                    ]),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(tr('sticker.frameCropDesc'),
-                          style: TextStyle(fontSize: 12, color: kMuted)),
+          return Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: ValoraGlassSheetSurface(
+                  radius: 28,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: valoraUseSceneLiquidGlass(context)
+                          ? Colors.transparent
+                          : (context.isDark
+                              ? const Color(0xFF111316)
+                              : Colors.white),
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(.16),
+                            blurRadius: 30,
+                            offset: const Offset(0, 16))
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: FutureBuilder<Size>(
-                        future: imageSizeFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState !=
-                              ConnectionState.done) {
-                            return ClipRRect(
-                                borderRadius: BorderRadius.circular(26),
-                                child: const ColoredBox(
-                                    color: Color(0xFFF2F5F8),
-                                    child: Center(
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2))));
-                          }
-                          final imageSize = snapshot.data ?? const Size(1, 1);
-                          if (!cropInitializedForImage) {
-                            cropInitializedForImage = true;
-                            cropRect =
-                                _defaultSquareCropForImageSize(imageSize);
-                          }
-                          return _DirectCropSelectionPreview(
-                            uri: sourceUri,
-                            imageSize: imageSize,
-                            cropRect: cropRect,
-                            borderRadius: 28,
-                            onCropRectChanged: (v) => setState(() => cropRect =
-                                _normalizeSquareCropRect(v, imageSize)),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            sectionCard(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                  Text(tr('sticker.frameStyle'),
+                    child: SafeArea(
+                      child: SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.92,
+                        child: Column(children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 12, 8),
+                            child: Row(children: [
+                              Expanded(
+                                  child: Text(tr('sticker.frameCrop'),
                                       style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 10),
-                                  Row(children: [
-                                    const Icon(Icons.crop_square_rounded,
-                                        size: 18, color: kMuted),
-                                    const SizedBox(width: 8),
-                                    Text(tr('sticker.frameThickness'),
-                                        style: TextStyle(
-                                            fontSize: 13, color: kMuted)),
-                                    Expanded(
-                                        child: Slider(
-                                            min: 0.02,
-                                            max: 0.10,
-                                            value: frameWidthFactor,
-                                            onChanged: (v) => setState(
-                                                () => frameWidthFactor = v))),
-                                    SizedBox(
-                                        width: 44,
-                                        child: Text(
-                                            frameWidthFactor.toStringAsFixed(2),
-                                            textAlign: TextAlign.right,
-                                            style: const TextStyle(
-                                                fontSize: 12, color: kMuted))),
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700))),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text(tr('common.cancel'))),
+                            ]),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(tr('sticker.frameCropDesc'),
+                                  style:
+                                      TextStyle(fontSize: 12, color: kMuted)),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: AspectRatio(
+                              aspectRatio: 1,
+                              child: FutureBuilder<Size>(
+                                future: imageSizeFuture,
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState !=
+                                      ConnectionState.done) {
+                                    return ClipRRect(
+                                        borderRadius: BorderRadius.circular(26),
+                                        child: const ColoredBox(
+                                            color: Color(0xFFF2F5F8),
+                                            child: Center(
+                                                child:
+                                                    CircularProgressIndicator(
+                                                        strokeWidth: 2))));
+                                  }
+                                  final imageSize =
+                                      snapshot.data ?? const Size(1, 1);
+                                  if (!cropInitializedForImage) {
+                                    cropInitializedForImage = true;
+                                    cropRect = _defaultSquareCropForImageSize(
+                                        imageSize);
+                                  }
+                                  return _DirectCropSelectionPreview(
+                                    uri: sourceUri,
+                                    imageSize: imageSize,
+                                    cropRect: cropRect,
+                                    borderRadius: 28,
+                                    onCropRectChanged: (v) => setState(() =>
+                                        cropRect = _normalizeSquareCropRect(
+                                            v, imageSize)),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    sectionCard(
+                                        child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                          Text(tr('sticker.frameStyle'),
+                                              style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700)),
+                                          const SizedBox(height: 10),
+                                          Row(children: [
+                                            const Icon(
+                                                Icons.crop_square_rounded,
+                                                size: 18,
+                                                color: kMuted),
+                                            const SizedBox(width: 8),
+                                            Text(tr('sticker.frameThickness'),
+                                                style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: kMuted)),
+                                            Expanded(
+                                                child: ValoraAdaptiveSlider(
+                                                    min: 0.02,
+                                                    max: 0.10,
+                                                    value: frameWidthFactor,
+                                                    semanticLabel: tr(
+                                                        'sticker.frameThickness'),
+                                                    onChanged: (v) => setState(
+                                                        () => frameWidthFactor =
+                                                            v))),
+                                            SizedBox(
+                                                width: 44,
+                                                child: Text(
+                                                    frameWidthFactor
+                                                        .toStringAsFixed(2),
+                                                    textAlign: TextAlign.right,
+                                                    style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: kMuted))),
+                                          ]),
+                                          Row(children: [
+                                            const Icon(
+                                                Icons.rounded_corner_rounded,
+                                                size: 18,
+                                                color: kMuted),
+                                            const SizedBox(width: 8),
+                                            Text(tr('sticker.cornerRadius'),
+                                                style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: kMuted)),
+                                            Expanded(
+                                                child: ValoraAdaptiveSlider(
+                                                    min: 0.06,
+                                                    max: 0.18,
+                                                    value: cornerRadiusFactor,
+                                                    semanticLabel: tr(
+                                                        'sticker.cornerRadius'),
+                                                    onChanged: (v) => setState(
+                                                        () =>
+                                                            cornerRadiusFactor =
+                                                                v))),
+                                            SizedBox(
+                                                width: 44,
+                                                child: Text(
+                                                    cornerRadiusFactor
+                                                        .toStringAsFixed(2),
+                                                    textAlign: TextAlign.right,
+                                                    style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: kMuted))),
+                                          ]),
+                                          Row(children: [
+                                            const Icon(Icons.fit_screen_rounded,
+                                                size: 18, color: kMuted),
+                                            const SizedBox(width: 8),
+                                            Text(tr('sticker.outerMargin'),
+                                                style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: kMuted)),
+                                            Expanded(
+                                                child: ValoraAdaptiveSlider(
+                                                    min: 0.03,
+                                                    max: 0.12,
+                                                    value: cardInsetFactor,
+                                                    semanticLabel: tr(
+                                                        'sticker.outerMargin'),
+                                                    onChanged: (v) => setState(
+                                                        () => cardInsetFactor =
+                                                            v))),
+                                            SizedBox(
+                                                width: 44,
+                                                child: Text(
+                                                    cardInsetFactor
+                                                        .toStringAsFixed(2),
+                                                    textAlign: TextAlign.right,
+                                                    style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: kMuted))),
+                                          ]),
+                                        ])),
                                   ]),
-                                  Row(children: [
-                                    const Icon(Icons.rounded_corner_rounded,
-                                        size: 18, color: kMuted),
-                                    const SizedBox(width: 8),
-                                    Text(tr('sticker.cornerRadius'),
-                                        style: TextStyle(
-                                            fontSize: 13, color: kMuted)),
-                                    Expanded(
-                                        child: Slider(
-                                            min: 0.06,
-                                            max: 0.18,
-                                            value: cornerRadiusFactor,
-                                            onChanged: (v) => setState(
-                                                () => cornerRadiusFactor = v))),
-                                    SizedBox(
-                                        width: 44,
-                                        child: Text(
-                                            cornerRadiusFactor
-                                                .toStringAsFixed(2),
-                                            textAlign: TextAlign.right,
-                                            style: const TextStyle(
-                                                fontSize: 12, color: kMuted))),
-                                  ]),
-                                  Row(children: [
-                                    const Icon(Icons.fit_screen_rounded,
-                                        size: 18, color: kMuted),
-                                    const SizedBox(width: 8),
-                                    Text(tr('sticker.outerMargin'),
-                                        style: TextStyle(
-                                            fontSize: 13, color: kMuted)),
-                                    Expanded(
-                                        child: Slider(
-                                            min: 0.03,
-                                            max: 0.12,
-                                            value: cardInsetFactor,
-                                            onChanged: (v) => setState(
-                                                () => cardInsetFactor = v))),
-                                    SizedBox(
-                                        width: 44,
-                                        child: Text(
-                                            cardInsetFactor.toStringAsFixed(2),
-                                            textAlign: TextAlign.right,
-                                            style: const TextStyle(
-                                                fontSize: 12, color: kMuted))),
-                                  ]),
-                                ])),
-                          ]),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                            child: Row(children: [
+                              OutlinedButton.icon(
+                                onPressed: () => setState(() {
+                                  cropInitializedForImage = false;
+                                  cropRect = const Rect.fromLTWH(
+                                      0.12, 0.12, 0.76, 0.76);
+                                  frameWidthFactor = 0.04;
+                                  cornerRadiusFactor = 0.11;
+                                  cardInsetFactor = 0.06;
+                                }),
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: Text(tr('common.reset')),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () async {
+                                    final out = await saveFramedCoverImage(
+                                      sourceUri,
+                                      cropRect: cropRect,
+                                      frameWidthFactor: frameWidthFactor,
+                                      cornerRadiusFactor: cornerRadiusFactor,
+                                      cardInsetFactor: cardInsetFactor,
+                                    );
+                                    if (context.mounted)
+                                      Navigator.pop(context, out);
+                                  },
+                                  icon: const Icon(
+                                      Icons.check_circle_outline_rounded),
+                                  label: Text(tr('sticker.generateFrame')),
+                                ),
+                              ),
+                            ]),
+                          ),
+                        ]),
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: Row(children: [
-                      OutlinedButton.icon(
-                        onPressed: () => setState(() {
-                          cropInitializedForImage = false;
-                          cropRect =
-                              const Rect.fromLTWH(0.12, 0.12, 0.76, 0.76);
-                          frameWidthFactor = 0.04;
-                          cornerRadiusFactor = 0.11;
-                          cardInsetFactor = 0.06;
-                        }),
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(tr('common.reset')),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () async {
-                            final out = await saveFramedCoverImage(
-                              sourceUri,
-                              cropRect: cropRect,
-                              frameWidthFactor: frameWidthFactor,
-                              cornerRadiusFactor: cornerRadiusFactor,
-                              cardInsetFactor: cardInsetFactor,
-                            );
-                            if (context.mounted) Navigator.pop(context, out);
-                          },
-                          icon: const Icon(Icons.check_circle_outline_rounded),
-                          label: Text(tr('sticker.generateFrame')),
-                        ),
-                      ),
-                    ]),
-                  ),
-                ]),
-              ),
-            ),
-          );
+                  )));
         },
       );
     },
@@ -3214,146 +3374,168 @@ Future<String?> editManualTraceSticker(
                 ),
                 child: child,
               );
-          return Container(
-            margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            decoration: BoxDecoration(
-              color: context.isDark ? const Color(0xFF111316) : Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(.16),
-                    blurRadius: 30,
-                    offset: const Offset(0, 16))
-              ],
-            ),
-            child: SafeArea(
-              child: SizedBox(
-                height: MediaQuery.sizeOf(context).height * 0.92,
-                child: Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 12, 8),
-                    child: Row(children: [
-                      Expanded(
-                          child: Text(tr('sticker.manualTrace'),
-                              style: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.w700))),
-                      TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(tr('common.cancel'))),
-                    ]),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(tr('sticker.manualTraceDesc'),
-                          style: TextStyle(fontSize: 12, color: kMuted)),
+          return Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: ValoraGlassSheetSurface(
+                  radius: 28,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: valoraUseSceneLiquidGlass(context)
+                          ? Colors.transparent
+                          : (context.isDark
+                              ? const Color(0xFF111316)
+                              : Colors.white),
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(.16),
+                            blurRadius: 30,
+                            offset: const Offset(0, 16))
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: FutureBuilder<Size>(
-                        future: imageSizeFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState !=
-                              ConnectionState.done) {
-                            return ClipRRect(
-                                borderRadius: BorderRadius.circular(26),
-                                child: const ColoredBox(
-                                    color: Color(0xFFF2F5F8),
-                                    child: Center(
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2))));
-                          }
-                          return _ManualTracePreview(
-                            uri: sourceUri,
-                            imageSize: snapshot.data ?? const Size(1, 1),
-                            points: points,
-                            onPointStart: (p) => setState(() => points.add(p)),
-                            onPointAppend: (p) {
-                              if (points.isEmpty) {
-                                setState(() => points.add(p));
-                              } else {
-                                final last = points.last;
-                                final dist = (last - p).distance;
-                                if (dist > 0.008) setState(() => points.add(p));
-                              }
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: Column(children: [
-                        sectionCard(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                              Text(tr('sticker.traceHint'),
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 8),
-                              Text(tr('sticker.traceSteps'),
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: kMuted,
-                                      height: 1.5)),
-                              const SizedBox(height: 12),
-                              Wrap(spacing: 8, runSpacing: 8, children: [
-                                OutlinedButton.icon(
-                                    onPressed: points.isEmpty
-                                        ? null
-                                        : () => setState(() {
-                                              if (points.isNotEmpty)
-                                                points.removeLast();
-                                            }),
-                                    icon: const Icon(Icons.undo_rounded),
-                                    label: Text(tr('sticker.undoPoint'))),
-                                OutlinedButton.icon(
-                                    onPressed: points.isEmpty
-                                        ? null
-                                        : () => setState(() => points.clear()),
-                                    icon:
-                                        const Icon(Icons.layers_clear_rounded),
-                                    label: Text(tr('sticker.clearRedraw'))),
+                    child: SafeArea(
+                      child: SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.92,
+                        child: Column(children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 12, 8),
+                            child: Row(children: [
+                              Expanded(
+                                  child: Text(tr('sticker.manualTrace'),
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700))),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text(tr('common.cancel'))),
+                            ]),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(tr('sticker.manualTraceDesc'),
+                                  style:
+                                      TextStyle(fontSize: 12, color: kMuted)),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: AspectRatio(
+                              aspectRatio: 1,
+                              child: FutureBuilder<Size>(
+                                future: imageSizeFuture,
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState !=
+                                      ConnectionState.done) {
+                                    return ClipRRect(
+                                        borderRadius: BorderRadius.circular(26),
+                                        child: const ColoredBox(
+                                            color: Color(0xFFF2F5F8),
+                                            child: Center(
+                                                child:
+                                                    CircularProgressIndicator(
+                                                        strokeWidth: 2))));
+                                  }
+                                  return _ManualTracePreview(
+                                    uri: sourceUri,
+                                    imageSize:
+                                        snapshot.data ?? const Size(1, 1),
+                                    points: points,
+                                    onPointStart: (p) =>
+                                        setState(() => points.add(p)),
+                                    onPointAppend: (p) {
+                                      if (points.isEmpty) {
+                                        setState(() => points.add(p));
+                                      } else {
+                                        final last = points.last;
+                                        final dist = (last - p).distance;
+                                        if (dist > 0.008)
+                                          setState(() => points.add(p));
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              child: Column(children: [
+                                sectionCard(
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                      Text(tr('sticker.traceHint'),
+                                          style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700)),
+                                      const SizedBox(height: 8),
+                                      Text(tr('sticker.traceSteps'),
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: kMuted,
+                                              height: 1.5)),
+                                      const SizedBox(height: 12),
+                                      Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            OutlinedButton.icon(
+                                                onPressed: points.isEmpty
+                                                    ? null
+                                                    : () => setState(() {
+                                                          if (points.isNotEmpty)
+                                                            points.removeLast();
+                                                        }),
+                                                icon: const Icon(
+                                                    Icons.undo_rounded),
+                                                label: Text(
+                                                    tr('sticker.undoPoint'))),
+                                            OutlinedButton.icon(
+                                                onPressed: points.isEmpty
+                                                    ? null
+                                                    : () => setState(
+                                                        () => points.clear()),
+                                                icon: const Icon(
+                                                    Icons.layers_clear_rounded),
+                                                label: Text(
+                                                    tr('sticker.clearRedraw'))),
+                                          ]),
+                                    ])),
                               ]),
-                            ])),
-                      ]),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          if (points.length < 3) {
-                            showNativeSnack(
-                                context, tr('sticker.needMinPoints'));
-                            return;
-                          }
-                          final out =
-                              await saveTracedStickerImage(sourceUri, points);
-                          if (context.mounted) Navigator.pop(context, out);
-                        },
-                        icon: const Icon(Icons.auto_fix_high_rounded),
-                        label: Text(tr('sticker.generateAndAdjust')),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: () async {
+                                  if (points.length < 3) {
+                                    showNativeSnack(
+                                        context, tr('sticker.needMinPoints'));
+                                    return;
+                                  }
+                                  final out = await saveTracedStickerImage(
+                                      sourceUri, points);
+                                  if (context.mounted)
+                                    Navigator.pop(context, out);
+                                },
+                                icon: const Icon(Icons.auto_fix_high_rounded),
+                                label: Text(tr('sticker.generateAndAdjust')),
+                              ),
+                            ),
+                          ),
+                        ]),
                       ),
                     ),
-                  ),
-                ]),
-              ),
-            ),
-          );
+                  )));
         },
       );
     },

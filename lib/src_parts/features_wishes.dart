@@ -80,12 +80,12 @@ class _ComposePageState extends State<ComposePage> {
     super.dispose();
   }
 
-  lge.LiquidGlass _buildComposeCancelGlass(
+  Widget _buildComposeCancelGlass(
       Widget cancelContent, EdgeInsets safe, bool dark) {
     final spring = _cancelPressed ? 1.0 : 0.0;
     final w = 92.0 * (1.0 + .045 * spring);
     final h = 44.0 * (1.0 + .045 * spring);
-    return lge.LiquidGlass(
+    return ValoraPositionedGlass(
       width: w,
       height: h,
       position: lge.LiquidGlassAlignPosition(
@@ -93,66 +93,60 @@ class _ComposePageState extends State<ComposePage> {
         margin: EdgeInsets.only(
             left: 12 - (w - 92.0) / 2, top: safe.top + 10 - (h - 44.0) / 2),
       ),
-      shape: lge.RoundedRectangleShape(
-        cornerRadius: 999,
-        borderWidth: 1.35 + .24 * spring,
-        borderColor: Colors.white.withOpacity(dark ? .28 : .64),
-        lightColor: Colors.white.withOpacity(dark ? .74 : .90),
-        lightIntensity: 1.35 + .28 * spring,
-        lightDirection: 132,
-        borderType: lge.OpticalBorder(
-            borderSaturation: 1.45 + .18 * spring,
-            ambientIntensity: 1.06 + .18 * spring,
-            borderSolidity: 0.0),
+      style: lge.LiquidGlassStyle(
+        shape: const lge.LiquidGlassShape.roundedRectangle(cornerRadius: 999),
+        specular: lge.LiquidGlassLight.specular(
+            thickness: (1.35 + .24 * spring) * 5.4,
+            intensity: 1.35 + .28 * spring,
+            angle: 132,
+            sharpness: 0),
+        glow: lge.LiquidGlassLight.glow(
+            thickness: (1.35 + .24 * spring) * 29.4,
+            intensity: 1.06 + .18 * spring,
+            angle: 222),
+        blur: liquidGlassBlurSigma(context),
+        refractionIndex: 1.0 + (.086 + .022 * spring) * .22,
+        refractionWidth: 30 + 6 * spring,
+        magnification: 1.038 + .024 * spring,
+        dispersion: (.00048 + .00012 * spring) * 660,
+        saturation: 1.055,
+        color: liquidGlassTint(context),
       ),
-      blur: lge.LiquidGlassBlur(
-          sigmaX: liquidGlassBlurSigma(context),
-          sigmaY: liquidGlassBlurSigma(context)),
-      distortion: .086 + .022 * spring,
-      distortionWidth: 30 + 6 * spring,
-      magnification: 1.038 + .024 * spring,
-      chromaticAberration: .00048 + .00012 * spring,
-      saturation: 1.055,
-      refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-      color: liquidGlassTint(context),
       child: cancelContent,
     );
   }
 
-  lge.LiquidGlass _buildComposeSaveGlass(
+  Widget _buildComposeSaveGlass(
       Widget saveContent, EdgeInsets safe, bool dark, double saveWidth) {
     final spring = _savePressed ? 1.0 : 0.0;
     final w = saveWidth * (1.0 + .038 * spring);
     final h = 58.0 * (1.0 + .038 * spring);
-    return lge.LiquidGlass(
+    return ValoraPositionedGlass(
       width: w,
       height: h,
       position: lge.LiquidGlassAlignPosition(
         alignment: Alignment.bottomCenter,
         margin: EdgeInsets.only(bottom: 18 + safe.bottom - (h - 58.0) / 2),
       ),
-      shape: lge.RoundedRectangleShape(
-        cornerRadius: 999,
-        borderWidth: 1.65 + .30 * spring,
-        borderColor: Colors.white.withOpacity(dark ? .30 : .66),
-        lightColor: Colors.white.withOpacity(dark ? .76 : .92),
-        lightIntensity: 1.55 + .34 * spring,
-        lightDirection: 132,
-        borderType: lge.OpticalBorder(
-            borderSaturation: 1.55 + .24 * spring,
-            ambientIntensity: 1.08 + .22 * spring,
-            borderSolidity: 0.0),
+      style: lge.LiquidGlassStyle(
+        shape: const lge.LiquidGlassShape.roundedRectangle(cornerRadius: 999),
+        specular: lge.LiquidGlassLight.specular(
+            thickness: (1.65 + .30 * spring) * 5.4,
+            intensity: 1.55 + .34 * spring,
+            angle: 132,
+            sharpness: 0),
+        glow: lge.LiquidGlassLight.glow(
+            thickness: (1.65 + .30 * spring) * 29.4,
+            intensity: 1.08 + .22 * spring,
+            angle: 222),
+        blur: liquidGlassBlurSigma(context),
+        refractionIndex: 1.0 + (.096 + .026 * spring) * .22,
+        refractionWidth: 32 + 7 * spring,
+        magnification: 1.044 + .030 * spring,
+        dispersion: (.00052 + .00014 * spring) * 660,
+        saturation: 1.055,
+        color: liquidGlassTint(context),
       ),
-      blur: lge.LiquidGlassBlur(
-          sigmaX: liquidGlassBlurSigma(context),
-          sigmaY: liquidGlassBlurSigma(context)),
-      distortion: .096 + .026 * spring,
-      distortionWidth: 32 + 7 * spring,
-      magnification: 1.044 + .030 * spring,
-      chromaticAberration: .00052 + .00014 * spring,
-      saturation: 1.055,
-      refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-      color: liquidGlassTint(context),
       child: saveContent,
     );
   }
@@ -622,10 +616,10 @@ class _ComposePageState extends State<ComposePage> {
             duringInteraction: _savePressed),
         backgroundWidget:
             ValoraGlassSceneBackground(child: RepaintBoundary(child: pageBody)),
-        children: [
+        child: Stack(children: [
           _buildComposeCancelGlass(cancelContent, safe, dark),
           _buildComposeSaveGlass(saveContent, safe, dark, saveWidth),
-        ],
+        ]),
       ),
     );
   }
@@ -1524,12 +1518,12 @@ class _WishEditorPageState extends State<WishEditorPage> {
     super.dispose();
   }
 
-  lge.LiquidGlass _buildWishSaveGlass(
+  Widget _buildWishSaveGlass(
       Widget saveContent, MediaQueryData media, double saveWidth, bool dark) {
     final spring = _wishSavePressed ? 1.0 : 0.0;
     final w = saveWidth * (1.0 + .038 * spring);
     final h = 58.0 * (1.0 + .038 * spring);
-    return lge.LiquidGlass(
+    return ValoraPositionedGlass(
       width: w,
       height: h,
       position: lge.LiquidGlassAlignPosition(
@@ -1537,28 +1531,25 @@ class _WishEditorPageState extends State<WishEditorPage> {
         margin:
             EdgeInsets.only(bottom: 16 + media.padding.bottom - (h - 58.0) / 2),
       ),
-      shape: lge.RoundedRectangleShape(
-        cornerRadius: 999,
-        borderWidth: 1.65 + .30 * spring,
-        borderColor: Colors.white.withOpacity(dark ? .30 : .66),
-        lightColor: Colors.white.withOpacity(dark ? .76 : .92),
-        lightIntensity: 1.55 + .34 * spring,
-        lightDirection: 132,
-        borderType: lge.OpticalBorder(
-            borderSaturation: 1.55 + .24 * spring,
-            ambientIntensity: 1.08 + .22 * spring,
-            borderSolidity: 0.0),
+      style: lge.LiquidGlassStyle(
+        shape: const lge.LiquidGlassShape.roundedRectangle(cornerRadius: 999),
+        specular: lge.LiquidGlassLight.specular(
+            thickness: (1.65 + .30 * spring) * 5.4,
+            intensity: 1.55 + .34 * spring,
+            angle: 132,
+            sharpness: 0),
+        glow: lge.LiquidGlassLight.glow(
+            thickness: (1.65 + .30 * spring) * 29.4,
+            intensity: 1.08 + .22 * spring,
+            angle: 222),
+        blur: liquidGlassBlurSigma(context),
+        refractionIndex: 1.0 + (.096 + .026 * spring) * .22,
+        refractionWidth: 32 + 7 * spring,
+        magnification: 1.044 + .030 * spring,
+        dispersion: (.00052 + .00014 * spring) * 660,
+        saturation: 1.055,
+        color: liquidGlassTint(context),
       ),
-      blur: lge.LiquidGlassBlur(
-          sigmaX: liquidGlassBlurSigma(context),
-          sigmaY: liquidGlassBlurSigma(context)),
-      distortion: .096 + .026 * spring,
-      distortionWidth: 32 + 7 * spring,
-      magnification: 1.044 + .030 * spring,
-      chromaticAberration: .00052 + .00014 * spring,
-      saturation: 1.055,
-      refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-      color: liquidGlassTint(context),
       child: saveContent,
     );
   }
@@ -1747,9 +1738,9 @@ class _WishEditorPageState extends State<WishEditorPage> {
             duringInteraction: _wishSavePressed),
         backgroundWidget:
             ValoraGlassSceneBackground(child: RepaintBoundary(child: pageBody)),
-        children: [
+        child: Stack(children: [
           _buildWishSaveGlass(saveContent, media, saveWidth, dark),
-        ],
+        ]),
       ),
     );
   }

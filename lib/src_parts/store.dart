@@ -571,6 +571,7 @@ void _ensurePersistedSettings(Map<String, dynamic> data) {
       'keepStickerCandidates',
       'homeMetaFontScale',
       'onboardingCompleted',
+      'welcomeCompleted',
       'cloudSync',
     ];
     data['settings'] = <String, dynamic>{
@@ -2382,10 +2383,15 @@ class AppStore extends ChangeNotifier {
           settings.includeRetiredInTotal || a.status != AssetStatus.retired)
       .fold(0, (sum, a) => sum + a.assetValue);
   double getAverageDailyCost() {
-    final list =
-        assets.where((a) => !a.isPriceless && a.includeInDailyCost).toList();
-    if (list.isEmpty) return 0;
-    return list.fold(0.0, (sum, a) => sum + a.dailyCost) / list.length;
+    var sum = 0.0;
+    var count = 0;
+    for (final a in assets) {
+      if (a.isPriceless || !a.includeInDailyCost) continue;
+      sum += a.dailyCost;
+      count++;
+    }
+    if (count == 0) return 0;
+    return sum / count;
   }
 
   int statusCount(AssetStatus status) =>
@@ -2404,6 +2410,9 @@ class AppStore extends ChangeNotifier {
         return false;
       if (taggedOnly && asset.tagIds.isEmpty) return false;
       if (targetedOnly && asset.targetMode == TargetMode.none) return false;
+      // 空查询是最常见的路径：旧行为等价于直接放行，跳过搜索域拼接避免
+      // 每次首页重建都为每个资产做分类/标签查找与字符串拼接。
+      if (q.isEmpty) return true;
       final haystack = [
         asset.name,
         asset.note,
@@ -2411,7 +2420,7 @@ class AppStore extends ChangeNotifier {
         if (asset.isPriceless) tr('store.pricelessKeywords'),
         ...asset.tagIds.map(tagName),
       ].join(' ').toLowerCase();
-      return q.isEmpty || haystack.contains(q);
+      return haystack.contains(q);
     }).toList();
     switch (sortMode) {
       case SortMode.dailyCost:
@@ -2478,14 +2487,14 @@ class AppStore extends ChangeNotifier {
 
   List<AssetLeakItem> walletLeaks({int limit = 4}) {
     final avg = getAverageDailyCost();
+    final idleKeyword = tr('store.tagIdle').toLowerCase();
     final rows = <AssetLeakItem>[];
     for (final asset in assets) {
       if (asset.isPriceless) continue;
       if (!asset.includeInDailyCost) continue;
       final isIdle = asset.status == AssetStatus.retired ||
-          asset.tagIds.any((id) => tagName(id)
-              .toLowerCase()
-              .contains(tr('store.tagIdle').toLowerCase()));
+          asset.tagIds
+              .any((id) => tagName(id).toLowerCase().contains(idleKeyword));
       final highDaily = avg > 0 && asset.dailyCost > avg * 1.35;
       final targetMiss = asset.targetMode != TargetMode.none &&
           asset.targetRatio < .55 &&
@@ -2713,12 +2722,12 @@ class AppStore extends ChangeNotifier {
       ));
     }
 
+    final idleKeyword = tr('store.tagIdle').toLowerCase();
     final idle = assets
         .where((a) =>
             a.status == AssetStatus.retired ||
-            a.tagIds.any((id) => tagName(id)
-                .toLowerCase()
-                .contains(tr('store.tagIdle').toLowerCase())))
+            a.tagIds
+                .any((id) => tagName(id).toLowerCase().contains(idleKeyword)))
         .length;
     if (idle > 0) {
       result.add(AssetInsight(

@@ -368,6 +368,39 @@ class _HeaderGlassPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actions = Row(mainAxisSize: MainAxisSize.min, children: [
+      ValoraMotionTrigger(
+          builder: (sourceContext) => InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => onSearch(sourceContext),
+              child: const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(Icons.search_rounded, size: 25)))),
+      ValoraMotionTrigger(
+          builder: (sourceContext) => InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => onFilter(sourceContext),
+              child: const SizedBox(
+                  width: 46,
+                  height: 48,
+                  child: Icon(Icons.keyboard_arrow_down_rounded, size: 28)))),
+    ]);
+    if (valoraUseSceneLiquidGlass(context)) {
+      return SizedBox(
+        width: 94,
+        height: 48,
+        child: ValoraGlassMaterial(
+          radius: 999,
+          blur: 3,
+          lite: Scrollable.maybeOf(context) != null,
+          tint: context.isDark
+              ? const Color(0x88253140)
+              : const Color(0xA3FFFFFF),
+          child: actions,
+        ),
+      );
+    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: BackdropFilter(
@@ -382,25 +415,7 @@ class _HeaderGlassPill extends StatelessWidget {
             border: Border.all(
                 color: Colors.white.withOpacity(context.isDark ? .12 : .76)),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            ValoraMotionTrigger(
-                builder: (sourceContext) => InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: () => onSearch(sourceContext),
-                    child: const SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: Icon(Icons.search_rounded, size: 25)))),
-            ValoraMotionTrigger(
-                builder: (sourceContext) => InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: () => onFilter(sourceContext),
-                    child: const SizedBox(
-                        width: 46,
-                        height: 48,
-                        child: Icon(Icons.keyboard_arrow_down_rounded,
-                            size: 28)))),
-          ]),
+          child: actions,
         ),
       ),
     );
@@ -2049,18 +2064,28 @@ class _AppSheetRoutePage extends StatelessWidget {
                   tag: motionTag ?? const ValoraMotionTag('sheet', ''),
                   enabled: motionTag != null,
                   destination: true,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: context.isDark
-                          ? kCardDark.withOpacity(.88)
-                          : Colors.white.withOpacity(.92),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                          color: Colors.white
-                              .withOpacity(context.isDark ? .12 : .72)),
-                      boxShadow: [softShadow(context)],
-                    ),
-                  ),
+                  child: valoraUseSceneLiquidGlass(context)
+                      ? ValoraGlassMaterial(
+                          radius: 30,
+                          lite: true,
+                          blur: 4,
+                          tint: context.isDark
+                              ? kCardDark.withOpacity(.88)
+                              : Colors.white.withOpacity(.88),
+                          child: const SizedBox.expand(),
+                        )
+                      : DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: context.isDark
+                                ? kCardDark.withOpacity(.88)
+                                : Colors.white.withOpacity(.92),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(
+                                color: Colors.white
+                                    .withOpacity(context.isDark ? .12 : .72)),
+                            boxShadow: [softShadow(context)],
+                          ),
+                        ),
                 ),
               ),
               if (animateContents)

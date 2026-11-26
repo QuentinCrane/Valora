@@ -319,7 +319,7 @@ class AssetDetailPage extends StatelessWidget {
 
     final safe = MediaQuery.paddingOf(context);
     final dark = context.isDark;
-    lge.LiquidGlass glassButton({
+    Widget glassButton({
       required double width,
       required double height,
       required Alignment alignment,
@@ -327,33 +327,28 @@ class AssetDetailPage extends StatelessWidget {
       required Widget child,
       required VoidCallback onTap,
     }) {
-      return lge.LiquidGlass(
+      return ValoraPositionedGlass(
         width: width,
         height: height,
         position:
             lge.LiquidGlassAlignPosition(alignment: alignment, margin: margin),
-        shape: lge.RoundedRectangleShape(
-          cornerRadius: 999,
-          borderWidth: 1.35,
-          borderColor: Colors.white.withOpacity(dark ? .28 : .66),
-          lightColor: Colors.white.withOpacity(dark ? .76 : .92),
-          lightIntensity: 1.52,
-          lightDirection: 132,
-          borderType: lge.OpticalBorder(
-              borderSaturation: 1.55,
-              ambientIntensity: 1.08,
-              borderSolidity: 0.0),
+        style: lge.LiquidGlassStyle(
+          shape: const lge.LiquidGlassShape.roundedRectangle(cornerRadius: 999),
+          specular: lge.LiquidGlassLight.specular(
+              thickness: (1.35) * 5.4,
+              intensity: 1.52,
+              angle: 132,
+              sharpness: 0),
+          glow: lge.LiquidGlassLight.glow(
+              thickness: (1.35) * 29.4, intensity: 1.08, angle: 222),
+          blur: liquidGlassBlurSigma(context),
+          refractionIndex: 1.0 + (.088) * .22,
+          refractionWidth: 28,
+          magnification: 1.040,
+          dispersion: (.00050) * 660,
+          saturation: 1.055,
+          color: liquidGlassTint(context),
         ),
-        blur: lge.LiquidGlassBlur(
-            sigmaX: liquidGlassBlurSigma(context),
-            sigmaY: liquidGlassBlurSigma(context)),
-        distortion: .088,
-        distortionWidth: 28,
-        magnification: 1.040,
-        chromaticAberration: .00050,
-        saturation: 1.055,
-        refractionMode: lge.LiquidGlassRefractionMode.shapeRefraction,
-        color: liquidGlassTint(context),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
@@ -373,7 +368,7 @@ class AssetDetailPage extends StatelessWidget {
         pixelRatio: liquidGlassCapturePixelRatio(context),
         backgroundWidget:
             ValoraGlassSceneBackground(child: RepaintBoundary(child: content)),
-        children: [
+        child: Stack(children: [
           glassButton(
             width: 92,
             height: 48,
@@ -426,7 +421,7 @@ class AssetDetailPage extends StatelessWidget {
                     ? Colors.white.withOpacity(.94)
                     : kText.withOpacity(.90)),
           ),
-        ],
+        ]),
       ),
     );
   }

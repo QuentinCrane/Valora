@@ -9,9 +9,9 @@ copyright and license notices required by the upstream packages.
 ## liquid_glass_easy
 
 - Package: `liquid_glass_easy`
-- Version used by Valora: `2.0.1`
+- Version used by Valora: `5.2.0`
 - Package page: https://pub.dev/packages/liquid_glass_easy
-- Purpose in Valora: real-time liquid glass visual effects, including background capture, shape-based refraction, blur, dynamic lens rendering, and Optical Border rim lighting.
+- Purpose in Valora: real-time liquid glass visual effects, including background capture, shape-based refraction, blur, dynamic lens rendering, and specular and glow rim lighting.
 - License: MIT
 - Copyright notice from the package license: Copyright (c) 2025 Ahmed Gamil
 - License source checked: https://pub.dev/packages/liquid_glass_easy/license
@@ -45,7 +45,7 @@ SOFTWARE.
 ## crypto
 
 - Package: `crypto`
-- Version used by Valora: `3.0.7`
+- Version used by Valora: `3.0.8`
 - Package page: https://pub.dev/packages/crypto
 - Purpose in Valora: SHA-256 hashing for archive integrity, release manifests,
   and provenance metadata.

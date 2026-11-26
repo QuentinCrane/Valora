@@ -1254,12 +1254,39 @@ class SettingSwitchRow extends StatelessWidget {
       iconBg: iconBg,
       label: label,
       description: description,
-      trailing: Switch(
-          value: value,
-          onChanged: (v) {
-            tapHaptic();
-            onChanged(v);
-          }),
+      trailing: context.getInheritedWidgetOfExactType<AppScope>() != null &&
+              valoraUseSceneLiquidGlass(context) &&
+              valoraMotionTier(context) == ValoraMotionTier.full
+          ? SizedBox(
+              width: 70,
+              height: 48,
+              child: Semantics(
+                container: true,
+                label: label,
+                toggled: value,
+                onTap: () => onChanged(!value),
+                child: ExcludeSemantics(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onChanged(!value),
+                    child: Center(
+                      child: lge.LiquidGlassSwitch(
+                        value: value,
+                        onChanged: onChanged,
+                        activeColor: kBrandStrong,
+                        pixelRatio: .75,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : Switch(
+              value: value,
+              onChanged: (v) {
+                tapHaptic();
+                onChanged(v);
+              }),
     );
   }
 }
@@ -1482,7 +1509,8 @@ class _SettingSliderRowState extends State<SettingSliderRow> {
         ]),
         Padding(
           padding: const EdgeInsets.only(left: 42, right: 2, top: 2),
-          child: Slider(
+          child: ValoraAdaptiveSlider(
+            semanticLabel: widget.label,
             value: _draftValue,
             onChanged: (next) {
               if ((next - _draftValue).abs() <= .005) return;
@@ -2796,55 +2824,59 @@ class _BackupManagerState extends State<BackupManager> {
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
-      builder: (sheetContext) => Semantics(
-        container: true,
-        scopesRoute: true,
-        label: tr('destructive.snapshotPreview'),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(tr('destructive.snapshotPreview'),
-                style: const TextStyle(
-                    fontSize: 19, fontWeight: FontWeight.normal)),
-            const SizedBox(height: 6),
-            Text(record.label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: kMuted)),
-            const SizedBox(height: 16),
-            if (!preview.isValid)
-              Text(tr('destructive.snapshotInvalid'),
-                  style: const TextStyle(color: kMuted))
-            else
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _previewPill(tr('compose.asset'), preview.assets),
-                  _previewPill(tr('compose.wish'), preview.wishes),
-                  _previewPill(tr('compose.category'), preview.categories),
-                  _previewPill(tr('compose.tags'), preview.tags),
-                  _previewPill(
-                      tr('home.valueRecovery'), preview.recoveryRecords),
-                ],
-              ),
-            const SizedBox(height: 18),
-            Row(children: [
-              Expanded(
-                  child: OutlinedButton(
-                      onPressed: () => Navigator.pop(sheetContext, false),
-                      child: Text(tr('common.cancel')))),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: FilledButton(
-                      onPressed: preview.isValid
-                          ? () => Navigator.pop(sheetContext, true)
-                          : null,
-                      child: Text(tl('恢复快照')))),
-            ]),
-          ]),
-        ),
-      ),
+      backgroundColor:
+          valoraUseSceneLiquidGlass(context) ? Colors.transparent : null,
+      builder: (sheetContext) => ValoraGlassSheetSurface(
+          radius: 28,
+          child: Semantics(
+            container: true,
+            scopesRoute: true,
+            label: tr('destructive.snapshotPreview'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(tr('destructive.snapshotPreview'),
+                    style: const TextStyle(
+                        fontSize: 19, fontWeight: FontWeight.normal)),
+                const SizedBox(height: 6),
+                Text(record.label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: kMuted)),
+                const SizedBox(height: 16),
+                if (!preview.isValid)
+                  Text(tr('destructive.snapshotInvalid'),
+                      style: const TextStyle(color: kMuted))
+                else
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _previewPill(tr('compose.asset'), preview.assets),
+                      _previewPill(tr('compose.wish'), preview.wishes),
+                      _previewPill(tr('compose.category'), preview.categories),
+                      _previewPill(tr('compose.tags'), preview.tags),
+                      _previewPill(
+                          tr('home.valueRecovery'), preview.recoveryRecords),
+                    ],
+                  ),
+                const SizedBox(height: 18),
+                Row(children: [
+                  Expanded(
+                      child: OutlinedButton(
+                          onPressed: () => Navigator.pop(sheetContext, false),
+                          child: Text(tr('common.cancel')))),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: FilledButton(
+                          onPressed: preview.isValid
+                              ? () => Navigator.pop(sheetContext, true)
+                              : null,
+                          child: Text(tl('恢复快照')))),
+                ]),
+              ]),
+            ),
+          )),
     );
     if (restore == true && mounted) await restoreSnapshot(record);
   }
@@ -3840,135 +3872,133 @@ class _TutorialBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = context.isDark;
     final isLast = index >= total - 1;
+    final glass = valoraUseSceneLiquidGlass(context);
     final media = MediaQuery.of(context);
     final maxBubbleHeight = math.min(372.0,
         media.size.height - media.padding.top - media.padding.bottom - 36);
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: math.max(220.0, maxBubbleHeight)),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 15, 16, 14),
-              decoration: BoxDecoration(
-                color: dark
-                    ? kCardDark.withOpacity(.92)
-                    : Colors.white.withOpacity(.94),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                    color: dark
-                        ? Colors.white.withOpacity(.10)
-                        : Colors.white.withOpacity(.75)),
-                boxShadow: [softShadow(context)],
-              ),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                            color: step.color.withOpacity(dark ? .22 : .28),
-                            borderRadius: BorderRadius.circular(16)),
-                        child: Icon(step.icon,
-                            color: dark
-                                ? Colors.white.withOpacity(.92)
-                                : kBrandInk,
-                            size: 23),
-                      ),
-                      const SizedBox(width: 11),
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Text(
-                                tlf('第 {index} / {total} 步', {
-                                  'index': '${index + 1}',
-                                  'total': '$total',
-                                }),
-                                style: const TextStyle(
-                                    color: kMuted, fontSize: 12, height: 1.1)),
-                            const SizedBox(height: 4),
-                            Text(tl(step.title),
-                                style: TextStyle(
-                                    fontSize: 18,
-                                    height: 1.12,
-                                    fontWeight: FontWeight.normal,
-                                    letterSpacing: -.25,
-                                    color: dark
-                                        ? Colors.white.withOpacity(.94)
-                                        : kText)),
-                          ])),
-                      TextButton(onPressed: onSkip, child: Text(tl('跳过'))),
-                    ]),
-                    const SizedBox(height: 12),
-                    Text(tl(step.subtitle),
+      child: ValoraGlassBackdrop(
+        radius: 28,
+        blur: 18,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 15, 16, 14),
+            decoration: BoxDecoration(
+              color: dark
+                  ? kCardDark.withOpacity(glass ? .78 : .92)
+                  : Colors.white.withOpacity(glass ? .78 : .94),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                  color: dark
+                      ? Colors.white.withOpacity(.10)
+                      : Colors.white.withOpacity(.75)),
+              boxShadow: [softShadow(context)],
+            ),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                          color: step.color.withOpacity(dark ? .22 : .28),
+                          borderRadius: BorderRadius.circular(16)),
+                      child: Icon(step.icon,
+                          color:
+                              dark ? Colors.white.withOpacity(.92) : kBrandInk,
+                          size: 23),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text(
+                              tlf('第 {index} / {total} 步', {
+                                'index': '${index + 1}',
+                                'total': '$total',
+                              }),
+                              style: const TextStyle(
+                                  color: kMuted, fontSize: 12, height: 1.1)),
+                          const SizedBox(height: 4),
+                          Text(tl(step.title),
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  height: 1.12,
+                                  fontWeight: FontWeight.normal,
+                                  letterSpacing: -.25,
+                                  color: dark
+                                      ? Colors.white.withOpacity(.94)
+                                      : kText)),
+                        ])),
+                    TextButton(onPressed: onSkip, child: Text(tl('跳过'))),
+                  ]),
+                  const SizedBox(height: 12),
+                  Text(tl(step.subtitle),
+                      style: TextStyle(
+                          color: dark
+                              ? Colors.white.withOpacity(.79)
+                              : kText.withOpacity(.77),
+                          fontSize: 13.2,
+                          height: 1.45,
+                          fontWeight: FontWeight.normal)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                        color: step.color.withOpacity(dark ? .13 : .15),
+                        borderRadius: BorderRadius.circular(18)),
+                    child: Text(tl(step.hint),
                         style: TextStyle(
                             color: dark
                                 ? Colors.white.withOpacity(.79)
-                                : kText.withOpacity(.77),
-                            fontSize: 13.2,
-                            height: 1.45,
-                            fontWeight: FontWeight.normal)),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                          color: step.color.withOpacity(dark ? .13 : .15),
-                          borderRadius: BorderRadius.circular(18)),
-                      child: Text(tl(step.hint),
-                          style: TextStyle(
-                              color: dark
-                                  ? Colors.white.withOpacity(.79)
-                                  : const Color(0xFF315168),
-                              fontSize: 12.2,
-                              height: 1.42)),
-                    ),
-                    const SizedBox(height: 13),
-                    Row(
-                        children: List.generate(total, (i) {
-                      final active = i == index;
-                      return Expanded(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          height: 4,
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          decoration: BoxDecoration(
-                            color: active
-                                ? step.color
-                                : (dark
-                                    ? Colors.white12
-                                    : const Color(0xFFE7EEF5)),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
+                                : const Color(0xFF315168),
+                            fontSize: 12.2,
+                            height: 1.42)),
+                  ),
+                  const SizedBox(height: 13),
+                  Row(
+                      children: List.generate(total, (i) {
+                    final active = i == index;
+                    return Expanded(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        height: 4,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: active
+                              ? step.color
+                              : (dark
+                                  ? Colors.white12
+                                  : const Color(0xFFE7EEF5)),
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                      );
-                    })),
-                    const SizedBox(height: 13),
-                    Row(children: [
-                      Expanded(
-                          child: OutlinedButton.icon(
-                              onPressed: onPrevious,
-                              icon: const Icon(Icons.chevron_left_rounded),
-                              label: Text(tl('上一步')))),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: FilledButton.icon(
-                              onPressed: onNext,
-                              icon: Icon(isLast
-                                  ? Icons.check_rounded
-                                  : Icons.chevron_right_rounded),
-                              label: Text(isLast ? tl('完成教程') : tl('下一步')))),
-                    ]),
+                      ),
+                    );
+                  })),
+                  const SizedBox(height: 13),
+                  Row(children: [
+                    Expanded(
+                        child: OutlinedButton.icon(
+                            onPressed: onPrevious,
+                            icon: const Icon(Icons.chevron_left_rounded),
+                            label: Text(tl('上一步')))),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: FilledButton.icon(
+                            onPressed: onNext,
+                            icon: Icon(isLast
+                                ? Icons.check_rounded
+                                : Icons.chevron_right_rounded),
+                            label: Text(isLast ? tl('完成教程') : tl('下一步')))),
                   ]),
-            ),
+                ]),
           ),
         ),
       ),
