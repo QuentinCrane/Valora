@@ -1135,7 +1135,10 @@ class AppSettings {
             .clamp(0.82, 1.12)
             .toDouble(),
         onboardingCompleted: map['onboardingCompleted'] == true,
-        welcomeCompleted: map['welcomeCompleted'] == true,
+        // Existing saved settings predate the welcome flow. Treat the missing
+        // flag as completed; a new install uses the constructor's false default.
+        welcomeCompleted: !map.containsKey('welcomeCompleted') ||
+            map['welcomeCompleted'] == true,
         cloudSync: CloudSyncSettings.fromMap(map['cloudSync'] is Map
             ? Map<String, dynamic>.from(map['cloudSync'])
             : null),

@@ -18,8 +18,12 @@ const double kRadiusMd = 20;
 const double kRadiusLg = 28;
 const double kPagePad = 10;
 
-String localizedAppName(Locale locale) =>
-    _localeKey(locale) == 'en' ? tr('app.name.en') : tr('app.name');
+String localizedAppName(Locale locale) {
+  final key = _localeKey(locale);
+  if (key == 'en') return 'Valora';
+  if (key == 'zh_Hant') return '值譜';
+  return '值谱';
+}
 
 Locale currentPlatformLocale() {
   final locales = WidgetsBinding.instance.platformDispatcher.locales;
@@ -96,10 +100,8 @@ class _ValoraAppState extends State<ValoraApp> {
   }
 
   bool shouldShowWelcomeFlow(StorageLoadResult loadResult) {
-    // Fresh installs only: a healthy empty store plus a never-completed
-    // welcome flow. Upgraded users keep data, so they never see it; users who
-    // cleared all data already have welcomeCompleted set, so they do not see
-    // it again either.
+    // Fresh installs have an unset completion flag; saved settings from older
+    // versions are migrated as completed, including stores with no assets.
     return !store.settings.welcomeCompleted &&
         !loadResult.isFailure &&
         store.assets.isEmpty &&

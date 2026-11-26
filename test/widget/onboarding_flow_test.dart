@@ -183,4 +183,25 @@ void main() {
     expect(find.byType(OnboardingFlowPage), findsNothing);
     expect(find.byType(ShellPage), findsOneWidget);
   });
+
+  testWidgets('upgraded users with an empty store skip the welcome flow',
+      (tester) async {
+    usePhoneSurface(tester);
+    persistedJson = jsonEncode({
+      'storageSchemaVersion': 1,
+      'settings': <String, dynamic>{},
+      'categories': <Map<String, dynamic>>[],
+      'tags': <Map<String, dynamic>>[],
+      'assets': <Map<String, dynamic>>[],
+      'wishes': <Map<String, dynamic>>[],
+    });
+
+    await tester.pumpWidget(const ValoraApp());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(OnboardingFlowPage), findsNothing);
+    expect(find.byType(ShellPage), findsOneWidget);
+  });
 }
